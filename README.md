@@ -10,20 +10,28 @@ AI 不预测个股。这是硬约束，不是选项。
 事实层  数据系统        PIT · T+1 · 覆盖率分年核查（可证伪）
 ```
 
+## 开始
+
+新用户直接走 [一键部署](docs/一键部署.md)。接入 AI API 后，数据源、配置、验证全交给 AI 向导，不必读本页其余内容。
+
 ## 接入 DeepSeek API
 
 接入 API 后，语言模型接管驱动层。控制、挖因子、审计、魔改，全部解锁。不接入，则只有写死引擎，没有 AI。
+
+**前提**：完整包（zip）已内置 HARNESS 运行时；单文件（exe）不含 HARNESS，AI 控制台不可用。系统需 Node.js 18+（https://nodejs.org），无则 HARNESS 自动跳过、量化系统照常。
+
+**最快方式**：双击 `接入API.cmd`，粘贴 Key，自动写入并验证。
 
 ```bash
 # 1. 获取 Key
 #    https://platform.deepseek.com/api_keys
 
-# 2. 复制凭据模板，填入 Key
+# 2. 复制凭据模板，填入 Key（或直接用接入API.cmd）
 copy harness\home\.credentials.yaml.example harness\home\.credentials.yaml
 #    编辑 .credentials.yaml：
-#    DEEPSEEK_API_KEY: sk-xxxxxxxxxxxxxxxx
+#    DEEPSEEK_API_KEY: sk-<your-key>
 
-# 3. 启动，打开控制页
+# 3. 启动（打印「启动 DeepSeek HARNESS」即集成成功）
 python launcher.py
 #    http://127.0.0.1:8787/control
 ```
@@ -85,15 +93,19 @@ python launcher.py
 ```bash
 # 源码
 pip install -r requirements.txt
-python scripts/build_demo_db.py      # 生成演示数据
+python data/demo/build_demo_db.py    # 生成演示数据
 python launcher.py                   # deck:8787 + HARNESS:3080
 
 # 单文件
 QuantDeck.exe                        # 双击即用，自动开浏览器
 
 # 完整包
-DSHQuant-v1.0.8-Release.zip          # 解压即用，含 HARNESS 运行时
+DSHQuant-v1.0.9-Release.zip          # 解压即用，含 HARNESS 运行时
 ```
+
+> **下载注意**：从 Release 页 **Assets 区**下载 `DSHQuant-v1.0.9-Release.zip`（完整包，含 HARNESS 运行时）。
+> **不要**下载页面底部的 "Source code (zip)" —— 那是源码包，harness/node_modules 被排除，没有 AI 控制台。
+> 判断：解压后 `harness\node_modules` 文件夹存在 = 完整包；不存在 = 下错了。
 
 运行要求：Python 3.10+（源码）/ 无（exe）。HARNESS 控制台需 Node.js 18+（可选）。
 
@@ -111,6 +123,6 @@ MIT。仅供研究学习。不构成投资建议。
 
 ## 文档
 
-[资产盘点](docs/资产盘点.md) · [架构说明](docs/架构.md) · [快速开始](docs/快速开始.md) · [HARNESS 接入](docs/HARNESS接入.md) · [数据说明](docs/数据说明.md) · [分钟数据接入](docs/分钟数据接入说明.md)
+[资产盘点](docs/资产盘点.md) · [架构说明](docs/架构.md) · [一键部署](docs/一键部署.md) · [快速开始](docs/快速开始.md) · [HARNESS 接入](docs/HARNESS接入.md) · [数据说明](docs/数据说明.md) · [分钟数据接入](docs/分钟数据接入说明.md)
 
 更新机制：`scripts/update.py`（manifest 驱动，用户配置保护，应用前自动备份）。

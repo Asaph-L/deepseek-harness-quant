@@ -682,17 +682,7 @@ def live_alerts() -> dict:
                                "code": a.get("code")})
         except Exception:
             pass
-    # 2) 止损预警
-    _sa = _latest("stop_alerts_*.json", "logs")
-    if _sa:
-        try:
-            sa = json.loads(_sa.read_text(encoding="utf-8"))
-            for c in (sa.get("triggered") or []):
-                alerts.append({"level": "high", "cat": "止损", "msg": f"{c} 已触发止损", "code": c})
-            for c in (sa.get("near") or []):
-                alerts.append({"level": "mid", "cat": "止损", "msg": f"{c} 接近止损位", "code": c})
-        except Exception:
-            pass
+    # ★2026-08-16 止损预警条整体删除（已触发/接近，用户要求）
     # 3) 择时不适合
     _tm = _latest("timing_system_*.json", "output")
     if _tm:
@@ -996,7 +986,7 @@ def live_funnel() -> dict:
         import glob as _gf
         _mf = sorted(_gf.glob(str(BASE / "logs" / "factor_manifest*.json")), key=_os.path.getmtime)
         if not _mf:
-            _mf = sorted(_gf.glob(r"<home>\Desktop\量化代码库思路库\因子池\output\factor_manifest_*.json"),
+            _mf = sorted(_gf.glob(r"data\factorpool\output\factor_manifest_*.json"),
                          key=_os.path.getmtime)
         if _mf:
             _md = json.load(open(_mf[-1], encoding="utf-8"))
@@ -1034,7 +1024,7 @@ def live_turnlow_top(top_n: int = 20) -> dict:
     import glob as _g
     import os as _os
     import sqlite3 as _sq
-    fs = sorted(_g.glob(r"<home>\Desktop\量化代码库思路库\因子池\output\daily_scores\daily_*.csv"),
+    fs = sorted(_g.glob(r"data\factorpool\output\daily_scores\daily_*.csv"),
                 key=os.path.getmtime)
     if not fs:
         return {"ok": False, "error": "无 daily_scores 文件"}
@@ -1349,72 +1339,8 @@ def live_brief() -> dict:
                               "msg": "当前所有有实盘样本的类型均处降权/观察——宁缺毋滥，仅质量折价等新样本类型可审"})
     except Exception:
         pass
-    # 2) 待审批
-    _dc = _latest("deck_decisions_*.json", "logs")
-    decided = set()
-    if _dc:
-        try:
-            decs = json.loads(_dc.read_text(encoding="utf-8"))
-            if isinstance(decs, list):
-                decided = {r.get("code") for r in decs if r.get("action") in ("buy", "drop")}
-        except Exception:
-            pass
-    n_pending = 0
-    for pat, sub in (("pitch_v2_*.json", "pitch"), ("tech_pitch_*.json", "entries")):
-        _f = _latest(pat, "logs")
-        if not _f:
-            continue
-        try:
-            d = json.loads(_f.read_text(encoding="utf-8"))
-            n_pending += sum(1 for p in d.get(sub, []) if p.get("code") not in decided)
-        except Exception:
-            pass
-    if n_pending:
-        items.append({"cat": "待审批", "level": "mid", "msg": f"{n_pending} 只 Pitch 候选待审批"})
-    # 3) 止损预警
-    _sa = _latest("stop_alerts_*.json", "logs")
-    n_near = n_trig = 0
-    if _sa:
-        try:
-            sa = json.loads(_sa.read_text(encoding="utf-8"))
-            for e in sa.get("entries", []):
-                if e.get("status") == "TRIGGERED":
-                    n_trig += 1
-                elif e.get("status") == "NEAR":
-                    n_near += 1
-        except Exception:
-            pass
-    if n_trig:
-        # ★2026-08-15 可读性：区分"人工持仓"与"机器池/远期池自动管理"（机器池止损自动执行无需人工，
-        #   混在一起提示会让用户误以为持仓触发）
-        _held_codes = set()
-        try:
-            _pf = _latest("portfolio_*.json", "logs") or _latest("portfolio.json", "logs")
-            if _pf:
-                _pd = json.loads(_pf.read_text(encoding="utf-8"))
-                for _p in (_pd.get("positions") or []):
-                    if _p.get("status") == "holding":
-                        _held_codes.add(_p.get("code"))
-        except Exception:
-            pass
-        _trig_codes = set()
-        if _sa:
-            try:
-                for e in json.loads(_sa.read_text(encoding="utf-8")).get("entries", []):
-                    if e.get("status") == "TRIGGERED" and e.get("code"):
-                        _trig_codes.add(e.get("code"))
-            except Exception:
-                pass
-        _n_held_trig = len(_trig_codes & _held_codes)
-        _n_pool_trig = len(_trig_codes - _held_codes)
-        msg = f"{n_trig} 只已触发止损"
-        if _n_held_trig:
-            msg += f"（持仓 {_n_held_trig} 只需处理）"
-        if _n_pool_trig:
-            msg += f"（机器池/远期池 {_n_pool_trig} 只自动离场）"
-        items.append({"cat": "止损", "level": "high", "msg": msg + "！"})
-    if n_near:
-        items.append({"cat": "止损", "level": "mid", "msg": f"{n_near} 只接近止损位（MA20 失守关注）"})
+    # ★2026-08-16「待审批」提示卡片整体删除（用户要求，与止损条同处理）
+    # ★2026-08-16 止损提示条整体删除（含已触发/接近止损，用户要求）
     # 4) 止盈
     _tp = _latest("take_profit_signals_*.json", "logs")
     n_tp = 0

@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>Deepseek HARNESS Quant · 控制</title>
+<meta http-equiv="Cache-Control" content="no-store">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="/v2/assets/ui_common.css">
 <link rel="stylesheet" href="/v2/assets/anim_common.css">
@@ -18,14 +19,14 @@
   .hz-kv b { color:#d4d4d8; font-weight:600; text-align:right; }
   .dot-live { display:inline-block; width:9px; height:9px; border-radius:50%; background:#4ade80; box-shadow:0 0 8px rgba(74,222,128,.8); animation:pulse-dot 2s infinite; }
   @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:.45} }
-  /* ★2026-08-15 HARNESS 原生聊天组件（整体嵌入，量化 Linear 风格；替代 iframe 映射） */
+  /* HARNESS 原生聊天组件（自绘 · 量化 Linear 风格） */
   .hz-chat-native { display:flex; height:62vh; background:#0f0f12;
     border:1px solid #2a2a30; border-radius:10px; overflow:hidden; }
-  /* ★2026-08-15 会话分类菜单（左侧） */
+  /* 会话分类菜单（左侧） */
   .hz-sess-panel { width:232px; flex-shrink:0; border-right:1px solid #2a2a30; background:#111114;
     display:flex; flex-direction:column; overflow:hidden; }
   .hz-sess-head { padding:10px 12px; font-size:12px; font-weight:700; color:#d4d4d8;
-    border-bottom:1px solid #2a2a30; letter-spacing:.5px; }
+    border-bottom:1px solid #2a2a30; letter-spacing:.5px; display:flex; align-items:center; justify-content:space-between; }
   .hz-sess-list { flex:1; overflow-y:auto; padding:6px; }
   .hz-sess-item { padding:8px 10px; border-radius:8px; cursor:pointer; margin-bottom:2px;
     border:1px solid transparent; transition:background .15s; }
@@ -34,7 +35,13 @@
   .hz-sess-item .t { font-size:12px; font-weight:600; color:#e4e4e7; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .hz-sess-item .p { font-size:11px; color:#71717a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
   .hz-sess-item .cur { font-size:10px; color:#4ade80; }
-  /* ★2026-08-15 会话分类：主系统 + 主观·牛散（Pitch 选股） */
+  /* ★2026-08-16 删除对话按钮（hover 显示，仅非当前会话可删） */
+  .hz-sess-del { position:absolute; right:8px; top:8px; display:none; width:18px; height:18px; border-radius:50%;
+    border:1px solid #3a3a44; background:#1c1c22; color:#a1a1aa; font-size:11px; line-height:1; cursor:pointer;
+    align-items:center; justify-content:center; }
+  .hz-sess-item { position:relative; }
+  .hz-sess-item:hover .hz-sess-del { display:flex; }
+  .hz-sess-del:hover { color:#fff; border-color:#ef4444; background:rgba(239,68,68,.25); }
   .hz-sess-cat { padding:10px 12px 4px; font-size:11px; color:#52525b; letter-spacing:1px; text-transform:uppercase; }
   .hz-sess-item .tag { display:inline-block; font-size:10px; color:#a78bfa; background:rgba(167,139,250,.12);
     border:1px solid rgba(167,139,250,.3); border-radius:4px; padding:0 5px; margin-left:6px; vertical-align:1px; font-weight:500; }
@@ -57,20 +64,90 @@
   .hz-input-row input:focus { border-color:var(--navy2); }
   .hz-session-bar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:8px; font-size:12px; color:var(--muted); }
   .hz-session-bar select { background:#131316; color:#d4d4d8; border:1px solid #2a2a30; border-radius:6px; padding:3px 8px; font-size:12px; }
+  /* ★2026-08-16 会话筛选 + 导入按钮 + 导入弹层 */
+  .hz-import-btn { width:32px; height:32px; border-radius:50%; border:1px solid rgba(255,255,255,.22);
+    background:linear-gradient(135deg,#5e6ad2,#8b5cf6); color:#fff; font-size:19px; font-weight:700; line-height:1;
+    cursor:pointer; display:flex; align-items:center; justify-content:center; user-select:none;
+    box-shadow:0 2px 12px rgba(94,106,210,.45); transition:all .15s; }
+  .hz-import-btn:hover { transform:translateY(-1px) scale(1.08); box-shadow:0 5px 18px rgba(139,92,246,.6); }
+  .hz-import-btn:active { transform:scale(.96); }
+  .hz-sess-filter { margin:6px 8px; padding:6px 10px; background:#0f0f12; border:1px solid #2a2a30; border-radius:8px;
+    color:#f4f4f5; font-size:12px; outline:none; width:calc(100% - 20px); box-sizing:border-box; }
+  .hz-sess-filter:focus { border-color:#5e6ad2; }
+  .hz-sess-filter::placeholder { color:#52525b; }
+  /* ★2026-08-16 批量删除工具栏 + 复选框 + 锁死标记 */
+  .hz-bulk-bar { display:flex; align-items:center; gap:6px; padding:0 8px 6px; }
+  .hz-bulk-btn { flex:1; font-size:11px; padding:4px 0; border-radius:6px; border:1px solid #3a3a44; background:#1c1c22;
+    color:#a1a1aa; cursor:pointer; white-space:nowrap; }
+  .hz-bulk-btn:hover { border-color:#5e6ad2; color:#fff; }
+  .hz-bulk-btn.danger { border-color:rgba(239,68,68,.35); color:#f87171; }
+  .hz-bulk-btn.danger:hover { background:rgba(239,68,68,.15); border-color:#ef4444; }
+  .hz-sess-ck { width:14px; height:14px; margin-right:8px; vertical-align:-2px; accent-color:#5e6ad2; cursor:pointer; flex-shrink:0; }
+  .hz-sess-item .trow { display:flex; align-items:center; }
+  .hz-sess-item .trow .tt { flex:1; min-width:0; }
+  .hz-lock { margin-left:4px; color:#52525b; font-size:10px; }
+  .hz-lock.unlockable { cursor:pointer; color:#71717a; }
+  .hz-lock.unlockable:hover { color:#f2c94c; }
+  .hz-lock.core { cursor:not-allowed; }
+  .hz-modal-mask { position:fixed; inset:0; background:rgba(5,6,10,.62); z-index:999; display:none;
+    align-items:center; justify-content:center; }
+  .hz-modal { width:540px; max-width:92vw; max-height:78vh; background:#131316; border:1px solid #2a2a30; border-radius:12px;
+    display:flex; flex-direction:column; overflow:hidden; box-shadow:0 18px 48px rgba(0,0,0,.55); }
+  .hz-modal-head { padding:12px 16px; font-size:14px; font-weight:700; color:#e4e4e7; border-bottom:1px solid #2a2a30;
+    display:flex; justify-content:space-between; align-items:center; }
+  .hz-modal-close { cursor:pointer; color:#71717a; font-size:18px; padding:0 4px; }
+  .hz-modal-close:hover { color:#fff; }
+  .hz-modal-tabs { display:flex; gap:2px; padding:12px 12px 0; }
+  .hz-modal-tab { padding:6px 14px; font-size:12px; color:#a1a1aa; cursor:pointer; border-bottom:2px solid transparent; }
+  .hz-modal-tab.on { color:#e4e4e7; border-bottom-color:#5e6ad2; font-weight:600; }
+  .hz-modal-body { flex:1; overflow-y:auto; padding:10px 12px 14px; min-height:180px; }
+  .hz-import-item { display:flex; align-items:center; gap:10px; padding:9px 12px; border:1px solid transparent; border-radius:8px; margin-bottom:4px; }
+  .hz-import-item:hover { background:#16161a; }
+  .hz-import-item .nm { font-size:12.5px; font-weight:600; color:#e4e4e7; font-family:monospace; white-space:nowrap; }
+  .hz-import-item .ds { font-size:11px; color:#71717a; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .hz-import-item .go { font-size:11px; padding:3px 12px; border-radius:6px; border:1px solid #3a3a44; background:#1c1c22;
+    color:#a1a1aa; cursor:pointer; white-space:nowrap; }
+  .hz-import-item .go:hover { border-color:#5e6ad2; color:#fff; background:rgba(94,106,210,.2); }
+  .hz-import-item.done { opacity:.55; }
+  .hz-import-item.done .go { color:#4ade80; border-color:rgba(74,222,128,.4); pointer-events:none; }
+  .hz-import-note { font-size:11px; color:#52525b; padding:4px 2px 8px; line-height:1.7; }
+  /* ★2026-08-16 显眼的「打开完整 GUI」按钮 + 连接状态徽章 */
+  .hz-open-gui { display:inline-flex; align-items:center; gap:6px; padding:7px 16px; border-radius:8px; font-size:13px; font-weight:700;
+    color:#fff; background:linear-gradient(120deg,#5e6ad2,#8b5cf6); border:1px solid rgba(255,255,255,.18); text-decoration:none;
+    box-shadow:0 2px 10px rgba(94,106,210,.35); transition:all .15s; white-space:nowrap; }
+  .hz-open-gui:hover { transform:translateY(-1px); box-shadow:0 4px 16px rgba(94,106,210,.5); }
+  .hz-conn-badge { display:inline-flex; align-items:center; gap:6px; font-size:11.5px; padding:4px 10px; border-radius:999px;
+    border:1px solid #2a2a30; background:#131316; color:#a1a1aa; white-space:nowrap; }
+  .hz-conn-badge .st-dot { width:8px; height:8px; border-radius:50%; }
+  .hz-conn-badge.ok .st-dot { background:#4ade80; box-shadow:0 0 6px rgba(74,222,128,.7); }
+  .hz-conn-badge.retry .st-dot { background:#f2c94c; box-shadow:0 0 6px rgba(242,201,76,.7); animation:pulse-dot 1.2s infinite; }
+  .hz-conn-badge.down .st-dot { background:#ef4444; box-shadow:0 0 6px rgba(239,68,68,.7); }
 </style>
 </head>
 <body style="background:var(--bg);margin:0">
 <div id="sidebar"></div>
 <div class="v2-wrap">
   <div class="v2-h"><span class="bar"></span><h1>控制</h1><span class="sub">DeepSeek HARNESS · 对话 · 状态 · 自主推进</span></div>
-  <div class="mini" style="opacity:.7">Deepseek harness 组件 · 量化系统 ←→ HARNESS 对话直连 · 30s 状态刷新</div>
+  <div class="mini" style="opacity:.7">量化系统 ←→ HARNESS 对话直连（自动重连） · 完整 GUI 一键弹出 · 30s 状态刷新</div>
 
-  <!-- ★2026-08-15 对话区：DeepSeek HARNESS 原生聊天（整体嵌入，直连 /quant/chat 真实会话，非 iframe） -->
+  <!-- ★2026-08-16 对话区：自绘聊天（健壮连接：超时 + 指数退避重试 + 自动重连） -->
   <div class="v2-card anim-fade-in-up" style="margin-top:12px;padding:14px 16px">
-    <h2> DeepSeek HARNESS · 对话 <span class="tag">原生直连 · 真实会话 · 发「1」触发自主推进</span></h2>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <h2 style="margin:0;flex:1"> DeepSeek HARNESS · 对话 <span class="tag">原生直连 · 发「1」触发自主推进</span></h2>
+      <span class="hz-conn-badge" id="hz-conn-badge"><span class="st-dot"></span><span id="hz-conn-txt">连接中…</span></span>
+      <button id="hz-import-btn" class="hz-import-btn" title="导入 Skill / Agent 预设">+</button>
+      <a class="hz-open-gui" href="http://127.0.0.1:3080" target="_blank" rel="noopener">打开完整 GUI ↗</a>
+    </div>
     <div class="hz-chat-native">
       <div class="hz-sess-panel">
-        <div class="hz-sess-head">会话</div>
+        <div class="hz-sess-head"><span>会话</span></div>
+        <input id="hz-sess-filter" class="hz-sess-filter" placeholder="筛选会话（标题/内容）…">
+        <div class="hz-bulk-bar">
+          <button id="hz-ck-all" class="hz-bulk-btn" title="全选可删除会话">全选</button>
+          <button id="hz-del-sel" class="hz-bulk-btn" title="删除选中的对话">删除所选</button>
+          <button id="hz-clear-all" class="hz-bulk-btn danger" title="清空所有未锁定的对话">一键清空</button>
+          <button id="hz-restore" class="hz-bulk-btn" title="恢复本面板隐藏的所有对话（不影响 GUI）">恢复</button>
+        </div>
         <div class="hz-sess-list" id="hz-sess-list"><div class="hz-msg sys" style="padding:8px">加载会话…</div></div>
       </div>
       <div class="hz-chat-col">
@@ -113,14 +190,15 @@
   <div class="v2-card anim-fade-in-up d1" style="margin-top:14px">
     <h2> 快速操作与架构</h2>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
-      <a class="v2-btn" href="http://127.0.0.1:3080" target="_blank" rel="noopener" style="text-decoration:none">独立窗口打开 HARNESS ↗</a>
+      <a class="hz-open-gui" href="http://127.0.0.1:3080" target="_blank" rel="noopener">打开完整 GUI ↗</a>
       <a class="v2-btn" href="/" style="text-decoration:none">返回量化门户</a>
       <button id="hz-refresh" class="v2-btn">刷新状态</button>
     </div>
     <div class="mini" style="margin-top:10px;line-height:1.9;color:var(--muted)">
-      <b style="color:var(--navy)">DeepSeek HARNESS</b>（本 agent · :3080）＝ 量化系统的<b>审计/控制/协作层</b>；
+      <b style="color:var(--navy)">DeepSeek HARNESS</b>（:3080）＝ 量化系统的<b>审计/控制/协作层</b>；
       <b style="color:var(--navy)">量化系统</b>（:8787）＝ 生产执行层（决策链 L0/L2/L1、持仓、因子、管道）。<br>
-      协作方：因子池（研究员）· AlphaGPT（自动因子挖掘，科研）。状态快照 <span style="font-family:monospace">output/harness_state.json</span>。
+      对话直连 :3080（8s 超时 + 指数退避自动重连，掉线自动恢复）；状态快照 <span style="font-family:monospace">output/harness_state.json</span> 30s 刷新。
+      协作方：factor_pool（研究员）· AlphaGPT（自动因子挖掘，科研）。
     </div>
   </div>
 
@@ -128,6 +206,19 @@
   <div class="v2-card anim-fade-in-up d1" style="margin-top:14px">
     <h2> HARNESS 文档资产</h2>
     <div id="hz-docs" class="mini" style="line-height:2"> 加载中…</div>
+  </div>
+</div>
+
+<!-- ★2026-08-16 导入 Skill / Agent 预设弹层（assets 打包 → 运行库） -->
+<div class="hz-modal-mask" id="hz-modal-mask">
+  <div class="hz-modal">
+    <div class="hz-modal-head"><span>导入 Skill / Agent 预设</span><span class="hz-modal-close" id="hz-modal-close">✕</span></div>
+    <div class="hz-modal-tabs">
+      <div class="hz-modal-tab on" data-tab="skill" id="hz-tab-skill">Skills（技能）</div>
+      <div class="hz-modal-tab" data-tab="preset" id="hz-tab-preset">Agent 预设</div>
+    </div>
+    <div class="hz-modal-body" id="hz-modal-body"><div class="hz-msg sys">加载资产清单…</div></div>
+    <div class="hz-import-note" style="padding:8px 16px 12px">来源：DSHQuant/assets/ 打包资产 → 一键安装到运行库（Skill → 工作区 .dsh/skills；预设 → .dsh/.agent-presets），新会话生效。</div>
   </div>
 </div>
 
@@ -141,6 +232,461 @@
   LW.sidebar.render('sidebar', {active: 'control'});
   var R = LW.render;
 
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  /* ★2026-08-16 健壮连接：超时 + 自动重试 + 连接状态徽章
+     走 8787 同源代理 /api/proxy/* → :3080（零跨源、零 CORS，绝对可靠） */
+  var HZ = '';
+  var connState = 'ok';          // ok | retry | down
+  var retryDelay = 1000;         // 重连退避基数
+  var lastConnFail = 0;
+
+  function setConn(state, txt) {
+    connState = state;
+    var badge = document.getElementById('hz-conn-badge');
+    var tx = document.getElementById('hz-conn-txt');
+    if (!badge || !tx) return;
+    badge.className = 'hz-conn-badge ' + state;
+    tx.textContent = txt;
+  }
+  function hzGet(path, timeoutMs) {
+    return hzFetch(path, timeoutMs || 8000).then(function (d) {
+      if (connState !== 'ok') setConn('ok', '已连接');
+      retryDelay = 1000;
+      return d;
+    }).catch(function (e) {
+      if (Date.now() - lastConnFail > 5000) {
+        setConn('retry', '重连中…');
+        lastConnFail = Date.now();
+      }
+      throw e;
+    });
+  }
+  function hzFetch(path, timeoutMs) {
+    var ctrl = new AbortController();
+    var tm = setTimeout(function () { ctrl.abort(); }, timeoutMs || 8000);
+    return fetch(HZ + path, { cache: 'no-store', signal: ctrl.signal }).then(function (r) {
+      clearTimeout(tm);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).catch(function (e) {
+      clearTimeout(tm);
+      throw e;
+    });
+  }
+  function hzPost(path, body) {
+    var ctrl = new AbortController();
+    var tm = setTimeout(function () { ctrl.abort(); }, 10000);
+    return fetch(HZ + path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: ctrl.signal,
+    }).then(function (r) {
+      clearTimeout(tm);
+      return r.json().catch(function () { return { ok: false, error: 'bad response' }; });
+    }).catch(function (e) {
+      clearTimeout(tm);
+      throw e;
+    });
+  }
+
+  /* ---------- 自绘聊天 ---------- */
+  var curTarget = null;       // { kind:'root', id, title } | { kind:'niu', persona, name }
+  var busy = false;
+  var lastCount = 0;
+  var rootsCache = [];
+  var niuCache = [];
+  var snapshotCache = '';
+  var snapshotDate = '';
+
+  function renderMsgs(messages, thinking) {
+    var box = document.getElementById('hz-msgs');
+    var visible = (messages || []).filter(function (m) {
+      return String(m.text || '').indexOf('【任务】你是「') !== 0;
+    });
+    if (!visible.length) {
+      box.innerHTML = '<div class="hz-msg sys">会话为空 —— 发送消息开始对话（发「1」触发自主推进；牛散分类 = 基于量化全量数据的主观选股）</div>';
+      return;
+    }
+    box.innerHTML = visible.map(function (m) {
+      var cls = m.role === 'user' ? 'user' : 'agent';
+      return '<div class="hz-msg ' + cls + '">' + esc(m.text) + '</div>';
+    }).join('') + ((busy || thinking) ? '<div class="hz-msg sys">⏳ ' + (curTarget && curTarget.kind === 'niu' ? '牛散思考中…' : 'agent 处理中…') + '</div>' : '');
+    box.scrollTop = box.scrollHeight;
+  }
+  function curLabel() {
+    if (!curTarget) return '—';
+    if (curTarget.kind === 'niu') return '牛散 · ' + curTarget.name;
+    return curTarget.title || ('会话 ' + String(curTarget.id).slice(0, 18) + '…');
+  }
+  function targetQuery() {
+    if (!curTarget) return null;
+    return curTarget.kind === 'niu'
+      ? '/api/proxy/niuapi/recent?persona=' + encodeURIComponent(curTarget.persona) + '&limit=30'
+      : '/api/proxy/quantapi/recent?sessionId=' + encodeURIComponent(curTarget.id) + '&limit=30';
+  }
+  function loadRecent() {
+    var q = targetQuery();
+    if (!q) return Promise.resolve();
+    return hzGet(q, curTarget && curTarget.kind === 'niu' ? 30000 : 8000).then(function (d) {
+      lastCount = (d.messages || []).length;
+      renderMsgs(d.messages || [], d.busy);
+    }).catch(function (e) {
+      document.getElementById('hz-msgs').innerHTML =
+        '<div class="hz-msg sys">🔌 HARNESS 暂不可达（' + esc((e && e.message) || e) + '）—— 自动重连中…（完整 GUI：' +
+        '<a href="http://127.0.0.1:3080" target="_blank" style="color:var(--navy2)">打开 ↗</a>）</div>';
+    });
+  }
+  /* 会话分类菜单：主系统（根会话）+ 主观·牛散 */
+  var KEEP_EXCLUDE_TITLES = ['如何实现笔记本关屏不关机', '基本面研究员 (1)'];
+  var sessKw = '';
+  var selectedSess = {};   // ★2026-08-16 批量删除选中集合 {sid: true}
+  function relatedRoots() {
+    return rootsCache.filter(function (s) {
+      if (KEEP_EXCLUDE_TITLES.indexOf(s.title) >= 0) return false;
+      if (!s.preview && !s.role) return false;
+      if (sessKw) {
+        var hay = ((s.title || '') + ' ' + (s.preview || '')).toLowerCase();
+        if (hay.indexOf(sessKw.toLowerCase()) < 0) return false;
+      }
+      return true;
+    });
+  }
+  function renderSessList() {
+    var list = document.getElementById('hz-sess-list');
+    var html = '';
+    html += '<div class="hz-sess-cat">主系统</div>';
+    var rel = relatedRoots();
+    if (!rel.length) html += '<div class="hz-msg sys" style="padding:4px 8px">' + (sessKw ? '无匹配' : '暂无') + '</div>';
+    html += rel.map(function (s) {
+      var locked = s.locked === true;
+      var active = curTarget && curTarget.kind === 'root' && curTarget.id === s.id ? ' active' : '';
+      var ck = locked ? '' : '<input type="checkbox" class="hz-sess-ck" data-ck="' + esc(s.id) + '"' + (selectedSess[s.id] ? ' checked' : '') + '>';
+      return '<div class="hz-sess-item' + active + '" data-kind="root" data-sid="' + esc(s.id) + '">' +
+        '<div class="trow">' + ck + '<span class="tt">' + esc(s.title) +
+        (s.current ? ' <span class="cur">●当前</span>' : '') +
+        (locked ? (s.coreLocked
+          ? ' <span class="hz-lock core" title="核心会话（主系统）永久锁死">🔒</span>'
+          : ' <span class="hz-lock unlockable" data-unlock="' + esc(s.id) + '" title="点击解锁后可删除">🔒</span>') : '') +
+        '</span></div>' +
+        (s.preview ? '<div class="p">' + esc(s.preview) + '</div>' : '<div class="p">空会话</div>') +
+        (locked ? '' : '<button class="hz-sess-del" data-del="' + esc(s.id) + '" title="删除对话">×</button>') +
+        '</div>';
+    }).join('');
+    html += '<div class="hz-sess-cat">主观 · 牛散 <span style="color:#71717a">基于 Pitch 卡选股</span></div>';
+    if (!niuCache.length) html += '<div class="hz-msg sys" style="padding:4px 8px">加载中…</div>';
+    var niuShown = 0;
+    html += niuCache.map(function (n) {
+      if (sessKw) {
+        var hay = ((n.name || '') + ' ' + (n.preview || '') + ' ' + (n.tag || '')).toLowerCase();
+        if (hay.indexOf(sessKw.toLowerCase()) < 0) return '';
+      }
+      niuShown++;
+      var active = curTarget && curTarget.kind === 'niu' && curTarget.persona === n.id ? ' active' : '';
+      return '<div class="hz-sess-item niu' + active + '" data-kind="niu" data-sid="' + esc(n.id) + '">' +
+        '<div class="t">' + esc(n.name) + '<span class="tag">' + esc(n.tag) + '</span></div>' +
+        (n.preview ? '<div class="p">' + esc(n.preview) + '</div>' : '<div class="p">未开聊 —— 首次发言自动建档</div>') +
+        '</div>';
+    }).join('');
+    if (sessKw && !niuShown) html += '<div class="hz-msg sys" style="padding:4px 8px">无匹配</div>';
+    list.innerHTML = html;
+    /* ★2026-08-16 解锁：点击 🔒（可解锁锁）→ 确认 → unlock → 刷新后变可删 */
+    list.querySelectorAll('.hz-lock.unlockable').forEach(function (lk) {
+      lk.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        var sid = lk.getAttribute('data-unlock');
+        if (!confirm('解锁该会话？解锁后可从列表删除（若为运行中会话，删除前请确认不再使用）')) return;
+        hzPost('/api/proxy/quantapi/unlock', { sessionId: sid }).then(function (res) {
+          if (res && res.ok) {
+            loadSessions();
+          } else {
+            alert('解锁失败：' + esc((res && res.error) || '未知'));
+          }
+        }).catch(function (e) { alert('解锁失败：' + esc(e.message)); });
+      });
+    });
+    /* ★2026-08-16 批量选择：复选框变更更新选中集合 */
+    list.querySelectorAll('.hz-sess-ck').forEach(function (ck) {
+      ck.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        var sid = ck.getAttribute('data-ck');
+        if (ck.checked) selectedSess[sid] = true;
+        else delete selectedSess[sid];
+        document.getElementById('hz-del-sel').textContent = '删除所选' + (Object.keys(selectedSess).length ? ' (' + Object.keys(selectedSess).length + ')' : '');
+      });
+    });
+    /* ★2026-08-16 删除对话：确认后 POST /quantapi/delete 归档会话并刷新列表 */
+    list.querySelectorAll('.hz-sess-del').forEach(function (btn) {
+      btn.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        var sid = btn.getAttribute('data-del');
+        if (!confirm('确认删除该对话？（从工作区归档，不可撤销）')) return;
+        hzPost('/api/proxy/quantapi/delete', { sessionId: sid }).then(function (res) {
+          if (res && res.ok) {
+            if (curTarget && curTarget.kind === 'root' && curTarget.id === sid) curTarget = null;
+            loadSessions();
+          } else {
+            alert('删除失败：' + esc((res && res.error) || '未知'));
+          }
+        }).catch(function (e) {
+          alert('删除失败：' + esc(e.message));
+        });
+      });
+    });
+    /* ★2026-08-16 批量工具栏：绑定在顶层（页面加载即生效，不依赖列表渲染成功） */
+    var delSelBtn = document.getElementById('hz-del-sel');
+    document.getElementById('hz-ck-all').onclick = function () {
+      var list = document.getElementById('hz-sess-list');
+      var cks = list ? list.querySelectorAll('.hz-sess-ck') : [];
+      var allChecked = cks.length > 0 && Array.from(cks).every(function (c) { return c.checked; });
+      cks.forEach(function (c) {
+        c.checked = !allChecked;
+        if (c.checked) selectedSess[c.getAttribute('data-ck')] = true;
+        else delete selectedSess[c.getAttribute('data-ck')];
+      });
+      delSelBtn.textContent = '删除所选' + (Object.keys(selectedSess).length ? ' (' + Object.keys(selectedSess).length + ')' : '');
+    };
+    delSelBtn.onclick = function () {
+      var ids = Object.keys(selectedSess);
+      if (!ids.length) { alert('未勾选任何会话（锁死会话不可选）'); return; }
+      if (!confirm('确认删除选中的 ' + ids.length + ' 个对话？（从工作区归档，不可撤销）')) return;
+      hzPost('/api/proxy/quantapi/delete-batch', { sessionIds: ids }).then(function (res) {
+        if (res && res.ok) {
+          selectedSess = {};
+          alert('已删除 ' + res.deleted + ' 个对话' + (res.skipped && res.skipped.length ? '，跳过锁死 ' + res.skipped.length + ' 个' : ''));
+          loadSessions();
+        } else {
+          alert('批量删除失败：' + esc((res && res.error) || '未知'));
+        }
+      }).catch(function (e) { alert('批量删除失败：' + esc(e.message)); });
+    };
+    document.getElementById('hz-clear-all').onclick = function () {
+      if (!confirm('⚠️ 一键清空：隐藏本面板所有未锁定的对话！\n仅本面板生效——GUI 面板与聊天历史完全不受影响（可随时点「恢复」找回）。\n\n确认继续？')) return;
+      hzPost('/api/proxy/quantapi/clear-all', {}).then(function (res) {
+        if (res && res.ok) {
+          selectedSess = {};
+          alert('已隐藏 ' + res.deleted + ' 个对话（仅本面板），锁死保留 ' + res.locked + ' 个');
+          loadSessions();
+        } else {
+          alert('清空失败：' + esc((res && res.error) || '未知'));
+        }
+      }).catch(function (e) { alert('清空失败：' + esc(e.message)); });
+    };
+    /* ★2026-08-16 恢复：清空本面板隐藏名单，全部会话重现（GUI 不受影响） */
+    document.getElementById('hz-restore').onclick = function () {
+      hzPost('/api/proxy/quantapi/restore-all', {}).then(function (res) {
+        if (res && res.ok) {
+          selectedSess = {};
+          loadSessions();
+        } else {
+          alert('恢复失败：' + esc((res && res.error) || '未知'));
+        }
+      }).catch(function (e) { alert('恢复失败：' + esc(e.message)); });
+    };
+    list.querySelectorAll('.hz-sess-item').forEach(function (el) {
+      el.addEventListener('click', function () {
+        var kind = el.getAttribute('data-kind');
+        var sid = el.getAttribute('data-sid');
+        if (kind === 'niu') {
+          var n = niuCache.filter(function (x) { return x.id === sid; })[0];
+          curTarget = { kind: 'niu', persona: sid, name: n ? n.name : sid };
+        } else {
+          var s = rootsCache.filter(function (x) { return x.id === sid; })[0];
+          curTarget = { kind: 'root', id: sid, title: s ? s.title : null };
+        }
+        renderSessList();
+        document.getElementById('hz-chat-session').textContent = curLabel();
+        loadRecent();
+      });
+    });
+  }
+  /* ★2026-08-16 量化全量快照：聚合择时/持仓/机会池/因子强共识/turn_low/Pitch——牛散能看到所有量化数据 */
+  function buildSnapshot() {
+    var snap = document.getElementById('hz-snap');
+    snap.innerHTML = '量化快照: <b style="color:#a78bfa">聚合中…</b>';
+    return Promise.all([
+      fetch('/api/pitch_v2', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
+      fetch('/api/live/holdings', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
+      fetch('/api/regime', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
+      fetch('/api/pool', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
+      fetch('/api/live/strong_hits', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
+      fetch('/api/live/turnlow_top', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
+    ]).then(function (res) {
+      var p = res[0], h = res[1], rg = res[2], pool = res[3], hits = res[4], tl = res[5];
+      var lines = [];
+      lines.push('【量化全量数据快照】');
+      lines.push('日期: ' + ((p && p.date) || '—'));
+      if (rg) {
+        var rgt = rg.timing || rg;
+        lines.push('【择时】' + (rgt.level || rg.level || '—') + (rgt.score != null ? ' ' + rgt.score + ' 分' : ''));
+      }
+      var ph = (h && h.position_risk) || {};
+      var holds = ph.per_stock || [];
+      lines.push('【当前持仓 ' + ((ph.n_holdings != null) ? ph.n_holdings : holds.length) + ' 只】' +
+        holds.map(function (x) { return x.code + ' ' + (x.name || ''); }).join(', '));
+      var poolList = (pool && (pool.opportunities || pool.items || pool.pool)) || [];
+      if (Array.isArray(poolList) && poolList.length) {
+        lines.push('【机会池 ' + poolList.length + ' 条】');
+        poolList.slice(0, 15).forEach(function (o) {
+          lines.push('- ' + (o.code || '') + ' ' + (o.name || '') + ' | ' + (o.otype_name || o.otype || '') + ' | 分 ' + (o.score != null ? Math.round(o.score) : '—'));
+        });
+      }
+      var hitList = (hits && (hits.hits || hits.strong_hits)) || [];
+      if (Array.isArray(hitList) && hitList.length) {
+        lines.push('【因子强共识 ' + hitList.length + ' 只】');
+        hitList.slice(0, 10).forEach(function (x) {
+          lines.push('- ' + (x.code || '') + ' ' + (x.name || '') + (x.hits != null ? ' ×' + x.hits + '因子' : ''));
+        });
+      }
+      var tlList = (tl && (tl.top || tl.entries || tl.list)) || [];
+      if (Array.isArray(tlList) && tlList.length) {
+        lines.push('【turn_low 防守 top' + Math.min(10, tlList.length) + '】');
+        tlList.slice(0, 10).forEach(function (x) {
+          lines.push('- ' + (x.code || '') + ' ' + (x.name || ''));
+        });
+      }
+      var pitch = (p && p.pitch) || [];
+      lines.push('【Pitch 候选卡 ' + pitch.length + ' 张】');
+      pitch.forEach(function (c) {
+        var sp = c.stop_plan || {};
+        var stopTxt = sp.desc || (sp.stop_loss_pct != null ? '止损 ' + sp.stop_loss_pct + '%' : '');
+        lines.push('- ' + c.code + ' ' + c.name +
+          ' | 评分 ' + Math.round(c.score || 0) +
+          ' | 胜率 ' + Math.round((c.winrate_est || 0) * 100) + '%' +
+          ' | 预期 +' + Math.round(c.upside_est || 0) + '%' +
+          ' | ' + (c.otype_name || '') +
+          (c.tier ? ' | ' + c.tier : '') +
+          (stopTxt ? ' | ' + stopTxt : ''));
+      });
+      snapshotCache = lines.join('\n');
+      snapshotDate = (p && p.date) || '';
+      snap.innerHTML = '量化快照: <b>' + esc(snapshotDate || '已聚合') + '</b> · 择时/持仓/机会池/强共识/turn_low/Pitch';
+      return snapshotCache;
+    }).catch(function () {
+      snap.innerHTML = '量化快照: <b style="color:var(--red)">聚合失败</b>';
+      return '';
+    });
+  }
+  /* ★2026-08-16 健壮轮询：失败自动重试（指数退避），恢复后刷新会话 */
+  function loadSessions() {
+    return Promise.all([
+      hzGet('/api/proxy/quantapi/sessions', 20000).then(function (d) { rootsCache = d.sessions || []; }),
+      hzGet('/api/proxy/niuapi/sessions', 15000).then(function (d) { niuCache = d.personas || []; })
+    ]).then(function () {
+      if (!curTarget) {
+        var rel = relatedRoots();
+        // ★2026-08-16 默认选中「主系统」会话（其他都不是默认）
+        var main = rel.filter(function (s) { return (s.title || '').indexOf('主系统') >= 0; })[0] || rel[0];
+        if (main) {
+          curTarget = { kind: 'root', id: main.id, title: main.title };
+        }
+      }
+      renderSessList();
+      document.getElementById('hz-chat-session').textContent = curLabel();
+      return loadRecent();
+    }).catch(function (e) {
+      setConn('retry', '重连中…');
+      document.getElementById('hz-sess-list').innerHTML =
+        '<div class="hz-msg sys" style="padding:8px">🔌 HARNESS 暂不可达（' + esc((e && e.message) || e) + '）—— 自动重连中…</div>';
+      if (!busy) {
+        // ★2026-08-16 快速重连：固定 2s 快速试探（不再指数退避拖慢恢复）
+        retryDelay = Math.min(retryDelay * 2, 5000);
+        setTimeout(function () {
+          if (connState === 'retry') loadSessions();
+        }, 2000);
+      }
+    });
+  }
+  function sendMsg() {
+    var input = document.getElementById('hz-input');
+    var text = (input.value || '').trim();
+    if (!text || busy) return;
+    if (!curTarget) { alert('会话未就绪'); return; }
+    busy = true;
+    input.value = '';
+    renderMsgs([]);
+    document.getElementById('hz-chat-status').textContent = '发送中…';
+    var p = curTarget.kind === 'niu'
+      ? hzPost('/api/proxy/niuapi/chat', { persona: curTarget.persona, text: text, snapshot: snapshotCache })
+      : hzPost('/api/proxy/quantapi/chat2', { text: text, sessionId: curTarget.id });
+    p.then(function (res) {
+      if (res.ok && res.accepted) {
+        document.getElementById('hz-chat-status').textContent = '已送达 · 等回复…';
+        var waited = 0;
+        var timer = setInterval(function () {
+          waited += 3000;
+          hzGet(targetQuery(), curTarget.kind === 'niu' ? 30000 : 8000).then(function (d) {
+            var ms = d.messages || [];
+            renderMsgs(ms);
+            var lastUser = null;
+            for (var i = ms.length - 1; i >= 0; i--) { if (ms[i].role === 'user') { lastUser = ms[i]; break; } }
+            var hasNewAgent = lastUser && ms[ms.length - 1].role === 'assistant' && ms[ms.length - 1] !== lastUser;
+            if (hasNewAgent || waited >= 90000) {
+              clearInterval(timer);
+              busy = false;
+              document.getElementById('hz-chat-status').textContent = hasNewAgent ? '✓ 已回复' : '（回复超时，见完整 GUI）';
+              if (hasNewAgent && curTarget && curTarget.kind === 'niu') {
+                var niuMsg = ms[ms.length - 1];
+                fetch('/api/niu/record', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ persona: curTarget.persona, text: niuMsg.text, snapshot_date: snapshotDate })
+                }).then(function (r) { return r.json().catch(function () { return {}; }); }).then(function (rec) {
+                  if (rec && rec.ok) {
+                    document.getElementById('hz-chat-status').textContent =
+                      '✓ 已回复 · 决策入远期池 ' + (rec.recorded || 0) + ' 条（' + (rec.date || '') + '）';
+                  }
+                }).catch(function () {});
+              }
+            }
+          }).catch(function () { busy = false; clearInterval(timer); });
+        }, 3000);
+      } else {
+        busy = false;
+        document.getElementById('hz-chat-status').textContent = '发送失败：' + esc((res && res.error) || '未知');
+      }
+    }).catch(function () {
+      busy = false;
+      setConn('retry', '重连中…');
+      document.getElementById('hz-chat-status').textContent = '未送达（HARNESS 暂不可达，自动重连中）';
+    });
+  }
+  document.getElementById('hz-send').onclick = sendMsg;
+  document.getElementById('hz-input').addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter') sendMsg();
+  });
+  document.getElementById('hz-snap-btn').onclick = function () { buildSnapshot(); };
+  var filterInput = document.getElementById('hz-sess-filter');
+  filterInput.addEventListener('input', function () {
+    sessKw = filterInput.value.trim();
+    renderSessList();
+  });
+  loadSessions();
+  buildSnapshot();
+  /* ★2026-08-16 健壮轮询：20s 会话刷新 + 10s 健康探测（掉线即自动重连） */
+  setInterval(function () {
+    if (busy) return;
+    if (connState === 'down' || connState === 'retry') {
+      loadSessions();
+    } else {
+      loadSessions();
+    }
+  }, 20000);
+  setInterval(function () {
+    if (connState === 'down' || connState === 'retry') {
+      hzGet('/api/proxy/quantapi/sessions', 15000).then(function () {
+        setConn('ok', '已连接');
+        loadSessions();
+      }).catch(function () {});
+    }
+  }, 5000);
+
+  /* ---------- 状态快照（/api/harness） ---------- */
   function loadHarness() {
     LW.api.get('/api/harness', { bypass: true }).then(function (d) {
       if (d.error) {
@@ -183,248 +729,93 @@
   document.getElementById('hz-refresh').onclick = loadHarness;
   setInterval(loadHarness, 30000);
 
-  /* ★2026-08-15 原生聊天 v8（整体嵌入 · 直连 :3080 /quant/* 真实会话 + 牛散主观选股） */
-  var HZ = 'http://127.0.0.1:3080';
-  var curTarget = null;       // { kind:'root', id, title } | { kind:'niu', persona, name }
-  var lastCount = 0;
-  var busy = false;
-  var rootsCache = [];
-  var niuCache = [];
-  var snapshotCache = '';
-  var snapshotDate = '';
-
-  function esc(s) {
-    return String(s == null ? '' : s)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  /* ---------- 导入 Skill / Agent 预设 ---------- */
+  var assetTab = 'skill';
+  var assetCache = { skills: [], presets: [] };
+  var installedMap = {};
+  function openImportModal() {
+    document.getElementById('hz-modal-mask').style.display = 'flex';
+    loadAssets();
   }
-  function hzGet(path) {
-    return fetch(HZ + path, { cache: 'no-store' }).then(function (r) {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.json();
+  function closeImportModal() {
+    document.getElementById('hz-modal-mask').style.display = 'none';
+  }
+  function loadAssets() {
+    var body = document.getElementById('hz-modal-body');
+    body.innerHTML = '<div class="hz-msg sys">加载资产清单…</div>';
+    LW.api.get('/api/assets/list', { bypass: true }).then(function (d) {
+      if (!d || !d.ok) throw new Error((d && d.error) || '接口异常');
+      assetCache = { skills: d.skills || [], presets: d.presets || [] };
+      renderAssetList();
+    }).catch(function (e) {
+      body.innerHTML = '<div class="hz-msg sys" style="color:var(--red)">加载失败：' + esc(e.message) + '</div>';
     });
   }
-  function hzPost(path, body) {
-    return fetch(HZ + path, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    }).then(function (r) {
-      return r.json().catch(function () { return { ok: false, error: 'bad response' }; });
-    });
-  }
-  function renderMsgs(messages) {
-    var box = document.getElementById('hz-msgs');
-    var visible = (messages || []).filter(function (m) {
-      return String(m.text || '').indexOf('【任务】你是「') !== 0;  // 隐藏牛散启动消息
-    });
-    if (!visible.length) {
-      box.innerHTML = '<div class="hz-msg sys">会话为空 —— 发送消息开始对话（发「1」触发自主推进；牛散分类 = 基于 Pitch 卡的主观选股）</div>';
+  function renderAssetList() {
+    var body = document.getElementById('hz-modal-body');
+    var list = assetTab === 'skill' ? assetCache.skills : assetCache.presets;
+    var label = assetTab === 'skill' ? 'Skill' : 'Agent 预设';
+    if (!list.length) {
+      body.innerHTML = '<div class="hz-msg sys">项目资产中暂无' + label + '（assets/ 目录为空）</div>';
       return;
     }
-    box.innerHTML = visible.map(function (m) {
-      var cls = m.role === 'user' ? 'user' : 'agent';
-      return '<div class="hz-msg ' + cls + '">' + esc(m.text) + '</div>';
-    }).join('') + (busy ? '<div class="hz-msg sys">⏳ agent 处理中…</div>' : '');
-    box.scrollTop = box.scrollHeight;
-  }
-  function curLabel() {
-    if (!curTarget) return '—';
-    if (curTarget.kind === 'niu') return '牛散 · ' + curTarget.name;
-    return curTarget.title || ('会话 ' + String(curTarget.id).slice(0, 18) + '…');
-  }
-  function targetQuery() {
-    if (!curTarget) return null;
-    return curTarget.kind === 'niu'
-      ? '/quant/niu/recent?persona=' + encodeURIComponent(curTarget.persona) + '&limit=30'
-      : '/quant/recent?sessionId=' + encodeURIComponent(curTarget.id) + '&limit=30';
-  }
-  function loadRecent() {
-    var q = targetQuery();
-    if (!q) return Promise.resolve();
-    return hzGet(q).then(function (d) {
-      lastCount = (d.messages || []).length;
-      renderMsgs(d.messages || []);
-    }).catch(function (e) {
-      document.getElementById('hz-msgs').innerHTML =
-        '<div class="hz-msg sys">🔌 HARNESS 未连接（' + esc(e.message) + '）——确认 :3080 已启动</div>';
-    });
-  }
-  /* ★2026-08-15 会话分类菜单：主系统（根会话）+ 主观·牛散（7 位 persona，Pitch 选股） */
-  /* 整理：主系统只保留相关对话（非空 + 非明确无关标题），空/闲聊/重复建档自动隐藏 */
-  var KEEP_EXCLUDE_TITLES = ['如何实现笔记本关屏不关机', '基本面研究员 (1)'];
-  function relatedRoots() {
-    return rootsCache.filter(function (s) {
-      if (KEEP_EXCLUDE_TITLES.indexOf(s.title) >= 0) return false;
-      if (!s.preview && !s.role) return false;   // 空会话
-      return true;
-    });
-  }
-  function renderSessList() {
-    var list = document.getElementById('hz-sess-list');
-    var html = '';
-    html += '<div class="hz-sess-cat">主系统</div>';
-    var rel = relatedRoots();
-    if (!rel.length) html += '<div class="hz-msg sys" style="padding:4px 8px">暂无</div>';
-    html += rel.map(function (s) {
-      var active = curTarget && curTarget.kind === 'root' && curTarget.id === s.id ? ' active' : '';
-      return '<div class="hz-sess-item' + active + '" data-kind="root" data-sid="' + esc(s.id) + '">' +
-        '<div class="t">' + esc(s.title) + (s.current ? ' <span class="cur">●当前</span>' : '') + '</div>' +
-        (s.preview ? '<div class="p">' + esc(s.preview) + '</div>' : '<div class="p">空会话</div>') +
+    body.innerHTML = list.map(function (it) {
+      var key = assetTab + ':' + it.name;
+      var done = installedMap[key];
+      return '<div class="hz-import-item' + (done ? ' done' : '') + '">' +
+        '<span class="nm">' + esc(it.name) + '</span>' +
+        '<span class="ds">' + esc(it.desc || '') + '</span>' +
+        '<button class="go" data-key="' + key + '">' + (done ? '已安装' : '导入') + '</button>' +
         '</div>';
     }).join('');
-    html += '<div class="hz-sess-cat">主观 · 牛散 <span style="color:#71717a">基于 Pitch 卡选股</span></div>';
-    if (!niuCache.length) html += '<div class="hz-msg sys" style="padding:4px 8px">加载中…</div>';
-    html += niuCache.map(function (n) {
-      var active = curTarget && curTarget.kind === 'niu' && curTarget.persona === n.id ? ' active' : '';
-      return '<div class="hz-sess-item niu' + active + '" data-kind="niu" data-sid="' + esc(n.id) + '">' +
-        '<div class="t">' + esc(n.name) + '<span class="tag">' + esc(n.tag) + '</span></div>' +
-        (n.preview ? '<div class="p">' + esc(n.preview) + '</div>' : '<div class="p">未开聊 —— 首次发言自动建档</div>') +
-        '</div>';
-    }).join('');
-    list.innerHTML = html;
-    list.querySelectorAll('.hz-sess-item').forEach(function (el) {
-      el.addEventListener('click', function () {
-        var kind = el.getAttribute('data-kind');
-        var sid = el.getAttribute('data-sid');
-        if (kind === 'niu') {
-          var n = niuCache.filter(function (x) { return x.id === sid; })[0];
-          curTarget = { kind: 'niu', persona: sid, name: n ? n.name : sid };
-        } else {
-          var s = rootsCache.filter(function (x) { return x.id === sid; })[0];
-          curTarget = { kind: 'root', id: sid, title: s ? s.title : null };
-        }
-        renderSessList();
-        document.getElementById('hz-chat-session').textContent = curLabel();
-        loadRecent();
+    body.querySelectorAll('.hz-import-item .go').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var key = btn.getAttribute('data-key');
+        var parts = key.split(':');
+        installAsset(parts[0], parts[1], btn);
       });
     });
   }
-  /* ★2026-08-15 Pitch 快照：拉最新候选卡 + 持仓，构造牛散选股上下文 */
-  function buildSnapshot() {
-    var snap = document.getElementById('hz-snap');
-    snap.innerHTML = 'Pitch 快照: <b style="color:#a78bfa">同步中…</b>';
-    return Promise.all([
-      fetch('/api/pitch_v2', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
-      fetch('/api/live/holdings', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
-    ]).then(function (res) {
-      var p = res[0], h = res[1];
-      var lines = [];
-      lines.push('【量化 Pitch 快照】');
-      if (p && p.date) lines.push('日期: ' + p.date);
-      var pitch = (p && p.pitch) || [];
-      lines.push('Pitch 候选卡 (' + pitch.length + ' 张):');
-      pitch.forEach(function (c) {
-        var sp = c.stop_plan || {};
-        var stopTxt = sp.desc || (sp.stop_loss_pct != null ? '止损 ' + sp.stop_loss_pct + '%' : '');
-        lines.push('- ' + c.code + ' ' + c.name +
-          ' | 评分 ' + Math.round(c.score || 0) +
-          ' | 胜率 ' + Math.round((c.winrate_est || 0) * 100) + '%' +
-          ' | 预期 +' + Math.round(c.upside_est || 0) + '%' +
-          ' | ' + (c.otype_name || '') +
-          (c.tier ? ' | ' + c.tier : '') +
-          (c.pitch_badge ? ' | ' + c.pitch_badge : '') +
-          (stopTxt ? ' | ' + stopTxt : ''));
-      });
-      var ph = (h && h.position_risk) || {};
-      var holds = ph.per_stock || [];
-      lines.push('当前持仓 (' + ((ph.n_holdings != null) ? ph.n_holdings : holds.length) + ' 只): ' +
-        holds.map(function (x) { return x.code; }).join(', '));
-      snapshotCache = lines.join('\n');
-      snapshotDate = (p && p.date) || '';
-      snap.innerHTML = 'Pitch 快照: <b>' + esc(snapshotDate || '已加载') + '</b> · ' + pitch.length + ' 卡 · ' + (holds.length || 0) + ' 持仓';
-      return snapshotCache;
-    }).catch(function (e) {
-      snap.innerHTML = 'Pitch 快照: <b style="color:var(--red)">同步失败</b>';
-      return '';
-    });
-  }
-  function loadSessions() {
-    return Promise.all([
-      hzGet('/quant/sessions').then(function (d) { rootsCache = d.sessions || []; }),
-      hzGet('/quant/niu/sessions').then(function (d) { niuCache = d.personas || []; })
-    ]).then(function () {
-      if (!curTarget) {
-        var rel = relatedRoots();
-        if (rel.length) {
-          curTarget = { kind: 'root', id: rel[0].id, title: rel[0].title };
-        }
-      }
-      renderSessList();
-      document.getElementById('hz-chat-session').textContent = curLabel();
-      return loadRecent();
-    }).catch(function () {
-      document.getElementById('hz-sess-list').innerHTML = '<div class="hz-msg sys" style="padding:8px">🔌 HARNESS 未连接 —— 确认 :3080 已启动</div>';
-      document.getElementById('hz-msgs').innerHTML = '<div class="hz-msg sys">🔌 HARNESS 未连接 —— 确认 :3080 已启动</div>';
-    });
-  }
-  function sendMsg() {
-    var input = document.getElementById('hz-input');
-    var text = (input.value || '').trim();
-    if (!text || busy) return;
-    if (!curTarget) { alert('会话未就绪'); return; }
-    busy = true;
-    input.value = '';
-    renderMsgs([]);  // 清空重拉
-    document.getElementById('hz-chat-status').textContent = '发送中…';
-    var p = curTarget.kind === 'niu'
-      ? hzPost('/quant/niu/chat', { persona: curTarget.persona, text: text, snapshot: snapshotCache })
-      : hzPost('/quant/chat2', { text: text, sessionId: curTarget.id });
-    p.then(function (res) {
-      if (res.ok && res.accepted) {
-        document.getElementById('hz-chat-status').textContent = '已送达 · 等回复…';
-        // 轮询回复（agent 异步处理，最多 90s）
-        var waited = 0;
-        var timer = setInterval(function () {
-          waited += 3000;
-          hzGet(targetQuery()).then(function (d) {
-            var ms = d.messages || [];
-            renderMsgs(ms);
-            var lastUser = null;
-            for (var i = ms.length - 1; i >= 0; i--) { if (ms[i].role === 'user') { lastUser = ms[i]; break; } }
-            var hasNewAgent = lastUser && ms[ms.length - 1].role === 'assistant' && ms[ms.length - 1] !== lastUser;
-            if (hasNewAgent || waited >= 90000) {
-              clearInterval(timer);
-              busy = false;
-              document.getElementById('hz-chat-status').textContent = hasNewAgent ? '✓ 已回复' : '（回复超时，见完整 GUI）';
-              /* ★2026-08-15 牛散决策自动入远期池：回复最后一行含 {"niu_decisions":[...]}，
-                 提取后 POST /api/niu/record（pool_type=niu_select，按决策者分组 fwd 验证） */
-              if (hasNewAgent && curTarget && curTarget.kind === 'niu') {
-                var niuMsg = ms[ms.length - 1];
-                fetch('/api/niu/record', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ persona: curTarget.persona, text: niuMsg.text, snapshot_date: snapshotDate })
-                }).then(function (r) { return r.json().catch(function () { return {}; }); }).then(function (rec) {
-                  if (rec && rec.ok) {
-                    document.getElementById('hz-chat-status').textContent =
-                      '✓ 已回复 · 决策入远期池 ' + (rec.recorded || 0) + ' 条（' + (rec.date || '') + '）';
-                  }
-                }).catch(function () {});
-              }
-            }
-          }).catch(function () { busy = false; clearInterval(timer); });
-        }, 3000);
+  function installAsset(typ, name, btn) {
+    var old = btn.textContent;
+    btn.textContent = '导入中…';
+    fetch('/api/import/install', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: typ, name: name })
+    }).then(function (r) { return r.json(); }).then(function (res) {
+      if (res && res.ok) {
+        installedMap[typ + ':' + name] = true;
+        var item = btn.closest('.hz-import-item');
+        if (item) item.classList.add('done');
+        btn.textContent = '✓ 已安装';
       } else {
-        busy = false;
-        document.getElementById('hz-chat-status').textContent = '发送失败：' + esc((res && res.error) || '未知');
+        btn.textContent = '失败';
+        alert('导入失败：' + esc((res && res.error) || '未知'));
+        setTimeout(function () { btn.textContent = old; }, 1600);
       }
     }).catch(function (e) {
-      busy = false;
-      document.getElementById('hz-chat-status').textContent = '未连接：' + esc(e.message);
+      btn.textContent = '失败';
+      alert('导入失败：' + esc(e.message));
+      setTimeout(function () { btn.textContent = old; }, 1600);
     });
   }
-  document.getElementById('hz-send').onclick = sendMsg;
-  document.getElementById('hz-input').addEventListener('keydown', function (ev) {
-    if (ev.key === 'Enter') sendMsg();
+  document.getElementById('hz-import-btn').onclick = openImportModal;
+  document.getElementById('hz-modal-close').onclick = closeImportModal;
+  document.getElementById('hz-modal-mask').addEventListener('click', function (ev) {
+    if (ev.target === this) closeImportModal();
   });
-  document.getElementById('hz-snap-btn').onclick = function () { buildSnapshot(); };
-  loadSessions();
-  buildSnapshot();  // 预热 Pitch 快照（牛散选股上下文）
-  setInterval(function () { if (!busy) loadSessions(); }, 20000);
+  [['hz-tab-skill', 'skill'], ['hz-tab-preset', 'preset']].forEach(function (pair) {
+    document.getElementById(pair[0]).addEventListener('click', function () {
+      assetTab = pair[1];
+      document.querySelectorAll('.hz-modal-tab').forEach(function (t) { t.classList.remove('on'); });
+      this.classList.add('on');
+      renderAssetList();
+    });
+  });
 })();
 </script>
 
-<div class="mini" style="text-align:center;margin-top:18px;opacity:.7"><span class="dsq-brand">Deepseek HARNESS Quant</span><span style="color:var(--muted)"> · 作者：LW </span><span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:#2a2a30;border:1px solid #3a3a44;box-shadow:0 2px 6px rgba(0,0,0,.5)"><svg class="cat-stroll" width="22" height="22" viewBox="0 0 24 24" fill="none"><path class="cat-tail" d="M14.5 17.5c3.2.6 5.2-1.2 5.6-3.8" stroke="#111" stroke-width="2.4" stroke-linecap="round" fill="none"/><path d="M7.4 6.8L6 2.8l3.6 2.6M16.6 6.8L18 2.8l-3.6 2.6" fill="#111" stroke="#111" stroke-width="1"/><circle cx="10.5" cy="9.5" r="4.4" fill="#111"/><ellipse cx="11" cy="16" rx="6" ry="4.4" fill="#111"/><circle cx="8.8" cy="9.2" r="0.9" fill="#4ade80"/><circle cx="12.2" cy="9.2" r="0.9" fill="#4ade80"/><path d="M5.8 10.2h-2.6M6.4 11.6L4 12.8M18.2 10.2h-2.6M17.6 11.6l2.4 1.2" stroke="#555" stroke-width="0.7" stroke-linecap="round"/></svg></span><span style="opacity:.5"> · 低频主观量化 · 宁缺毋滥</span></div>
+<div class="mini" style="text-align:center;margin-top:18px;opacity:.7"><span class="dsq-brand">Deepseek HARNESS Quant<span class="beta-mark">β</span></span><span style="color:var(--muted)"> · 作者：LW </span><span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:#2a2a30;border:1px solid #3a3a44;box-shadow:0 2px 6px rgba(0,0,0,.5)"><svg class="cat-stroll" width="22" height="22" viewBox="0 0 24 24" fill="none"><path class="cat-tail" d="M14.5 17.5c3.2.6 5.2-1.2 5.6-3.8" stroke="#111" stroke-width="2.4" stroke-linecap="round" fill="none"/><path d="M7.4 6.8L6 2.8l3.6 2.6M16.6 6.8L18 2.8l-3.6 2.6" fill="#111" stroke="#111" stroke-width="1"/><circle cx="10.5" cy="9.5" r="4.4" fill="#111"/><ellipse cx="11" cy="16" rx="6" ry="4.4" fill="#111"/><circle cx="8.8" cy="9.2" r="0.9" fill="#4ade80"/><circle cx="12.2" cy="9.2" r="0.9" fill="#4ade80"/><path d="M5.8 10.2h-2.6M6.4 11.6L4 12.8M18.2 10.2h-2.6M17.6 11.6l2.4 1.2" stroke="#555" stroke-width="0.7" stroke-linecap="round"/></svg></span><span style="opacity:.5"> · 低频主观量化 · 宁缺毋滥</span></div>
 </body>
 </html>

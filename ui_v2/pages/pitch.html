@@ -14,6 +14,10 @@
   .opp-row .nm { color:var(--muted); min-width:70px; }
   .tag-ot { font-size:10px; padding:1px 7px; border-radius:8px; background:#1c1c22; color:var(--navy); }
   .sc { font-weight:700; min-width:52px; text-align:right; }
+  /* ★2026-08-16 对比度修复：暗紫 #5e6ad2 在深色底上可读性差 → 页面级统一提亮（覆盖行内样式） */
+  [style*="color:#5e6ad2"] { color:#aab6fa !important; }
+  /* 深色底上的暗灰说明文字统一提亮一档 */
+  .opp-row .nm, [style*="color:#a1a1aa"] { color:#c4c4cd !important; }
 </style>
 </head>
 <body style="background:var(--bg);margin:0">
@@ -121,13 +125,13 @@
         var done = LW.decide._done[x.code];
         var st = done === 'buy' ? '<span class="st-done st-buy">已买入</span>' :
                 done === 'drop' ? '<span class="st-done st-drop">已放弃</span>' :
-                '<span class="mini" style="color:var(--gold)">待审批</span>';
+                '<span class="mini" style="color:#ffd76a;font-weight:700;text-shadow:0 0 10px rgba(242,201,76,.35)">待审批</span>';
         var scoreTxt = x.score != null ? (+x.score).toFixed(1) : '—';
-        return '<div class="sq-factor">' +
-          '<span style="font-family:ui-monospace,Consolas,monospace;font-size:12px;font-weight:700;color:var(--navy);min-width:86px">' + x.code + '</span>' +
-          '<b style="font-size:13px;min-width:64px">' + R._f(x.name, '—') + '</b>' +
-          '<span class="tag-ot" style="background:rgba(94,106,210,.14);color:#5e6ad2">' + (x.isShort ? '短线 · ' : '') + R._f(x.otype, '—') + '</span>' +
-          '<span class="mini" style="color:#a1a1aa">评分 <b style="color:#d4d4d8">' + scoreTxt + '</b></span>' + st +
+        return '<div class="sq-factor" style="background:#1a1a20;border:1px solid rgba(255,255,255,.1)">' +
+          '<span style="font-family:ui-monospace,Consolas,monospace;font-size:12px;font-weight:700;color:#ffffff;min-width:86px">' + x.code + '</span>' +
+          '<b style="font-size:13px;min-width:64px;color:#f4f4f5">' + R._f(x.name, '—') + '</b>' +
+          '<span class="tag-ot" style="background:rgba(139,156,246,.18);color:#aab6fa">' + (x.isShort ? '短线 · ' : '') + R._f(x.otype, '—') + '</span>' +
+          '<span class="mini" style="color:#c9c9d2">评分 <b style="color:#ffffff">' + scoreTxt + '</b></span>' + st +
           '<span style="margin-left:auto;display:flex;gap:6px;align-items:center">' + actionHtml(x.code, x.name, x.otype) + '</span></div>';
       }
       function section(title, list, color) {
@@ -817,6 +821,6 @@
 })();
 </script>
 
-<div class="mini" style="text-align:center;margin-top:18px;opacity:.7"><span class="dsq-brand">Deepseek HARNESS Quant</span><span style="color:var(--muted)"> · 作者：LW </span><span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:#2a2a30;border:1px solid #3a3a44;box-shadow:0 2px 6px rgba(0,0,0,.5)"><svg class="cat-stroll" width="22" height="22" viewBox="0 0 24 24" fill="none"><path class="cat-tail" d="M14.5 17.5c3.2.6 5.2-1.2 5.6-3.8" stroke="#111" stroke-width="2.4" stroke-linecap="round" fill="none"/><path d="M7.4 6.8L6 2.8l3.6 2.6M16.6 6.8L18 2.8l-3.6 2.6" fill="#111" stroke="#111" stroke-width="1"/><circle cx="10.5" cy="9.5" r="4.4" fill="#111"/><ellipse cx="11" cy="16" rx="6" ry="4.4" fill="#111"/><circle cx="8.8" cy="9.2" r="0.9" fill="#4ade80"/><circle cx="12.2" cy="9.2" r="0.9" fill="#4ade80"/><path d="M5.8 10.2h-2.6M6.4 11.6L4 12.8M18.2 10.2h-2.6M17.6 11.6l2.4 1.2" stroke="#555" stroke-width="0.7" stroke-linecap="round"/></svg></span><span style="opacity:.5"> · 低频主观量化 · 宁缺毋滥</span></div>
+<div class="mini" style="text-align:center;margin-top:18px;opacity:.7"><span class="dsq-brand">Deepseek HARNESS Quant<span class="beta-mark">β</span></span><span style="color:var(--muted)"> · 作者：LW </span><span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:#2a2a30;border:1px solid #3a3a44;box-shadow:0 2px 6px rgba(0,0,0,.5)"><svg class="cat-stroll" width="22" height="22" viewBox="0 0 24 24" fill="none"><path class="cat-tail" d="M14.5 17.5c3.2.6 5.2-1.2 5.6-3.8" stroke="#111" stroke-width="2.4" stroke-linecap="round" fill="none"/><path d="M7.4 6.8L6 2.8l3.6 2.6M16.6 6.8L18 2.8l-3.6 2.6" fill="#111" stroke="#111" stroke-width="1"/><circle cx="10.5" cy="9.5" r="4.4" fill="#111"/><ellipse cx="11" cy="16" rx="6" ry="4.4" fill="#111"/><circle cx="8.8" cy="9.2" r="0.9" fill="#4ade80"/><circle cx="12.2" cy="9.2" r="0.9" fill="#4ade80"/><path d="M5.8 10.2h-2.6M6.4 11.6L4 12.8M18.2 10.2h-2.6M17.6 11.6l2.4 1.2" stroke="#555" stroke-width="0.7" stroke-linecap="round"/></svg></span><span style="opacity:.5"> · 低频主观量化 · 宁缺毋滥</span></div>
 </body>
 </html>

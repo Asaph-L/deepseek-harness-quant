@@ -33,10 +33,10 @@ sys.path.insert(0, str(BASE))
 import numpy as np
 import pandas as pd
 
-BARS_DB = Path(r"data/cache/bars.db")
-FIN_DB = Path(r"data/cache/finance.db")
-BASIC_DB = Path(r"data/cache/stock_basic.db")
-MV_CSV = Path(r"data/cache/circ_mv_map_full.csv")
+BARS_DB = Path(r"D:/劳威派量化数据/cache/bars.db")
+FIN_DB = Path(r"D:/劳威派量化数据/cache/finance.db")
+BASIC_DB = Path(r"D:/劳威派量化数据/cache/stock_basic.db")
+MV_CSV = Path(r"D:/劳威派量化数据/cache/circ_mv_map_full.csv")
 
 
 def load_close_panel(days=300, end=None) -> pd.DataFrame:
@@ -67,7 +67,7 @@ def load_close_panel(days=300, end=None) -> pd.DataFrame:
         except Exception:
             pass
     df = pd.read_sql(
-        "SELECT date, code, close, volume FROM daily_bar "
+        "SELECT date, code, close, volume, high, low FROM daily_bar "
         "WHERE adjust='qfq' AND date<=? AND close>0", con, params=(last,))
     # ★#143 增量库数据补充（增量行覆盖主库同 key）
     try:
@@ -76,7 +76,7 @@ def load_close_panel(days=300, end=None) -> pd.DataFrame:
             try:
                 _c = sqlite3.connect(f"file:{_p}?mode=ro&immutable=1", uri=True, timeout=3)
                 _df2 = pd.read_sql(
-                    "SELECT date, code, close, volume FROM daily_bar "
+                    "SELECT date, code, close, volume, high, low FROM daily_bar "
                     "WHERE adjust='qfq' AND date<=? AND close>0", _c, params=(last,))
                 if len(_df2):
                     df = pd.concat([df, _df2], ignore_index=True).drop_duplicates(
@@ -89,8 +89,13 @@ def load_close_panel(days=300, end=None) -> pd.DataFrame:
     con.close()
     p = df.pivot_table(index="date", columns="code", values="close")
     v = df.pivot_table(index="date", columns="code", values="volume")
+    h = df.pivot_table(index="date", columns="code", values="high")
+    l = df.pivot_table(index="date", columns="code", values="low")
     p = p.sort_index().tail(days)
-    return p, v.reindex(p.index).sort_index()
+    v = v.reindex(p.index).sort_index()
+    h = h.reindex(p.index).sort_index()
+    l = l.reindex(p.index).sort_index()
+    return p, v, h, l
 
 
 def load_fundamentals(end=None) -> pd.DataFrame:
@@ -135,14 +140,20 @@ def rank(date: str = None, n: int = 30) -> dict:
             except Exception:
                 _last = None
         date = _last or datetime.now().strftime("%Y-%m-%d")
-    px, vx = load_close_panel(end=date)
+    px, vx, hx, lx = load_close_panel(end=date)
     if px.empty:
         return {"error": "close 面板为空", "date": date}
 
     # ---- 因子计算 ----
     close = px.astype(float)
-    vol60 = close.pct_change().rolling(60, min_periods=40).std() * np.sqrt(252)
+    ret = close.pct_change()
+    vol60 = ret.rolling(60, min_periods=40).std() * np.sqrt(252)
     mom120 = close / close.shift(120) - 1   # 120 日动量
+    # ★2026-08-16 B-14 落地：量价前四强进排名引擎（max_ret20/std20/amp20/skew20，全负向）
+    max_ret20 = ret.rolling(20, min_periods=10).max()
+    std20 = ret.rolling(20, min_periods=10).std()
+    skew20 = ret.rolling(20, min_periods=10).skew()
+    amp20 = (hx / lx - 1).rolling(20, min_periods=10).mean()
     # ★技术状态（决策池严格确认用）：MA50/MA200/52周高低点/量比
     ma50 = close.rolling(50, min_periods=40).mean()
     ma200 = close.rolling(200, min_periods=120).mean()
@@ -153,6 +164,10 @@ def rank(date: str = None, n: int = 30) -> dict:
     f = pd.DataFrame({
         "vol60": vol60.iloc[-1],
         "mom120": mom120.iloc[-1],
+        "max_ret20": max_ret20.iloc[-1],
+        "std20": std20.iloc[-1],
+        "skew20": skew20.iloc[-1],
+        "amp20": amp20.iloc[-1],
         "close": close.iloc[-1],
         "ma50": ma50.iloc[-1],
         "ma200": ma200.iloc[-1],
@@ -199,7 +214,14 @@ def rank(date: str = None, n: int = 30) -> dict:
     score["reversal"] = f["mom120"].rank(pct=True, ascending=False)   # 超跌→高分（动量反向）
     score["quality"] = f["roe"].rank(pct=True, ascending=False)       # ROE 高→高分
     score["growth"] = f["nyoy"].rank(pct=True, ascending=False)       # 净利同比高→高分
-    W = {"quality": 0.30, "growth": 0.30, "lowvol": 0.20, "reversal": 0.20}
+    # ★2026-08-16 B-14：量价前四强（全负向：低彩票/低波/低振幅/低偏度 → 高分）
+    score["max_ret20"] = f["max_ret20"].rank(pct=True, ascending=False)
+    score["std20"] = f["std20"].rank(pct=True, ascending=False)
+    score["amp20"] = f["amp20"].rank(pct=True, ascending=False)
+    score["skew20"] = f["skew20"].rank(pct=True, ascending=False)
+    # ★2026-08-16 权重调整：质量/成长为主（0.25×2），量价四强合计 0.20 增强
+    W = {"quality": 0.25, "growth": 0.25, "lowvol": 0.15, "reversal": 0.15,
+         "max_ret20": 0.05, "std20": 0.05, "amp20": 0.05, "skew20": 0.05}
     total = sum(score[k] * w for k, w in W.items())
     f["score"] = total * 100
 
