@@ -1,0 +1,345 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>研究成果库 · Research · 20260811_101549</title>
+<link rel="stylesheet" href="/ui_common.css"><style>
+body{font-family:'Microsoft YaHei',sans-serif;margin:0;background:#f5f7fa;color:#1f2937}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+.header{background:linear-gradient(135deg,#2563eb,#1e40af);color:#fff;border-radius:12px;padding:16px 20px;margin-bottom:14px}
+.header h1{margin:0;font-size:20px}.header .sub{margin-top:4px;font-size:12px;opacity:.85}
+.card{background:#fff;border-radius:10px;padding:12px 16px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.06);cursor:pointer;transition:box-shadow .15s}
+.card:hover{box-shadow:0 3px 8px rgba(0,0,0,.12)}
+.card .hd{display:flex;justify-content:space-between;align-items:center;font-weight:600}
+.card .tag{font-size:11px;background:#eef2ff;color:#2563eb;border-radius:6px;padding:2px 8px;font-weight:400}
+.card .bd{display:none;margin-top:8px;font-size:13px;color:#4b5563;border-top:1px dashed #e5e7eb;padding-top:8px;line-height:1.7}
+.card.open .bd{display:block}
+.card .link{color:#2563eb;text-decoration:none;font-size:12px}
+.sec{font-size:15px;font-weight:700;margin:18px 0 10px;color:#111827;display:flex;align-items:center;gap:8px}
+.sec .n{font-size:11px;color:#6b7280;font-weight:400}
+.search{width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;margin-bottom:10px;box-sizing:border-box}
+table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden}
+th,td{padding:7px 10px;font-size:12px;text-align:left;border-bottom:1px solid #f3f4f6}
+th{background:#f9fafb;color:#374151}
+.term{display:none}.term.show{display:table-row}
+.empty{padding:20px;text-align:center;color:#9ca3af;font-size:13px}
+</style></head>
+<body><div class="lw-nav" data-page="terms"></div><script src="/nav_common.js"></script>
+<div class="wrap">
+<div class="header"><h1>📚 研究成果库</h1>
+<div class="sub">25+ 研究文档 + 策略标注 + 术语表 · 指向系统决策 · 数据截至研究文档实时</div></div>
+
+
+<div class="sec">🎛 择时白话卡 <span class="n">档位 / 闸门 / 审计 · 帮你看懂"现在能不能做"</span></div>
+<div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🧭 仓位档位（动态择时）</span><span class="tag">regime</span></div>
+  <div class="bd"><b>满仓 100%</b>＝市场环境强（赚钱效应好，放心打）；<b>进攻 75%</b>＝环境偏强（可积极参与）；<b>中性 50%</b>＝震荡市（半仓观望）；<b>防守 25%</b>＝环境转弱（轻仓试错）；<b>空仓 0%</b>＝市场风险高（现金为王，不硬做）。<br>当前档位见决策总览「择时整合卡」。</div>
+</div>
+<div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🚧 趋势闸门（MA60）</span><span class="tag">gate</span></div>
+  <div class="bd">个股<b>站上 MA60 且均线向上</b>才参与——跌势中的反弹不接（"接飞刀"实证：跌得多的股票继续跌，不反转）。金叉位置参与的胜率差（实证 78% vs 41%），所以宁可等企稳。</div>
+</div>
+<div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🔍 数据审计</span><span class="tag">audit</span></div>
+  <div class="bd">系统每天校验行情/财报数据是否完整新鲜（<b>断档/缺字段会告警</b>）——数据不可信时信号也不可信，先修数据再决策。详见「系统状态」页审计区。</div>
+</div>
+
+<div class="sec">📄 研究成果文档 <span class="n">25 篇 · 点击展开摘要</span></div>
+<div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>📄 11大因子库研究评估</span><span class="tag">因子池注册 + 体检</span></div>
+  <div class="bd">- **真相**：世坤 101 个公式化量价因子（论文《101 Formulaic Alphas》），美股 A 股通用 - **项目状态**：已在《量价因子三库第一批配置清单》——华泰 7 有效（Alpha3/13/15/16/44/50/55）+ 渤海 top15 交叉，第一批 8 因子入池规划 - **数据**：零缺口（OHLCV）；qlib 内置实现 - **结论**：维持 A 级，无新增 - **真相**：Microsoft Q<br><span class="link">文档路径：01_策略研究与评价/11大因子库研究评估.md</span></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>📄 A级清单到主系统6类机会映射</span><span class="tag">研究参考</span></div>
+  <div class="bd">| A 级项 | 类别 | 机会类型 | 角色 | 建议权重方向 | 数据依赖 | |---|---|---|---|---|---| | **reversal20** | 因子 | **反转** | 识别因子（核心） | 正（超跌做多） | 日线 ✅ | | **sentiment** | 因子 | **反转 / 事件** | 确认因子 | 正（异动惯性） | 日线 ✅ | | **turnover** | 因子 | **质量折价**<br><span class="link">文档路径：01_策略研究与评价/A级清单到主系统6类机会映射.md</span></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>📄 A股事件驱动研究</span><span class="tag">event 机会类 + 择时</span></div>
+  <div class="bd">| 事件 | 总体效应 | 关键分层 | 对本库的价值 | |---|---|---|---| | **涨停板** | 次日买入长期亏损（胜率 40-50%，开盘溢价 3-5% 隐性成本） | 换手<3% 秒板 → 次日胜率 80%；换手>50% 尾盘板 → 跌停率 22% | **反转因子的污染源识别 + 情绪池质量过滤器** | | **龙虎榜** | 打板成功率仅 42-44%（前 30 营业部） | 机构席位≠游资席位；知名游资<br><span class="link">文档路径：01_策略研究与评价/A股事件驱动研究.md</span></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>📄 A股微观结构与因子实现细节</span><span class="tag">机会引擎（reversal/breakout/event 触发）</span></div>
+  <div class="bd">| # | 制度细节 | 影响的因子/环节 | 严重度 | 处理要点 | |---|---|---|---|---| | 1 | 涨跌停板（±10%/±20%/±5%/±30%） | 反转/动量/MAX/可交易性 | 🔴 高 | 涨停日信号不可执行；反转因子需剔除涨停次日样本 | | 2 | 流通股本动态（解禁/定增/回购） | 换手率因子 PIT | 🔴 高 | 分母必须用当日流通股本快照 | | 3 | T+1 交易制度 | 所有日<br><span class="link">文档路径：01_策略研究与评价/A股微观结构与因子实现细节.md</span></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>📄 A股日历效应研究</span><span class="tag">event 机会类 + 择时</span></div>
+  <div class="bd">| 时段 | 统计规律 | 强弱 | 对因子库/配方的影响 | |---|---|---|---| | **2 月**（春节+两会前） | 胜率 ~70%、收益中位 ~3%（全年最强）；中证1000 胜率 94% | ⭐⭐⭐⭐⭐ | 春季躁动核心窗口；52周高点等动量类配方**2 月过滤**（已有）；错杀/小盘弹性配方 2 月可加仓 | | **4 月**（年报+一季报截止） | 胜率 31.3%（全年最低）、中位 -1.44% | 🔴<br><span class="link">文档路径：01_策略研究与评价/A股日历效应研究.md</span></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>📄 A股行业轮动研究</span><span class="tag">机会引擎（reversal/breakout/event 触发）</span></div>
+  <div class="bd">``` ┌─ 行业选择层（月度）：行业动量/景气度/拥挤度 三因子 → 配置 TOP N 行业 ├─ 行业内选股层（现有因子池）：量价四因子 + Alpha三库 + 配方 → 行业内选股 └─ 交叉约束：行业拥挤度门槛 → 高拥挤行业切换策略；行业中性化（已有） ``` **四大实证锚点（券商回测，🟢 可引用）**： | 模型 | 行业层因子 | 表现 | |---|---|---| | 西南证券动态分域（2013.12-2026.5）<br><span class="link">文档路径：01_策略研究与评价/A股行业轮动研究.md</span></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>📄 A股趋势过滤研究</span><span class="tag">机会引擎（reversal/breakout/event 触发）</span></div>
+  <div class="bd">1. **趋势过滤是 A 股组合层最有效的防御机制**：因子池 P6 实测（2019-2026）有过滤 +341% vs 无过滤 -51%；浙商回测（1990-2025）2000-2020 显著提升风险调整收益、2008 几乎完全规避下跌； 2. **适用环境是"高波动趋势市"**：浙商明确"高波动是舒适区"——创业板/高波动个股效果好；**2020 后低波震荡环境效果一般**（结构性市+震荡，无大级别牛熊）——趋势过滤需要 Regim<br><span class="link">文档路径：01_策略研究与评价/A股趋势过滤研究.md</span></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>📄 BigQuant挖掘_评价与配方</span><span class="tag">研究参考</span></div>
+  <div class="bd">| 类别 | 数量 | 占比 | 测评结论 | |---|---|---|---| | 小市值/小盘 | 201 | 32.8% | 社区最大共识，但 PIT 口径已证伪，**多数不可信** | | 破净/低估值 | 67 | 10.9% | ★ 用户点名方向，含多个高质量组合配方 | | 成长/业绩 | 63 | 10.3% | PIT 后 IC≈0（本库实证），只宜做过滤/确认 | | ETF/指数/轮动 | 50 | 8.2% |<br><span class="link">文档路径：01_策略研究与评价/BigQuant挖掘_评价与配方.md</span></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>📄 M4仓位管理总则</span><span class="tag">B-11 止损引擎 + M4 仓位</span></div>
+  <div class="bd">1. **信号分层**：市场层（择时）→ 行业层（配置）→ 个股层（筛选）→ 组合层（风控）——各层独立输出，取交集； 2. **保守原则**：任何信号触发"降仓/回避"都执行；触发"加仓"需 2 个以上独立信号共振； 3. **正交性**：各信号来源不同（估值/趋势/日历/情绪/资金），避免同一信息重复计数； 4. **可验证**：每条规则都有历史实证或行业证据支撑，参数可回测校准。 | 破净率 | 状态 | 仓位动作 | |---|<br><span class="link">文档路径：01_策略研究与评价/M4仓位管理总则.md</span></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>📄 near_high差异诊断与增强规格</span><span class="tag">研究参考</span></div>
+  <div class="bd">| # | 成因 | 说明 | |---|---|---| | 1 | **缺行业增强层**（最大嫌疑） | 学术原版（George & Hwang 2004；Quantpedia #0088）**不是简单个股 PTH 排序**，而是**行业加权 PRILAG 排序**（20 个行业按市值加权平均 PTH 排序，买前 6 行业、空后 6 行业）。单因子版只捕捉个股层面锚定效应，丢了"行业整体接近新高"的信号——而后者才是 #0088 收<br><span class="link">文档路径：01_策略研究与评价/near_high差异诊断与增强规格.md</span></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>📄 业内情报_巫师财经与量化生态研究</span><span class="tag">研究参考</span></div>
+  <div class="bd">| # | 情报 | 来源 | 对本库启示 | 优先级 | |---|---|---|---|---| | 1 | 2026 指增超额从 14.17% → 3.11%（一年砍八成） | 🟢 私募排排网/第一财经 | **静态策略必然衰减的行业级实证**（17 课主题验证）；超额消失速度比想象快 | ⭐⭐⭐⭐⭐ | | 2 | 7 月大回撤元凶："**动量因子波动率翻了数倍**" | 🟢 量化私募人士 | **因子拥挤度监控指标**：因子<br><span class="link">文档路径：01_策略研究与评价/业内情报_巫师财经与量化生态研究.md</span></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>📄 低估值安全垫强度分级</span><span class="tag">价值线因子（估值/基本面）</span></div>
+  <div class="bd">1. **两层结构**：市场层（系统性恐慌）× 个股层（个股安全边际）——两层独立评分，最终分 = 市场层加成 × 个股层分（0-10）。 2. **全部用可得数据**：破净率（每股净资产 PIT）/ PB 分位 / 股息率 / 10 年国债利率 / 大股东增持 / 回购 / 负债率 / 现金流——财报扩展 + 行情数据即可实现。 3. **动态而非静态**：替代"PB 分位<20%"单阈值——安全垫随市场恐慌程度和个股质量变化。 | <br><span class="link">文档路径：01_策略研究与评价/低估值安全垫强度分级.md</span></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>📄 假信号识别大全</span><span class="tag">数据质量审计 + FS 过滤层</span></div>
+  <div class="bd">**假信号 = 信号发出后，价格行为与信号预期方向背离的信号。** 本质不是"指标算错了"，而是**信号背后的市场力量是人为制造的（对倒/诱多/洗盘）或统计口径失真的（PIT/幸存者/不可成交）**： | 真信号特征 | 假信号特征 | |---|---| | 多个独立维度共振（价格+量能+时间） | 单一维度好看，其他维度不配合 | | 量能可持续（次日不减） | 单日放量，次日打回原形 | | 位置合理（低位放量/高位滞涨有区分） <br><span class="link">文档路径：01_策略研究与评价/假信号识别大全.md</span></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>📄 历史优质交易案例研究_机制提炼与成果整合</span><span class="tag">研究参考</span></div>
+  <div class="bd">| # | 机制 | 历史案例 | 对应现有成果 | 结论 | |---|---|---|---|---| | 1 | **恐慌溢价买入**（市场极端悲观时买被错杀的优质股） | A股 5 次破净潮、邓普顿 1939、巴菲特 2008 | CN-6 超跌+质量过滤、A1 错杀+资金确认、情绪反转 | ✅ **双背书，A 系列方向正确** | | 2 | **深度价值安全边际**（清算价值保护） | 格雷厄姆 GEICO 1948、NCA<br><span class="link">文档路径：01_策略研究与评价/历史优质交易案例研究_机制提炼与成果整合.md</span></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>📄 外网与A股学术证据</span><span class="tag">研究参考</span></div>
+  <div class="bd">| 来源 | 类型 | 特点 | 对本项目的价值 | |---|---|---|---| | **Quantpedia** (quantpedia.com) | 策略百科全书 | 收录 1000+ 学术策略、按因子分类、每策略附论文与回测 | ★★★ 因子学术证据的"字典"，本报告核心素材 | | **Alpha Architect** (alphaarchitect.com) | 因子研究博客 | 学术论文解读（Larry Swedr<br><span class="link">文档路径：01_策略研究与评价/外网与A股学术证据.md</span></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>📄 当前市场状态快照_2026-08</span><span class="tag">研究参考</span></div>
+  <div class="bd">**7 月大回撤后的超跌修复行情已行至后半程**：指数修复强劲（中证1000 周涨 8.5%），但量价背离+存量博弈显示情绪修复渐近尾声； 破净率 7.57% 中性（无恐慌也无极端）、成交 2.5 万亿+ 活跃、量化资金处于"踩踏后买回"阶段—— **配置含义：A 系列错杀配方正常权重不加仓；不追高；盯科技拥挤度；8 月下旬中报窗口是下一个决策点**。 - 7.13-17 单周急跌：科创综指 -17.46%、中证500 -11.7%、中<br><span class="link">文档路径：01_策略研究与评价/当前市场状态快照_2026-08.md</span></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>📄 数据层PIT缺口诊断</span><span class="tag">数据质量审计 + FS 过滤层</span></div>
+  <div class="bd">`data\cache\finance.db` 的 `finance_report` 表结构（2026-08-09 检查）： ``` code / period / net_profit / revenue / sq_net_profit / sq_net_yoy / sq_revenue / sq_rev_yoy / eps / roe / source ``` **没有 `ann_date`（公告日）字段**。行数 33<br><span class="link">文档路径：01_策略研究与评价/数据层PIT缺口诊断.md</span></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>📄 止损策略与买入逻辑匹配研究</span><span class="tag">B-11 止损引擎 + M4 仓位</span></div>
+  <div class="bd">1. **止损放在"买入论点被证伪"的位置**（thesis invalidation）——不是拍脑袋的百分比，而是"什么价格说明我错了" 2. **止损控制的是亏损规模，不是避免亏损**——欧奈尔：跌破 8% 通常意味着基本面或技术面出了大问题，后市大概率深跌 3. **止损必须机械化**——心理止损执行率 <50%（行为金融实证），等于没有止损 **止损位置设置原则**（技术位优先于百分比）： ``` 支撑下方（前期低点/平台）→ <br><span class="link">文档路径：01_策略研究与评价/止损策略与买入逻辑匹配研究.md</span></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>📄 海外大神策略_A股适配研究</span><span class="tag">研究参考</span></div>
+  <div class="bd">- **出处**：Joseph Piotroski (2000)《Value Investing: The Use of Historical Financial Statement Information to Separate Winners from Losers》 - **规则**：在价值股池（高 BM）内做 9 项财务体检，每项 0/1 分： - 盈利能力（4 项）：① ROA>0 ② 经营现金流>0 ③ ΔROA>0 ④ 现<br><span class="link">文档路径：01_策略研究与评价/海外大神策略_A股适配研究.md</span></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>📄 研究共识与冲突全景总结</span><span class="tag">研究参考</span></div>
+  <div class="bd">- **共识 = 直接采用**：至少 3 个独立来源一致支持，可作为设计铁律； - **冲突 = 需裁决**：标注双方证据、冲突原因分析、裁决方案（体检/条件化/以 A 股实证为准）； - 每条结论给出"证据源数量"和"可信度"（🟢 高 / 🟡 中）。 | 来源 | 证据 | |---|---| | 因子池实测 | 量价四因子 ICIR 0.47-0.57；基本面 PIT 后归零 | | 华泰 Alpha101 | 7 个有效因子全是价<br><span class="link">文档路径：01_策略研究与评价/研究共识与冲突全景总结.md</span></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>📄 研究落地差距分析_20260810</span><span class="tag">研究参考</span></div>
+  <div class="bd">| 层 | 因子数量 | 内容 | 落地度 | |---|---|---|---| | **研究知识库**（我的产出） | 60+ 因子/配方 | 评分表 A/B 级、量价三库、学术锚点、行业 IND、事件 EV、日历 CAL、F-Score/SUE 规格 | —（上游） | | **因子池**（回测师产出） | **33 个量价因子**（今日全量体检）+ **4 个基本面因子**（今日 PIT 复活） | 全部过 8 维体检，ICIR<br><span class="link">文档路径：01_策略研究与评价/研究落地差距分析_20260810.md</span></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>📄 策略学术评审与筛选总表</span><span class="tag">研究参考</span></div>
+  <div class="bd">| 维度 | 问的问题 | 评估要点 | |---|---|---| | **① 理论依据** | 是否有学术文献支撑？ | 因子发现/异象的原始论文、跨市场复现 | | **② 实证证据** | 证据是否一致？ | 学术回测 × 本库回测（PIT）× 社区回测 三者一致性 | | **③ 经济机制** | 赚钱的逻辑是什么？ | 风险补偿 / 行为偏差 / 市场摩擦——机制是否可解释、可持续 | | **④ 稳健性** | 换个时期还<br><span class="link">文档路径：01_策略研究与评价/策略学术评审与筛选总表.md</span></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>📄 量价共识机会类型设计</span><span class="tag">研究参考</span></div>
+  <div class="bd">**问题**：低换手+低波+情绪稳定的"冷门优质"逻辑——安全垫高 → 安全权重应高？还是量价异动 → 收益权重高？ **结论：安全权重应高（40%），收益 25%、概率 35%。理由如下：** | 因子 | 方向 | 属性 | 共识命中时的贡献 | |---|---|---|---| | turn_mid_prox | 换手中位接近 | 安全 | 排除过热（>90分位）与无人问津（<10分位） | | turnover | 低换手（负<br><span class="link">文档路径：01_策略研究与评价/量价共识机会类型设计.md</span></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>📄 量价因子三库第一批配置清单</span><span class="tag">因子池注册 + 体检</span></div>
+  <div class="bd">1. **A 股实证优先**：只选有券商实证记录的因子（华泰 2019 全A测试 / 渤海 top15 / 东吴周频实证 / 聚源 2025 跟踪）。 2. **类别分散**：第一批覆盖"价量背离 / 波动时序 / 流动性相关 / 日内结构"四个维度，避免全选同一族 （华泰 7 个有效因子全是价量背离类，两两相关较高，不能全选）。 3. **零数据缺口**：全部基于 OHLCV + 成交量，纯日线可得。 4. **可实现性**：**排除<br><span class="link">文档路径：01_策略研究与评价/量价因子三库第一批配置清单.md</span></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>📄 隔夜日内异象研究</span><span class="tag">机会引擎（reversal/breakout/event 触发）</span></div>
+  <div class="bd">| 年 | C2O 均值（%/日） | |---|---| | 2019 | -0.021 | | 2020 | -0.088 | | 2021 | -0.060 | | 2022 | -0.063 | | 2023 | -0.013 | | 2024 | -0.027 | | 2025 | -0.057 | | 2026 | -0.050 | | **全样本** | **-0.046**（日内 O2C +0.113，隔夜与日内方向相反<br><span class="link">文档路径：01_策略研究与评价/隔夜日内异象研究.md</span></div>
+</div>
+
+<div class="sec">🎯 策略标注（A-D 区）<span class="n">· 点击展开</span></div>
+<div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 低估值</span><span class="tag">value</span></div>
+  <div class="bd"><b>是什么：</b>在股价跌到历史低位（PB/PE 便宜）的股票里，找基本面没有变坏的。<br><b>为什么有效：</b>市场逻辑：便宜总有反弹的均值回归力量；行为金融：投资者对坏消息过度悲观、对冷门股定价不足；实证：17 年 6 月胜率 62.5%。<br><b>证据：</b>17 年回测（2011-2026，2379 样本）：6月胜率 62.5% / 均收益 +11.6% / 盈亏比 2.42（7 类第 2 强，安全垫实证🏆）</div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 价值重估</span><span class="tag">revalue</span></div>
+  <div class="bd"><b>是什么：</b>业绩超预期爆发（净利大增）的股票，估值和盈利一起往上走（戴维斯双击）。<br><b>为什么有效：</b>市场逻辑：盈利加速会吸引资金把估值也抬起来；行为金融：分析师预期滞后于盈利拐点（PEAD 效应）；实证：17 年胜率 53.6% 且收益稳定。<br><b>证据：</b>17 年回测（2011-2026，7669 样本）：6月胜率 53.6% / 均收益 +8.7%（稳定正期望）</div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 质量折价</span><span class="tag">quality_gap</span></div>
+  <div class="bd"><b>是什么：</b>好公司（ROE 高）因为短期利空被错杀大跌，买「便宜的优质股」。<br><b>为什么有效：</b>市场逻辑：优质公司基本面有支撑，恐慌抛售过头后必然修复；行为金融：过度反应（disaster myopia）；实证：17 年 70.4% 胜率 7 类最强。<br><b>证据：</b>17 年回测（2011-2026，520 样本）：6月胜率 70.4% / 均收益 +14.6%（7 类最强🏆）</div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 量价共识</span><span class="tag">pv_consensus</span></div>
+  <div class="bd"><b>是什么：</b>量价五因子（换手/情绪/低换手/反转/低波）中 4 个以上同时优秀——「五票通过」的冷门优质股。<br><b>为什么有效：</b>市场逻辑：多因子独立证据共振比单因子可靠（每个因子都可能误报，同时命中=共识）；实证：五强因子 ICIR 0.47-0.87 均显著，17 年胜率 53.3%。<br><b>证据：</b>17 年回测（2011-2026，8832 样本）：6月胜率 53.3% / 均收益 +4.3%；五强 ICIR：turn_mid_prox 0.868 全库最强</div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 事件驱动</span><span class="tag">event</span></div>
+  <div class="bd"><b>是什么：</b>政策/行业景气度驱动的板块重定价——A 股「政策市」特征明显。<br><b>为什么有效：</b>市场逻辑：政策与行业催化带来资金集中流入，板块整体重估；实证：中信建投政策信号=板块超额核心驱动，17 年胜率 51.5%。<br><b>证据：</b>17 年回测（2011-2026，6893 样本）：6月胜率 51.5% / 均收益 +8.3%（稳定正期望）</div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 突破</span><span class="tag">breakout</span></div>
+  <div class="bd"><b>是什么：</b>股价在长期横盘后放量突破关键位（52 周高点/平台），赌新趋势启动。<br><b>为什么有效：</b>市场逻辑：趋势确认后惯性延续（动量）；但 A 股反转市追高胜率低——实证 17 年仅 45.5%，且环境敏感（2011-14 达 54.6%，2019+ 仅 39%）。<br><b>证据：</b>17 年回测（2011-2026，6731 样本）：6月胜率 45.5% / 均收益 +5.4%；两段稳健性实测：54.6%（2011-14）vs 39.0%（2019-26）</div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 反转</span><span class="tag">reversal</span></div>
+  <div class="bd"><b>是什么：</b>超跌股票（深回撤）企稳反弹——A 股动量全区间反向，超跌反弹是最稳定的统计特征。<br><b>为什么有效：</b>市场逻辑：恐慌抛售过度，超跌后有均值回归力量；实证：动量 RankIC -0.070（CS-01），17 年回测胜率仅 39%——负期望，所以门槛提高宁缺毋滥。<br><b>证据：</b>17 年回测（2011-2026，1840 样本）：6月胜率仅 39% / 均收益 -1.8%（负期望）→ 门槛已提至 68；早期段（2011-14）更差 34.3%</div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 60 日低波</span><span class="tag">tech_lowvol_60</span></div>
+  <div class="bd"><b>是什么：</b>过去 60 个交易日波动率低（股价平稳）的股票。<br><b>为什么有效：</b>A 股实证：低波因子 ICIR -0.62（负）——不是低波不好，而是符号反了：低波在 A 股收益低、高波反而收益高（散户风险偏好）；裁决：取负使用=高波溢价，与五强 lowvol 合并去重。<br><b>证据：</b>ICIR -0.6226（17 年体检，69 个月）｜ 取负后 ≈+0.62</div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 20-120 日动量</span><span class="tag">tech_mom_20_120</span></div>
+  <div class="bd"><b>是什么：</b>最近 20 日相对 120 日涨跌（中期动量）。<br><b>为什么有效：</b>A 股全区间动量反向（CS-01 RankIC -0.070）：涨得多的中期会回调——取负使用 = 中期反转因子，ICIR≈+0.40。<br><b>证据：</b>ICIR -0.4005（17 年体检，66 个月）｜ 取负后 ≈+0.40</div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 120 日相对强度</span><span class="tag">tech_rps_120</span></div>
+  <div class="bd"><b>是什么：</b>个股 120 日涨幅相对全市场排名（相对强弱）。<br><b>为什么有效：</b>与 mom_20_120 完全同计算（ICIR/月数/IC胜率全同）——重复因子，裁决：剔除并入 mom_20_120，防混淆。<br><b>证据：</b>ICIR -0.4005（与 mom_20_120 相同，确认重复）</div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 创 52 周新高</span><span class="tag">tech_new_high_250</span></div>
+  <div class="bd"><b>是什么：</b>股价创过去 250 日新高（追高信号）。<br><b>为什么有效：</b>A 股追高亏钱：创新高后 6 月收益负（IC 胜率 30.6%）——裁决：降级为触发过滤（创新高股评分减分 ≤0.05），不独立入池。<br><b>证据：</b>ICIR -0.384（17 年体检，72 个月，IC 胜率 30.6%）</div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 接近 52 周高点</span><span class="tag">tech_near_high_250</span></div>
+  <div class="bd"><b>是什么：</b>股价距 250 日最高点的距离（突破候选容量）。<br><b>为什么有效：</b>弱反向（ICIR -0.18）：接近高点的股票整体偏弱——裁决：降级为突破类触发过滤（≤0.10 权重），突破评分主驱动改 vol_contract+vol_ratio（P1-3 裁决）。<br><b>证据：</b>ICIR -0.1779（17 年体检，66 个月，IC 胜率 39.4%）</div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 政策不确定性水平</span><span class="tag">epu_epu_level</span></div>
+  <div class="bd"><b>是什么：</b>经济政策不确定性指数（EPU）的当前水平——政策越不确定，市场越谨慎。<br><b>为什么有效：</b>择时模拟验证不过（2023 后独立择时失效），人工锁定为 candidate：仅回撤控制有效（高 EPU 时降仓）→ 保持观察不升级。<br><b>证据：</b>score 71.2（体检）｜ FRED CHNMAINLANDEPU</div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 政策不确定性 Z 值</span><span class="tag">epu_epu_z12</span></div>
+  <div class="bd"><b>是什么：</b>EPU 的 12 个月标准化值（相对历史高低）。<br><b>为什么有效：</b>同 epu_level：择时验证不过，人工锁定 candidate；高 EPU 期回撤控制有效。<br><b>证据：</b>score 69.9（体检）</div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 政策不确定性 3 月变化</span><span class="tag">epu_epu_chg_3m</span></div>
+  <div class="bd"><b>是什么：</b>EPU 近 3 个月斜率（政策不确定性上升/下降）。<br><b>为什么有效：</b>变化率因子：EPU 快速上升期（政策密集）市场承压；candidate 状态待验证。<br><b>证据：</b>score 61.8（体检）</div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 政策不确定性 1 月变化</span><span class="tag">epu_epu_chg_1m</span></div>
+  <div class="bd"><b>是什么：</b>EPU 环比变化（最敏感的政策信号）。<br><b>为什么有效：</b>噪音较大（单月波动），score 44.3 偏弱，candidate。<br><b>证据：</b>score 44.3（体检）</div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 货币政策不确定性（H&L）</span><span class="tag">epu_epu_hl_monetary</span></div>
+  <div class="bd"><b>是什么：</b>Huang&Luk 构建的货币政策不确定性指数（2000-2022）。<br><b>为什么有效：</b>数据源已停止更新（2022 截止）——retired：无新数据，退出因子池。<br><b>证据：</b>score 34.7 ｜ Huang&Luk 2020</div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 财政政策不确定性（H&L）</span><span class="tag">epu_epu_hl_fiscal</span></div>
+  <div class="bd"><b>是什么：</b>Huang&Luk 财政政策不确定性指数（2000-2022）。<br><b>为什么有效：</b>同 monetary：数据 2022 截止，retired。<br><b>证据：</b>score 29.1 ｜ Huang&Luk 2020</div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 换手中位接近度</span><span class="tag">factor_turn_mid_prox</span></div>
+  <div class="bd"><b>是什么：</b>个股 20 日均换手率与全市场中位数的接近程度——热度「刚刚好」的股票。<br><b>为什么有效：</b>全库最强因子（ICIR 0.868）：排除了过热（高换手）和无人问津（低换手），选「正常热度」；冷门但非死股。<br><b>证据：</b>ICIR 0.868（20日）/ 1.35（60日），23 因子第一</div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 情绪（换手异动）</span><span class="tag">factor_sentiment</span></div>
+  <div class="bd"><b>是什么：</b>个股换手率相对其 60 日均值的放大程度——资金关注度突变。<br><b>为什么有效：</b>ICIR 0.566：换手异动后的惯性（资金进场后短期延续）；但当前拥挤度 90% 分位（2026-08）——已触发降权 50%，警惕踩踏。<br><b>证据：</b>ICIR 0.566（20日）｜ C3 拥挤度实测：90.0% 分位 → 降权</div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 低换手（换手率）</span><span class="tag">factor_turnover</span></div>
+  <div class="bd"><b>是什么：</b>20 日均换手率低=筹码锁定好、关注度低的股票。<br><b>为什么有效：</b>ICIR 0.514：低换手溢价（A 股冷门股被低估）；与情绪因子互补（低换手+无异动=真冷门）。<br><b>证据：</b>ICIR 0.514（20日）</div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 20 日反转</span><span class="tag">factor_reversal20</span></div>
+  <div class="bd"><b>是什么：</b>过去 20 日跌幅（超跌程度）。<br><b>为什么有效：</b>ICIR 0.484：A 股超跌后短期反弹（20 日反转效应）；与 120 日动量反向一脉相承（反转市特征）。<br><b>证据：</b>ICIR 0.484（20日）</div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 低波</span><span class="tag">factor_lowvol</span></div>
+  <div class="bd"><b>是什么：</b>60 日波动率低（股价平稳）。<br><b>为什么有效：</b>ICIR 0.472：低波股票风险调整后收益好（Smart Beta 经典）；与档案 lowvol_60 同源（符号表示不同，C2 已去重）。<br><b>证据：</b>ICIR 0.472（20日）｜ 与 lowvol_60 合并（C2 裁决）</div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 胜率</span><span class="tag">winrate</span></div>
+  <div class="bd"><b>是什么：</b>赚钱的交易占比（比如 100 次交易 60 次赚钱=60%）<br><b>为什么有效：</b>胜率高不等于赚钱——还要看赢的时候赚多少、输的时候亏多少（盈亏比）<br><b>证据：</b></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 盈亏比</span><span class="tag">pl_ratio</span></div>
+  <div class="bd"><b>是什么：</b>平均每笔盈利 ÷ 平均每笔亏损<br><b>为什么有效：</b>盈亏比 2=赚一次够亏两次；胜率 45%+盈亏比 2 依然赚钱<br><b>证据：</b></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 分层收益</span><span class="tag">layered_ret</span></div>
+  <div class="bd"><b>是什么：</b>按因子值把股票分 5-10 组，看每组未来收益——检验因子单调性<br><b>为什么有效：</b>如果第 1 组到第 5 组收益逐步递增，说明因子真有效（而非个别股票）<br><b>证据：</b></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 单调性</span><span class="tag">monotonic</span></div>
+  <div class="bd"><b>是什么：</b>因子值从小到大排序，收益也跟着单调变化（递增或递减）<br><b>为什么有效：</b>单调=因子逻辑清晰稳定；不单调=可能只是巧合<br><b>证据：</b></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 LS 组合（多空组合）</span><span class="tag">ls_combo</span></div>
+  <div class="bd"><b>是什么：</b>做多因子最好的 1 组、做空最差的 1 组，看两者差<br><b>为什么有效：</b>对冲掉大盘涨跌，纯粹看因子本身的选股能力<br><b>证据：</b></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 PIT（点即时）</span><span class="tag">pit</span></div>
+  <div class="bd"><b>是什么：</b>Point-in-Time：只用当时真实能拿到的数据（财报公告日之后才能用财报）<br><b>为什么有效：</b>防止用未来数据作弊——回测再好看，用了未来数据实盘必亏<br><b>证据：</b></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 未来函数</span><span class="tag">lookahead</span></div>
+  <div class="bd"><b>是什么：</b>回测里用了当时还不知道的信息（比如用今天发布的财报回测昨天）<br><b>为什么有效：</b>未来函数=回测假象的最大来源，实盘必翻车<br><b>证据：</b></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 幸存者偏差</span><span class="tag">survivorship</span></div>
+  <div class="bd"><b>是什么：</b>只统计还活着的股票，退市/暴跌的没算进去——结果虚高<br><b>为什么有效：</b>A 股退市股很多，忽略它们回测会过度乐观<br><b>证据：</b></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 前视偏差</span><span class="tag">lookahead_bias</span></div>
+  <div class="bd"><b>是什么：</b>用事后才知道的信息做决策（如用最终财报修正历史数据）<br><b>为什么有效：</b>和未来函数类似，是回测作弊的隐蔽形式<br><b>证据：</b></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 因子拥挤度</span><span class="tag">factor_crowding</span></div>
+  <div class="bd"><b>是什么：</b>多少资金/机构在用同一个因子——太拥挤会失效甚至踩踏<br><b>为什么有效：</b>拥挤因子：大家都埋伏好，预期已透支；本项目 C3 将监控（60 日波动率分位>90 降权）<br><b>证据：</b></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 半衰期</span><span class="tag">half_life</span></div>
+  <div class="bd"><b>是什么：</b>因子预测力衰减到一半需要多久<br><b>为什么有效：</b>半衰期短=要及时换手；长=可以慢慢持有<br><b>证据：</b></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 动量</span><span class="tag">momentum</span></div>
+  <div class="bd"><b>是什么：</b>过去涨得多的股票未来继续涨（美股有效）<br><b>为什么有效：</b>美股趋势市有效；A 股反转市动量长期反向<br><b>证据：</b></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 反转</span><span class="tag">reversal_term</span></div>
+  <div class="bd"><b>是什么：</b>过去跌得多的股票未来反弹（与动量相反）<br><b>为什么有效：</b>A 股超跌反弹是最稳定的 alpha 之一<br><b>证据：</b></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 量比</span><span class="tag">vol_ratio</span></div>
+  <div class="bd"><b>是什么：</b>今天成交量相对近期平均的倍数（1.5=放量 50%）<br><b>为什么有效：</b>放量=资金关注；突变放量=异动信号<br><b>证据：</b></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 VCP（波动收缩）</span><span class="tag">vcp</span></div>
+  <div class="bd"><b>是什么：</b>Volatility Contraction Pattern：突破前波动率逐步收窄的形态<br><b>为什么有效：</b>收缩=多空平衡快结束，突破方向更有持续性<br><b>证据：</b></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 均线多头</span><span class="tag">ma_bull</span></div>
+  <div class="bd"><b>是什么：</b>短期均线在上、长期均线在下（5>20>60 等）的排列<br><b>为什么有效：</b>多头排列=趋势向上，回调到均线有支撑<br><b>证据：</b></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 Beneish M-Score</span><span class="tag">beneish</span></div>
+  <div class="bd"><b>是什么：</b>8 个财务指标的造假嫌疑打分（M 值越高越像造假）<br><b>为什么有效：</b>识别财报粉饰——比单一指标（如毛利率）更全面<br><b>证据：</b></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 财报粉饰</span><span class="tag">financial_foam</span></div>
+  <div class="bd"><b>是什么：</b>通过会计手段把利润做得好看的操作（虚增收入/隐藏费用）<br><b>为什么有效：</b>粉饰后的利润不可持续，是暴雷源头<br><b>证据：</b></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 ROE 单季口径</span><span class="tag">roe_quarter</span></div>
+  <div class="bd"><b>是什么：</b>只用最新一个季度的净利润算 ROE（年化），而非全年累计<br><b>为什么有效：</b>单季更灵敏——能抓到业绩拐点；全年口径滞后<br><b>证据：</b></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 PE/PB 分位</span><span class="tag">pe_pb_pct</span></div>
+  <div class="bd"><b>是什么：</b>当前估值在自己历史中的位置（PB 分位 20%=比历史上 80% 时间都便宜）<br><b>为什么有效：</b>分位比绝对值更能反映贵贱（不同行业 PE 不可比）<br><b>证据：</b></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 股息率</span><span class="tag">div_yield</span></div>
+  <div class="bd"><b>是什么：</b>每股分红 ÷ 股价（3%=每 100 元股票年分红 3 元）<br><b>为什么有效：</b>高股息=现金流好+防守属性；低利率环境下更珍贵<br><b>证据：</b></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 中性化</span><span class="tag">neutralize</span></div>
+  <div class="bd"><b>是什么：</b>把行业/市值等已知因素从因子里剔除，剩下纯粹的选股能力<br><b>为什么有效：</b>避免选出的股票只是因为行业好或盘子小（而非因子本身有效）<br><b>证据：</b></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 行业市值中性化</span><span class="tag">industry_mv_neu</span></div>
+  <div class="bd"><b>是什么：</b>先在行业内部、市值相近的股票里排名，再比较<br><b>为什么有效：</b>银行 vs 科技 PE 不可比；大票 vs 小票波动不可比<br><b>证据：</b></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 横截面</span><span class="tag">cross_section</span></div>
+  <div class="bd"><b>是什么：</b>同一时点所有股票之间的比较（横向）<br><b>为什么有效：</b>选股是横向比较（今天谁最好），不是纵向比自己<br><b>证据：</b></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 时间序列</span><span class="tag">time_series</span></div>
+  <div class="bd"><b>是什么：</b>同一只股票/指数随时间的变化（纵向）<br><b>为什么有效：</b>择时看时间序列（指数在 200 日线上吗）；选股看横截面<br><b>证据：</b></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 样本外</span><span class="tag">oos</span></div>
+  <div class="bd"><b>是什么：</b>没参与拟合的新数据上测试（训练集之外）<br><b>为什么有效：</b>样本内拟合好可能只是背答案；样本外才算真本事<br><b>证据：</b></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 过拟合</span><span class="tag">overfit</span></div>
+  <div class="bd"><b>是什么：</b>把参数调得正好匹配历史，换新数据就失效<br><b>为什么有效：</b>过拟合=自我欺骗：历史完美、实盘打脸<br><b>证据：</b></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 多重检验</span><span class="tag">multiple_testing</span></div>
+  <div class="bd"><b>是什么：</b>试了很多因子/参数，总有一个碰巧有效<br><b>为什么有效：</b>试 100 次，5 次碰巧显著很正常——需多重检验校正<br><b>证据：</b></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 择时</span><span class="tag">timing</span></div>
+  <div class="bd"><b>是什么：</b>判断大盘方向决定整体仓位（满仓/半仓/空仓）<br><b>为什么有效：</b>A 股波动大，择时能显著改善体验；但择时很难持续做对<br><b>证据：</b></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 Regime（市场状态）</span><span class="tag">regime</span></div>
+  <div class="bd"><b>是什么：</b>市场所处的状态：牛/熊/震荡/风格切换<br><b>为什么有效：</b>不同状态不同策略：趋势市追动量，震荡市做反转<br><b>证据：</b></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 持仓集中度</span><span class="tag">concentration</span></div>
+  <div class="bd"><b>是什么：</b>持仓股票数量与单票占比（本项目纪律：持股≤5 只）<br><b>为什么有效：</b>集中=收益弹性大但波动大；分散=稳健但平庸<br><b>证据：</b></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 模拟盘</span><span class="tag">paper_trading</span></div>
+  <div class="bd"><b>是什么：</b>用历史/实时数据模拟交易（不花真钱）验证策略<br><b>为什么有效：</b>验证策略在真实节奏下的表现，暴露执行问题<br><b>证据：</b></div>
+</div><div class="card" onclick="this.classList.toggle('open')">
+  <div class="hd"><span>🎯 回测</span><span class="tag">backtest</span></div>
+  <div class="bd"><b>是什么：</b>用历史数据把策略完整跑一遍，看过去会赚多少<br><b>为什么有效：</b>回测是策略的体检——但要注意 PIT/幸存者偏差/过拟合<br><b>证据：</b></div>
+</div>
+
+<div class="sec">📖 术语表 <span class="n">· 输入检索</span></div>
+<input class="search" id="termSearch" placeholder="🔍 检索术语（如 ICIR / 夏普 / 反转）" oninput="filterTerms(this.value)">
+<table><thead><tr><th>术语</th><th>代码</th><th>说明</th></tr></thead>
+<tbody><tr class="term" data-k="IC（信息系数） IC">
+  <td>IC（信息系数）</td><td class="mini">IC</td><td>因子预测准不准的相关系数：IC=0.05 表示这个因子排名和未来收益有点正相关</td></tr><tr class="term" data-k="ICIR（IC 稳定度） ICIR">
+  <td>ICIR（IC 稳定度）</td><td class="mini">ICIR</td><td>IC 的平均值除以它的波动——衡量因子预测力稳不稳（不是有多强，而是多稳定）</td></tr><tr class="term" data-k="RankIC RankIC">
+  <td>RankIC</td><td class="mini">RankIC</td><td>用排名（1、2、3...）算的 IC，对极端值不敏感</td></tr><tr class="term" data-k="夏普比率 sharpe">
+  <td>夏普比率</td><td class="mini">sharpe</td><td>每承担 1 份波动能换来多少超额收益——收益除以波动</td></tr><tr class="term" data-k="最大回撤 max_dd">
+  <td>最大回撤</td><td class="mini">max_dd</td><td>历史上从最高点跌到最低点的最大幅度</td></tr><tr class="term" data-k="胜率 winrate">
+  <td>胜率</td><td class="mini">winrate</td><td>赚钱的交易占比（比如 100 次交易 60 次赚钱=60%）</td></tr><tr class="term" data-k="盈亏比 pl_ratio">
+  <td>盈亏比</td><td class="mini">pl_ratio</td><td>平均每笔盈利 ÷ 平均每笔亏损</td></tr><tr class="term" data-k="分层收益 layered_ret">
+  <td>分层收益</td><td class="mini">layered_ret</td><td>按因子值把股票分 5-10 组，看每组未来收益——检验因子单调性</td></tr><tr class="term" data-k="单调性 monotonic">
+  <td>单调性</td><td class="mini">monotonic</td><td>因子值从小到大排序，收益也跟着单调变化（递增或递减）</td></tr><tr class="term" data-k="LS 组合（多空组合） ls_combo">
+  <td>LS 组合（多空组合）</td><td class="mini">ls_combo</td><td>做多因子最好的 1 组、做空最差的 1 组，看两者差</td></tr><tr class="term" data-k="PIT（点即时） pit">
+  <td>PIT（点即时）</td><td class="mini">pit</td><td>Point-in-Time：只用当时真实能拿到的数据（财报公告日之后才能用财报）</td></tr><tr class="term" data-k="未来函数 lookahead">
+  <td>未来函数</td><td class="mini">lookahead</td><td>回测里用了当时还不知道的信息（比如用今天发布的财报回测昨天）</td></tr><tr class="term" data-k="幸存者偏差 survivorship">
+  <td>幸存者偏差</td><td class="mini">survivorship</td><td>只统计还活着的股票，退市/暴跌的没算进去——结果虚高</td></tr><tr class="term" data-k="前视偏差 lookahead_bias">
+  <td>前视偏差</td><td class="mini">lookahead_bias</td><td>用事后才知道的信息做决策（如用最终财报修正历史数据）</td></tr><tr class="term" data-k="因子拥挤度 factor_crowding">
+  <td>因子拥挤度</td><td class="mini">factor_crowding</td><td>多少资金/机构在用同一个因子——太拥挤会失效甚至踩踏</td></tr><tr class="term" data-k="半衰期 half_life">
+  <td>半衰期</td><td class="mini">half_life</td><td>因子预测力衰减到一半需要多久</td></tr><tr class="term" data-k="动量 momentum">
+  <td>动量</td><td class="mini">momentum</td><td>过去涨得多的股票未来继续涨（美股有效）</td></tr><tr class="term" data-k="反转 reversal_term">
+  <td>反转</td><td class="mini">reversal_term</td><td>过去跌得多的股票未来反弹（与动量相反）</td></tr><tr class="term" data-k="量比 vol_ratio">
+  <td>量比</td><td class="mini">vol_ratio</td><td>今天成交量相对近期平均的倍数（1.5=放量 50%）</td></tr><tr class="term" data-k="VCP（波动收缩） vcp">
+  <td>VCP（波动收缩）</td><td class="mini">vcp</td><td>Volatility Contraction Pattern：突破前波动率逐步收窄的形态</td></tr><tr class="term" data-k="均线多头 ma_bull">
+  <td>均线多头</td><td class="mini">ma_bull</td><td>短期均线在上、长期均线在下（5>20>60 等）的排列</td></tr><tr class="term" data-k="Beneish M-Score beneish">
+  <td>Beneish M-Score</td><td class="mini">beneish</td><td>8 个财务指标的造假嫌疑打分（M 值越高越像造假）</td></tr><tr class="term" data-k="财报粉饰 financial_foam">
+  <td>财报粉饰</td><td class="mini">financial_foam</td><td>通过会计手段把利润做得好看的操作（虚增收入/隐藏费用）</td></tr><tr class="term" data-k="ROE 单季口径 roe_quarter">
+  <td>ROE 单季口径</td><td class="mini">roe_quarter</td><td>只用最新一个季度的净利润算 ROE（年化），而非全年累计</td></tr><tr class="term" data-k="PE/PB 分位 pe_pb_pct">
+  <td>PE/PB 分位</td><td class="mini">pe_pb_pct</td><td>当前估值在自己历史中的位置（PB 分位 20%=比历史上 80% 时间都便宜）</td></tr><tr class="term" data-k="股息率 div_yield">
+  <td>股息率</td><td class="mini">div_yield</td><td>每股分红 ÷ 股价（3%=每 100 元股票年分红 3 元）</td></tr><tr class="term" data-k="中性化 neutralize">
+  <td>中性化</td><td class="mini">neutralize</td><td>把行业/市值等已知因素从因子里剔除，剩下纯粹的选股能力</td></tr><tr class="term" data-k="行业市值中性化 industry_mv_neu">
+  <td>行业市值中性化</td><td class="mini">industry_mv_neu</td><td>先在行业内部、市值相近的股票里排名，再比较</td></tr><tr class="term" data-k="横截面 cross_section">
+  <td>横截面</td><td class="mini">cross_section</td><td>同一时点所有股票之间的比较（横向）</td></tr><tr class="term" data-k="时间序列 time_series">
+  <td>时间序列</td><td class="mini">time_series</td><td>同一只股票/指数随时间的变化（纵向）</td></tr><tr class="term" data-k="样本外 oos">
+  <td>样本外</td><td class="mini">oos</td><td>没参与拟合的新数据上测试（训练集之外）</td></tr><tr class="term" data-k="过拟合 overfit">
+  <td>过拟合</td><td class="mini">overfit</td><td>把参数调得正好匹配历史，换新数据就失效</td></tr><tr class="term" data-k="多重检验 multiple_testing">
+  <td>多重检验</td><td class="mini">multiple_testing</td><td>试了很多因子/参数，总有一个碰巧有效</td></tr><tr class="term" data-k="择时 timing">
+  <td>择时</td><td class="mini">timing</td><td>判断大盘方向决定整体仓位（满仓/半仓/空仓）</td></tr><tr class="term" data-k="Regime（市场状态） regime">
+  <td>Regime（市场状态）</td><td class="mini">regime</td><td>市场所处的状态：牛/熊/震荡/风格切换</td></tr><tr class="term" data-k="持仓集中度 concentration">
+  <td>持仓集中度</td><td class="mini">concentration</td><td>持仓股票数量与单票占比（本项目纪律：持股≤5 只）</td></tr><tr class="term" data-k="模拟盘 paper_trading">
+  <td>模拟盘</td><td class="mini">paper_trading</td><td>用历史/实时数据模拟交易（不花真钱）验证策略</td></tr><tr class="term" data-k="回测 backtest">
+  <td>回测</td><td class="mini">backtest</td><td>用历史数据把策略完整跑一遍，看过去会赚多少</td></tr></tbody></table>
+</div>
+<script>
+function filterTerms(k){
+  k=k.trim().toLowerCase();
+  document.querySelectorAll('.term').forEach(r=>{
+    r.classList.toggle('show', !k || (r.dataset.k||'').toLowerCase().includes(k));
+  });
+}
+document.querySelectorAll('.term').forEach(r=>r.classList.add('show'));
+</script>
+</body></html>

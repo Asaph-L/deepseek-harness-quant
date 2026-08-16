@@ -1,0 +1,172 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">
+<title>系统实时状态 · DeepSeek HARNESS Quant</title>
+<link rel="stylesheet" href="/ui_common.css"><link rel="stylesheet" href="/anim_common.css">
+<style>
+/* ★UI 标准 v1（2026-08-13）：tokens 基础来源 ui_common.css；本页为唯一深色终端特例（覆盖 --bg 等） */
+:root { --navy:#0A2540; --green:#0F6E56; --red:#C0392B; --gold:#D4A843; --bg:#0D1B2E; --muted:#7a8ba3; --line:#1d3350; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:"Consolas","Microsoft YaHei",monospace; background:var(--bg); color:#d5e2f3; padding:20px; }
+.wrap { max-width:1200px; margin:0 auto; }
+.header { display:flex; align-items:center; justify-content:space-between; }
+h1 { font-size:18px; } .dot { display:inline-block; width:10px; height:10px; border-radius:50%; background:var(--green); margin-right:8px; animation:blink 1.2s infinite; }
+@keyframes blink { 50% { opacity:.35; } }
+#clock { font-size:13px; color:var(--muted); }
+.section { background:#0F2138; border:1px solid var(--line); border-radius:12px; padding:14px 18px; margin-top:14px; }
+.section h2 { font-size:13px; margin-bottom:10px; color:#8fb4e3; }
+.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; }
+.db-card { border:1px solid var(--line); border-radius:8px; padding:10px 12px; background:#0B1929; }
+.db-card .name { font-size:11px; color:var(--muted); } .db-card .st { font-size:15px; font-weight:700; margin-top:3px; }
+.ok { color:var(--green); } .bad { color:var(--red); } .warn { color:var(--gold); }
+.log-box { background:#071120; border-radius:8px; padding:12px 14px; font-size:12px; line-height:1.9; max-height:240px; overflow-y:auto; }
+/* ★2026-08-10 手动全域更新 */
+.mu-status { font-size:13px; margin-bottom:8px; }
+.mu-btn { background:#185FA5; color:#fff; border:none; border-radius:8px; padding:9px 18px; font-size:13px; cursor:pointer; }
+.mu-btn:disabled { background:#a8b8cc; cursor:not-allowed; }
+.mu-row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.log-line { white-space:pre-wrap; color:#9fc3ea; }
+.log-line.new { color:#7ee2a8; }
+table { width:100%; border-collapse:collapse; }
+th { font-size:11px; color:var(--muted); text-align:left; padding:5px 8px; border-bottom:1px solid var(--line); }
+td { padding:6px 8px; border-bottom:1px solid #14293f; font-size:12px; }
+.api-ok { color:var(--green); } .api-stale { color:var(--gold); }
+.footer { text-align:center; font-size:11px; color:var(--muted); margin-top:16px; }
+</style></head><body>
+<div class="lw-nav" data-page="live"></div>
+<script src="/nav_common.js"></script>
+<div class="wrap">
+<div class="header">
+  <h1><span class="dot"></span>系统实时状态 <span style="font-weight:400;font-size:13px;opacity:.7">每 5 秒自动刷新</span></h1>
+  <div id="clock">—</div>
+</div>
+
+<div class="section">
+  <h2>🗄 数据库在线状态</h2>
+  <div class="grid" id="db-grid"><div class="db-card">加载中…</div></div>
+</div>
+
+<div class="section">
+  <h2>⚙️ 系统当前在干什么 <span style="font-weight:400;font-size:11px;opacity:.6">dev_auto 最近日志</span></h2>
+  <div class="log-box" id="devlog"><div class="log-line">加载中…</div></div>
+</div>
+
+<div class="section">
+  <h2>⏱ 计划任务 <span style="font-weight:400;font-size:11px;opacity:.6">倒计时</span></h2>
+  <table id="sched"><thead><tr><th>任务</th><th>说明</th><th>下次运行</th><th>倒计时</th></tr></thead><tbody><tr><td colspan=4>加载中…</td></tr></tbody></table>
+</div>
+
+<div class="section">
+  <h2>🚀 手动全域更新 <span style="font-weight:400;font-size:11px;opacity:.6">自动程序失效时的补充 · 自动运行时自动禁用</span></h2>
+  <div id="mu-status" class="mu-status">检测中…</div>
+  <div class="mu-row">
+    <button id="mu-btn" class="mu-btn" onclick="manualUpdate()" disabled>启动手动全域更新</button>
+    <span class="mini" style="color:var(--muted)">完整管道：7z→parquet→日线→巡检→竞价信号→扫描→Pitch（关机后补数据用，约 5-30 分钟）</span>
+  </div>
+  <div class="log-box" id="mu-log" style="margin-top:8px"><div class="log-line">—</div></div>
+</div>
+
+<div class="section">
+  <h2>📦 最近系统活动 <span style="font-weight:400;font-size:11px;opacity:.6">近 60 分钟产出（证明系统在干活）</span></h2>
+  <div class="log-box" id="activity"><div class="log-line">加载中…</div></div>
+</div>
+
+<div class="section">
+  <h2>🔌 数据接口健康</h2>
+  <table id="api"><thead><tr><th>接口</th><th>状态</th><th>数据年龄</th></tr></thead><tbody><tr><td colspan=3>加载中…</td></tr></tbody></table>
+</div>
+
+<div class="footer">DeepSeek HARNESS Quant · 实时监控 · 数据源 /api/system_live</div>
+</div>
+<script>
+let lastLogs = [];
+async function refresh() {
+  try {
+    const r = await fetch('/api/system_live');
+    const d = await r.json();
+    document.getElementById('clock').textContent = '更新于 ' + d.ts;
+    // 1) 数据库
+    const dbs = Object.entries(d.databases);
+    document.getElementById('db-grid').innerHTML = dbs.map(([k, v]) =>
+      `<div class="db-card"><div class="name">${k}</div><div class="st ${v.online ? 'ok' : 'bad'}">${v.online ? '● 在线' : '✕ 离线'}</div>` +
+      (v.rows != null ? `<div class="name">${v.rows.toLocaleString()} 行</div>` : '') +
+      (v.error ? `<div class="name bad">${v.error}</div>` : '') + '</div>').join('');
+    // 2) dev_auto 日志
+    const logs = d.dev_auto_tail || [];
+    const set = new Set(logs);
+    const newly = lastLogs.length ? logs.filter(l => !lastLogs.includes(l)) : [];
+    lastLogs = logs;
+    document.getElementById('devlog').innerHTML = logs.map(l =>
+      `<div class="log-line ${newly.includes(l) ? 'new' : ''}">${l}</div>`).join('') || '<div class="log-line">（无日志）</div>';
+    // 3) 计划任务（含倒计时）
+    document.getElementById('sched').querySelector('tbody').innerHTML =
+      Object.entries(d.scheduled).map(([k, v]) =>
+        `<tr><td><b>${k}</b></td><td>${v.desc}</td><td>${v.next}</td><td class="api-ok">${(d.next_schedule||[]).find(x=>x.name===k)?.mins_left ?? '—'} 分钟</td></tr>`).join('');
+    // 3.5) 实时活动流
+    const acts = d.activity_feed || [];
+    document.getElementById('activity').innerHTML = acts.length
+      ? acts.map(a => `<div class="log-line">${a.ts} · <b>${a.file}</b>（${a.age_min} 分钟前产出）</div>`).join('')
+      : '<div class="log-line">近 1 小时无新产出（等待下轮巡检）</div>';
+    // 4) API 健康
+    document.getElementById('api').querySelector('tbody').innerHTML =
+      Object.entries(d.api_health).map(([k, v]) =>
+        `<tr><td><b>${k}</b></td><td class="${v.online ? 'api-ok' : 'bad'}">${v.online ? '● 正常' : '✕ 缺失'}</td>` +
+        `<td>${v.age_h != null ? v.age_h + ' 小时' : '—'}</td></tr>`).join('');
+  } catch (e) {
+    document.getElementById('clock').textContent = '连接失败: ' + e;
+  }
+}
+refresh();
+setInterval(refresh, 5000);
+
+// ★2026-08-10 手动全域更新（自动程序运行中自动禁用，不误伤）
+async function muRefresh() {
+  try {
+    const r = await fetch('/api/update_status');
+    const d = await r.json();
+    const btn = document.getElementById('mu-btn');
+    const st = document.getElementById('mu-status');
+    const lg = document.getElementById('mu-log');
+    if (d.busy) {
+      btn.disabled = true;
+      st.innerHTML = '<b style="color:#C0392B">⛔ ' + (d.reason || '忙') + '</b>';
+      if (d.running_since) st.innerHTML += '<span class="mini" style="color:#C0392B">（' + d.running_since + ' 启动）</span>';
+    } else {
+      btn.disabled = false;
+      const last = d.last || {};
+      if (last.status === 'done') {
+        st.innerHTML = '<b style="color:#0F6E56">✅ 上次手动更新成功</b><span class="mini"> ' +
+          (last.started_at || '') + ' → ' + (last.finished_at || '') + '（退出码 ' + (last.rc ?? '?') + '）</span>';
+      } else if (last.status === 'failed') {
+        st.innerHTML = '<b style="color:#C0392B">❌ 上次手动更新失败</b><span class="mini"> ' + (last.error || ('退出码 ' + (last.rc ?? '?'))) + '</span>';
+      } else {
+        st.innerHTML = '<b style="color:#0F6E56">✅ 空闲，可手动更新</b>';
+      }
+    }
+    if (d.log_tail && d.log_tail.length) {
+      lg.innerHTML = d.log_tail.map(l => '<div class="log-line">' + l.replace(/</g, '&lt;') + '</div>').join('');
+      lg.scrollTop = lg.scrollHeight;
+    }
+  } catch (e) {}
+}
+async function manualUpdate() {
+  if (!confirm('确认启动手动全域更新？\n\n将执行完整管道：分钟数据→日线→巡检→竞价信号→机会扫描→Pitch（约 5-30 分钟）\n\n若自动程序正在运行，本操作会被自动拒绝。')) return;
+  const btn = document.getElementById('mu-btn');
+  btn.disabled = true;
+  btn.textContent = '启动中…';
+  try {
+    const r = await fetch('/api/manual_update', { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) {
+      document.getElementById('mu-status').innerHTML = '<b style="color:#185FA5">🚀 已启动（' + d.ts + '）</b><span class="mini"> ' + d.note + '</span>';
+    } else {
+      alert('无法启动：' + (d.reason || '未知原因'));
+      document.getElementById('mu-status').innerHTML = '<b style="color:#C0392B">⛔ ' + (d.reason || '拒绝') + '</b>';
+    }
+  } catch (e) {
+    alert('请求失败：' + e.message);
+  }
+  btn.textContent = '启动手动全域更新';
+  muRefresh();
+}
+muRefresh();
+setInterval(muRefresh, 5000);
+</script></body></html>

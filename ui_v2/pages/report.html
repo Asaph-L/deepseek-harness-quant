@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Deepseek HARNESS Quant · 日报</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="/v2/assets/ui_common.css">
+<link rel="stylesheet" href="/v2/assets/anim_common.css">
+<link rel="stylesheet" href="/v2/assets/app.css">
+<style>
+  .report-md { line-height:1.9; font-size:14px; color:#f4f4f5; }
+  .report-md h1 { font-size:22px; font-weight:700; margin:4px 0 16px; }
+  .report-md h2 { font-size:16px; font-weight:700; margin:20px 0 8px; padding-left:10px; border-left:3px solid var(--navy2); }
+  .report-md h3 { font-size:14px; font-weight:600; margin:14px 0 6px; padding-left:8px; color:#d4d4d8; border-left:2px solid #3f3f46; }  /* ★#361 牛散点评个股 */
+  .report-md ul { margin:6px 0; padding-left:20px; }
+  .report-md li { margin:4px 0; }
+  .report-md blockquote { color:#a1a1aa; border-left:3px solid #2a2a30; padding-left:12px; margin:8px 0; }
+  .report-md strong { color:#f4f4f5; }
+  .report-md .md-sub { list-style:none; margin-left:14px; font-size:12px; color:#a1a1aa; line-height:1.7; }
+</style>
+</head>
+<body>
+<div id="sidebar"></div>
+<div class="v2-wrap">
+  <div class="v2-h"><span class="bar"></span><h1>日报</h1><span class="sub">每日市场环境 · 自动选股 · 候选 · 因子实测</span>
+    <button id="export-xlsx" class="v2-btn" style="margin-left:auto" title="导出 Excel（含今日 Pitch 三问 + 分 Regime 情景赔率，可转发决策）">导出 Excel</button>
+    <button id="export-poster" class="v2-btn v2-btn-ghost" style="margin-left:8px" title="导出 HTML 海报（一屏看全，可打印/截图）">导出海报</button>
+  </div>
+  <div class="v2-card anim-fade-in-up" style="margin-top:14px">
+    <div id="report-box" class="mini" style="opacity:.6">加载日报…</div>
+  </div>
+</div>
+
+<script src="/v2/core/api.js"></script>
+<script src="/v2/core/render.js"></script>
+<script src="/v2/components/icons.js"></script>
+<script src="/v2/components/search.js"></script>
+<script src="/v2/components/sidebar.js"></script>
+<script>
+(function () {
+  LW.sidebar.render('sidebar', {active: 'report'});
+  var R = LW.render;
+
+  // ★#328 导出中心（日报栏内）：点击 → 生成 Excel/海报 → 跳 /dl/ 下载
+  function doExport(kind) {
+    var btn = document.getElementById(kind === 'xlsx' ? 'export-xlsx' : 'export-poster');
+    if (!btn || btn.disabled) return;
+    var orig = btn.textContent;
+    btn.disabled = true; btn.textContent = '生成中…';
+    LW.api.get('/api/export_data', { bypass: true }).then(function (d) {
+      var name = kind === 'xlsx' ? d.excel : d.poster;
+      btn.disabled = false; btn.textContent = orig;
+      if (name) { window.open('/dl/' + name, '_blank'); }
+      else { btn.textContent = '生成失败'; setTimeout(function () { btn.textContent = orig; }, 2000); }
+    }).catch(function (e) {
+      btn.disabled = false; btn.textContent = orig;
+      alert('导出失败：' + e);
+    });
+  }
+  document.getElementById('export-xlsx').addEventListener('click', function () { doExport('xlsx'); });
+  document.getElementById('export-poster').addEventListener('click', function () { doExport('poster'); });
+
+  // 轻量 markdown → HTML（标题/列表/加粗/引用，够日报用）
+  function md2html(md) {
+    var lines = md.split('\n');
+    var html = [];
+    var inUl = false;
+    function closeUl() { if (inUl) { html.push('</ul>'); inUl = false; } }
+    lines.forEach(function (l) {
+      if (/^# /.test(l)) { closeUl(); html.push('<h1>' + l.slice(2) + '</h1>'); }
+      else if (/^## /.test(l)) { closeUl(); html.push('<h2>' + l.slice(3) + '</h2>'); }
+      else if (/^### /.test(l)) { closeUl(); html.push('<h3>' + l.slice(4) + '</h3>'); }  // ★#361 牛散点评个股三级标题
+      else if (/^> /.test(l)) { closeUl(); html.push('<blockquote>' + l.slice(2) + '</blockquote>'); }
+      else if (/^  · /.test(l)) {
+        // ★#325 列表子行（三问详情：机制/赔率/止损）——缩进显示
+        var t = l.slice(2).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        html.push('<li class="md-sub">' + t + '</li>');
+        inUl = true;
+      }
+      else if (/^- /.test(l)) {
+        if (!inUl) { html.push('<ul>'); inUl = true; }
+        var t = l.slice(2).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        html.push('<li>' + t + '</li>');
+      }
+      else if (l.trim()) { closeUl(); html.push('<p>' + l.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>') + '</p>'); }
+      else { closeUl(); }
+    });
+    closeUl();
+    return html.join('');
+  }
+
+  // ★#347 日报加载：60s 轮询（18:30 自动链跑完自动出现新日报，不用手动刷新）+ 数据日标注
+  function loadReport() {
+    LW.api.get('/api/daily_report', { bypass: true }).then(function (d) {
+      var box = document.getElementById('report-box');
+      if (!d.ok) { box.innerHTML = '<div class="mini" style="color:var(--muted)">' + (d.error || '日报未生成') + '</div>'; return; }
+      box.innerHTML = '<div class="mini" style="margin:0 0 8px;opacity:.6">日报数据日 <b>' + R._f(d.date) + '</b> · 每日 18:30 自动更新（60s 自动刷新）</div>' +
+        '<div class="report-md">' + md2html(d.markdown) + '</div>';
+    }).catch(function (e) {
+      document.getElementById('report-box').innerHTML = '<div class="mini" style="color:var(--muted)">日报加载失败：' + e + '</div>';
+    });
+  }
+  loadReport();
+  setInterval(loadReport, 60000);
+})();
+</script>
+
+<div class="mini" style="text-align:center;margin-top:18px;opacity:.7"><span class="dsq-brand">Deepseek HARNESS Quant</span><span style="color:var(--muted)"> · 作者：LW </span><span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:#2a2a30;border:1px solid #3a3a44;box-shadow:0 2px 6px rgba(0,0,0,.5)"><svg class="cat-stroll" width="22" height="22" viewBox="0 0 24 24" fill="none"><path class="cat-tail" d="M14.5 17.5c3.2.6 5.2-1.2 5.6-3.8" stroke="#111" stroke-width="2.4" stroke-linecap="round" fill="none"/><path d="M7.4 6.8L6 2.8l3.6 2.6M16.6 6.8L18 2.8l-3.6 2.6" fill="#111" stroke="#111" stroke-width="1"/><circle cx="10.5" cy="9.5" r="4.4" fill="#111"/><ellipse cx="11" cy="16" rx="6" ry="4.4" fill="#111"/><circle cx="8.8" cy="9.2" r="0.9" fill="#4ade80"/><circle cx="12.2" cy="9.2" r="0.9" fill="#4ade80"/><path d="M5.8 10.2h-2.6M6.4 11.6L4 12.8M18.2 10.2h-2.6M17.6 11.6l2.4 1.2" stroke="#555" stroke-width="0.7" stroke-linecap="round"/></svg></span><span style="opacity:.5"> · 低频主观量化 · 宁缺毋滥</span></div>
+</body>
+</html>

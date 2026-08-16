@@ -1,0 +1,54 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">
+<title>📡 监控总览 · 2026-08-10</title>
+<style>
+:root { --navy:#0A2540; --green:#0F6E56; --red:#C0392B; --bg:#F0F3F8; --muted:#8a94a6; --line:#e5e9f0; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,"Microsoft YaHei",sans-serif; background:var(--bg); color:#0A2540; padding:20px; }
+.wrap { max-width:1500px; margin:0 auto; }
+.header { background:linear-gradient(135deg,#0A2540,#185FA5); border-radius:14px; padding:16px 20px; color:#fff; }
+.header h1 { font-size:17px; } .header .sub { font-size:12px; color:rgba(255,255,255,.7); margin-top:4px; }
+.tabs { display:flex; gap:8px; margin:14px 0; flex-wrap:wrap; }
+.tab-btn { padding:9px 18px; border-radius:10px; background:#fff; border:1px solid var(--line); cursor:pointer; font-size:13px; color:#37445c; }
+.tab-btn b { font-size:13px; color:var(--navy); }
+.tab-btn.on { background:var(--navy); color:#fff; border-color:var(--navy); }
+.tab-btn.on b { color:#fff; }
+.tabpane { display:none; }
+.tabpane.on { display:block; }
+iframe { width:100%; height:calc(100vh - 190px); min-height:560px; border:1px solid var(--line); border-radius:12px; background:#fff; }
+.note { font-size:11px; color:var(--muted); margin-top:8px; }
+<link rel="stylesheet" href="/ui_common.css"></style></head><body>
+<div class="lw-nav" data-page="monitor"></div>
+<script src="/nav_common.js"></script>
+<div class="wrap">
+<div class="header">
+  <h1>📡 监控总览 <span style="font-weight:400;font-size:13px;opacity:.8">系统状态 · 涨跌幅榜 · 竞价信号（合并页）</span></h1>
+  <div class="sub">数据 2026-08-10 ｜ 各子页保持独立实时刷新 ｜ 原页面：系统实时状态 / 涨跌幅榜 / 竞价信号</div>
+</div>
+
+<div class="tabs">
+  <div class="tab-btn on" data-t="live" onclick="switchTab('live')">🖥️ 系统实时状态</div>
+  <div class="tab-btn" data-t="ranks" onclick="switchTab('ranks')">📊 涨跌幅榜 · 引擎对照</div>
+  <div class="tab-btn" data-t="auction" onclick="switchTab('auction')">⚡ 竞价信号</div>
+</div>
+
+<div class="tabpane on" id="tabpane-live"><iframe data-src="/dashboard_live.html" src="/dashboard_live.html"></iframe></div>
+<div class="tabpane" id="tabpane-ranks"><iframe data-src="/dashboard_ranks.html"></iframe></div>
+<div class="tabpane" id="tabpane-auction"><iframe data-src="/dashboard_auction.html"></iframe></div>
+
+<div class="note">💡 tab 切换懒加载：仅当前显示的子页保持刷新，切换不打断各自轮询。详情请进入各原页面。</div>
+</div>
+<script>
+function switchTab(t) {
+  document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.toggle('on', b.dataset.t === t); });
+  document.querySelectorAll('.tabpane').forEach(function (p) {
+    var on = p.id === 'tabpane-' + t;
+    p.classList.toggle('on', on);
+    if (on) {
+      var f = p.querySelector('iframe');
+      if (f && !f.src) f.src = f.dataset.src;   // 惰性加载
+    }
+  });
+}
+</script>
+</div>
+</body></html>

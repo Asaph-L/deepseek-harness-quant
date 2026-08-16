@@ -1,0 +1,114 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">
+<title>系统全景 · 120 轮（百轮收官后主线）</title>
+<style>
+:root{--navy:#0A2540;--gold:#D4A843;--green:#0F6E56;--red:#C0392B;--bg:#F0F3F8;--muted:#8a94a6;--line:#e5e9f0}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"Microsoft YaHei",sans-serif;background:var(--bg);color:#0A2540;padding:20px}
+.wrap{max-width:1080px;margin:0 auto}
+.hero{background:linear-gradient(135deg,#0A2540,#185FA5);border-radius:16px;padding:24px 28px;color:#fff}
+.hero h1{font-size:22px} .hero .sub{font-size:13px;color:rgba(255,255,255,.75);margin-top:6px;line-height:1.7}
+.hero .badge{display:inline-block;background:#D4A843;color:#0A2540;border-radius:12px;padding:2px 12px;font-size:12px;font-weight:700;margin-top:8px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-top:16px}
+.kpi{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px;text-align:center}
+.kpi b{font-size:26px;display:block} .kpi .mini{font-size:11px;color:var(--muted)}
+.sec{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px 22px;margin-top:16px}
+.sec h2{font-size:15px;margin-bottom:12px}
+.map{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12.5px}
+.map .m{background:#F8FAFD;border:1px solid var(--line);border-radius:8px;padding:8px 12px}
+.map .m b{color:#185FA5}
+.todo{background:#FFFBF0;border:1px solid #EADFC8;border-radius:10px;padding:10px 14px;margin-top:6px;font-size:12.5px;line-height:1.8}
+.todo .do{color:var(--green);font-weight:700} .todo .wait{color:var(--gold);font-weight:700}
+.chain-status{margin:10px 0}
+.alert-status{margin:8px 0}
+.mini{font-size:11px;color:var(--muted)}
+</style>
+<link rel="stylesheet" href="/ui_common.css"></head><body>
+<div class="lw-nav" data-page="overview"></div>
+<script src="/nav_common.js"></script>
+<div class="wrap">
+<div class="hero">
+  <h1>🗺 劳威派量化 · 系统全景</h1>
+  <div class="sub">百轮 100/100 收官 + 主线 20 轮 ｜ 数据截至 2026-08-12 09:11 ｜ 决策三层（总览→操作→数据研究）· 价值/科技两线并行 · 持股≤5</div>
+  <span class="badge">120 轮交付 · 全链路健康（16 项一致性 + 12 项日验 + 13 环节决策链）· 实盘裁决可追溯 · 盘前自检</span>
+</div>
+<div class="grid">
+  <div class="kpi"><b>437</b><span class="mini">机会池（信号族）</span></div>
+  <div class="kpi"><b>0</b><span class="mini">Pitch 候选（长线）</span></div>
+  <div class="kpi"><b>28</b><span class="mini">量价共识（FRC 后）</span></div>
+  <div class="kpi"><b>4</b><span class="mini">当前持仓（≤5 纪律）</span></div>
+  <div class="kpi"><b id="kpi-timing">—</b><span class="mini">市场择时</span></div>
+  <div class="kpi"><b id="kpi-alert">—</b><span class="mini">预警数</span></div>
+</div>
+<div class="chain-status" style="margin-top:14px"></div>
+<div class="alert-status"></div>
+<div class="sec"><h2>🔗 数据决策链（12 环节）</h2>
+  <div class="map">
+    <div class="m"><b>数据管道</b>：17:30 Tushare 日线 → 18:30 全链路（审计→面板→机会→Pitch→三层池→远期池→止盈→风控→择时）</div>
+    <div class="m"><b>机会引擎</b>：7 类型 × 9 信号族（价值/成长/质量/量价/情绪/反转/资金/政策/其他）+ FRC 因子风控（83 因子 eff 加权）</div>
+    <div class="m"><b>信号联动</b>：83 因子 health × 5816 只 daily rank → signal_score = Σ(ICIR×rank)/ΣICIR + EXT 十一强共识（含 open_prem_20）</div>
+    <div class="m"><b>强因子直通</b>：11 独立强因子 × rank≤0.10 跨家族≥2 → 机会池内 +3 确认 + 💪直通榜（极强≥6 家族 45 只）</div>
+    <div class="m"><b>Pitch 决策台</b>：长短双线 × ⚡直通/🤝共识/📊高分 × ⭐核心/◔备选/▫临时 × 对比模式（含直通家族/仓位提示）× 新鲜度</div>
+    <div class="m"><b>审批闭环</b>：买入/放弃/撤回 → 远期池标记 + 持仓同步（自动带价）+ 环境留痕 + 观察池/机会池状态回显</div>
+    <div class="m"><b>持仓执行</b>：盈亏总览 → 组合绩效（净值/回撤 SVG + 沪深300 基准/超额）→ 止盈/止损引擎 → 一键卖出 → 历史落账</div>
+    <div class="m"><b>择时系统 v2</b>：政策40%+宏观25%(H27分化降档)+情绪20%(温度计反向)+宽度15%(行业冰点) → 🟢适合/🟡谨慎/🔴不适合 + 四维仪表</div>
+    <div class="m"><b>决策可视化</b>：决策链 12 环节全绿 + 全局预警 10 类 + 每日简报（含日历窗口/分化度）+ 决策漏斗（淘汰原因）+ 数据就绪日历</div>
+  </div>
+</div>
+<div class="sec"><h2>📦 120 轮交付地图</h2>
+  <div class="map">
+    <div class="m"><b>数据流</b>：观察池/组合风控/门户/决策链 13 环节全绿（#1/6/11/16/23/57/97）+ 数据就绪日历（#53/87 平均收益）+ 双库合并修复（#40/65/69/102 全量排查 + #113 计划任务巡检）</div>
+    <div class="m"><b>择时 v4</b>：新系统+四维仪表+环境适配+审批传导（#3/12/17/36/48）+ 实证方向修正 74.3→86.7（#66）+ 政策四因子 86.7→80.5（#91）+ 宏观真实化 80.5→80.0（#105）+ 备忘录 v4（#92/105）</div>
+    <div class="m"><b>止盈止损</b>：引擎+预警+持仓联动+处置闭环（#4/18/39）+ 绩效沪深300基准（#69）+ 逐日明细（#109）+ **行业敞口（#119）**</div>
+    <div class="m"><b>决策联动</b>：审批→持仓→盈亏→绩效→卖出全链（#5/38/40/44）+ 审批回显闭环（#72/74）+ 对比模式增强（#78）+ **持仓名称/行业补全（#119）**</div>
+    <div class="m"><b>信号体系</b>：9 信号族+有效性加权+manifest 无缝接入（#35/108）+ v8/v9 因子修复（#47/76）+ EXT 扩名单 open_prem/lhb（#76/107）+ 强因子直通（#67/68/86）+ 分域权重（#81）+ **弱因子防护双层验证（#112）**</div>
+    <div class="m"><b>Pitch 体验</b>：三级分档+环境徽章+IC Memo+对比模式+漏斗（#10/14/34/42/49）+ 淘汰原因（#71）+ 直通徽章（#86）+ 降权从严四件套（#89/90）+ 卡片直通徽章（#86）</div>
+    <div class="m"><b>预警与简报</b>：**12 类预警** + 简报 9 项含审批指引（#41/52/70/94）+ 健康扫描 4 维化（#82/113 计划任务）+ 决策链 13 环节（#57/97）</div>
+    <div class="m"><b>质量防线</b>：一致性 16 项 + verify 12 项 + 全站扫描（#28/46/56/75/82/98/99/113）+ 个股检测证据链（#73）+ **裁决快照每日落盘（#114）**</div>
+    <div class="m"><b>实证落地</b>：FRC 因子风控（#65）+ 日历层四窗口（#65）+ H27 分化监控（#65）+ 环境分层复盘（#60）+ 三层漏斗（#64）+ T+5 预研（#80）+ 实盘归因（#88）+ **P1 复核 + 新文件验证（#111）**</div>
+    <div class="m"><b>★实盘裁决体系</b>：类型触发建议（#89）→ 降权 revalue/短线（#89/93）→ Pitch 从严四件套（#90）→ 简报审批指引（#94）→ 门户裁决卡（#96）→ 决策链 13 环节（#97）→ 双管道校验（#98/99）→ 落池降权标记（#103）→ 复盘类型现状（#104）→ T+5 自动复核（#106）→ **裁决快照/降权天数（#114）→ 演进时间线（#115）→ 持仓降权标注（#116）→ 首批样本明细（#118）**——十一入口全链路 + 历史可追溯</div>
+    <div class="m"><b>外包协作闭环</b>：**P0-1~P0-4 全闭环（#107）+ P1 部分闭环（#111）**——gp_a/roa 标注失效（#112 验证防护）+ shebao_hold rank 幽灵因子催办（P1-2）+ factor_pool_summary 全登记催办（P1-4）+ P-4 清单催办</div>
+    <div class="m"><b>性能与稳定性</b>：load_panel 10min→15.4s（#65）· scan 2m23s（#107 3m04s）· 双库读取点全量排查（#102）· **健康扫描 4 维（#113）· 盘前自检（#117）**</div>
+  </div>
+</div>
+<div class="sec"><h2>⏳ 收官后待办与依赖</h2>
+  <div class="todo">
+    <span class="do">✅ 已落地</span>：实盘裁决体系（#89-118 十一入口 + 快照可追溯）· 决策链 13 环节 · 一致性 16 项 · verify 12 项 · 择时 v4 · 外包 P0 全闭环 · lhb 启用 · manifest 无缝接入 · 健康扫描 4 维 · 盘前自检 · 行业敞口 · 首批样本明细
+    <br><span class="wait">🧑💻 外包待交付</span>：**P1-2 shebao_hold rank 重算**（原始 1387 只有效、rank 常数 0.5 幽灵因子）· **P1-4 factor_pool_summary 全因子登记**（当前仅 2 行）· P-4 两线清单（研究员交付中——催办）· P1-3 P2 回测 · P-5 远期池收益口径
+    <br><span class="wait">🔌 外部条件</span>：I1 manifest 政策因子 → policy_hook 退役 + 择时公式校准 · 宏观深度因子（PMI/M2）· 第二次服务器（186 全量+实时竞价）→ 盘中实时突破监控
+    <br><span class="wait">⏰ 时间节点</span>：**08-12 今晚持仓 T+1 首日（绩效曲线延伸）** · **08-14 远期池 T+5 首批（5 只，T+1 全正）→ 降权自动复核** · 8 月底中报全披露 → quality 因子全量生效
+    <br><span class="wait">⏳ 观察项</span>：FRC 后 pv_consensus 29 只（过少降 EXT_EFF_MIN 4.5）· revalue/短线降权 08-14 复核（首批 T+1 全正 = 解除乐观信号）· quality_gap 样本 3→30 目标
+  </div>
+</div>
+<div class="sec"><h2>🩺 常用入口</h2>
+  <div class="map">
+    <div class="m"><a href="/">🎛 控制门户</a>（决策三层总览 + 四维分数）</div>
+    <div class="m"><a href="/pitch.html">✅ Pitch 决策台</a>（长短线审批 + 四维仪表 + 对比）</div>
+    <div class="m"><a href="/dashboard_opp.html">📊 机会池</a>（9 信号族 + 💪直通榜）</div>
+    <div class="m"><a href="/dashboard_watch.html">👁 观察池</a>（三层递进 + 审批回显）</div>
+    <div class="m"><a href="/dashboard_holdings.html">💼 持有池</a>（盈亏/绩效基准/止盈止损）</div>
+    <div class="m"><a href="/dashboard_pitchtrack.html">📈 远期池</a>（审批复盘/验证对照/就绪日历）</div>
+    <div class="m"><a href="/dashboard_techpitch.html">🚀 科技池</a>（短线情绪）</div>
+    <div class="m"><a href="/dashboard_live.html">🖥 系统实时面板</a>（5 库/任务/API）</div>
+    <div class="m"><a href="/system_overview.html">🗺 本页（系统全景）</a></div>
+    <div class="m"><a href="/dashboard_research_lib.html">📚 研究成果库</a>（25 篇 + 术语检索）</div>
+  </div>
+</div>
+<div class="mini" style="margin-top:14px;text-align:center">劳威派量化 v2.2 ｜ 百轮 100/100 + 主线 20 轮 ｜ 生成 2026-08-12 09:11:21</div>
+</div>
+<script src="/chain_status.js"></script>
+<script>
+// ★动态刷新择时/预警 KPI
+(async function(){
+  try{
+    const tm = await fetch('/api/timing').then(r=>r.json());
+    const el = document.getElementById('kpi-timing');
+    if(el && tm.level) el.textContent = tm.score + ' 分';
+  }catch(e){}
+  try{
+    const al = await fetch('/api/live/alerts').then(r=>r.json());
+    const el = document.getElementById('kpi-alert');
+    if(el && al.ok) el.textContent = al.n + (al.n ? '（高'+al.n_high+'）' : '');
+  }catch(e){}
+})();
+</script>
+</body></html>

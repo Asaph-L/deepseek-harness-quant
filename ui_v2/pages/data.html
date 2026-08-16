@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Deepseek HARNESS Quant · 数据</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="/v2/assets/ui_common.css">
+<link rel="stylesheet" href="/v2/assets/anim_common.css">
+<link rel="stylesheet" href="/v2/assets/app.css">
+<style>
+  .dt-tabs { display:flex; flex-wrap:wrap; gap:8px; }
+  .dt-tab { border:1px solid #2a2a30; background:#131316; border-radius:8px; padding:10px 14px; min-width:120px; cursor:pointer; }
+  .dt-tab .n { font-size:18px; font-weight:700; font-variant-numeric:tabular-nums; color:#f4f4f5; }
+  .dt-tab .nm { font-size:12px; color:#a1a1aa; margin-top:2px; }
+  .dt-line { display:flex; gap:10px; padding:8px 10px; border-bottom:1px solid rgba(255,255,255,.08); font-size:12px; }
+  .dt-line .db { font-weight:600; min-width:140px; color:#f4f4f5; }
+  .dt-line .cs { flex:1; color:#a1a1aa; font-size:12px; line-height:1.6; word-break:break-all; }
+  .dt-inv { display:flex; gap:10px; padding:7px 10px; border-bottom:1px solid rgba(255,255,255,.08); font-size:12px; align-items:baseline; }
+  .dt-inv .nm { font-weight:600; min-width:150px; }
+  .dt-inv .kd { min-width:80px; color:#5e6ad2; font-size:12px; }
+  .dt-inv .sz { min-width:70px; text-align:right; font-variant-numeric:tabular-nums; color:#a1a1aa; }
+  .dt-inv .dt { flex:1; color:#a1a1aa; font-size:12px; }
+  .db-sec { margin-top:14px; }
+  .db-sec h3 { font-size:13px; font-weight:700; color:#5e6ad2; margin:12px 0 6px; }
+</style>
+</head>
+<body style="background:var(--bg);margin:0">
+<div id="sidebar"></div>
+<div class="v2-wrap">
+  <div class="v2-h"><span class="bar"></span><h1>数据</h1><span class="sub">持仓复盘 · 因子实战库 · 加权结果 · 数据资产</span></div>
+
+  <!-- ★#332 持仓复盘（当前持仓 + 止盈 + 历史决策，方便复盘） -->
+  <div class="v2-card anim-fade-in-up" style="margin-top:14px">
+    <h2> 持仓复盘 <span class="tag">当前持仓 · 止盈信号 · 历史决策</span></h2>
+    <div id="hold-box"> 加载中…</div>
+  </div>
+
+  <!-- ★#319 因子实战库（数据库面板核心：实战远期效果入数据库 → 加权结果） -->
+  <div class="v2-card anim-fade-in-up" style="margin-top:14px">
+    <h2> 因子实战库 <span class="tag">unified.db · factor_agg 实战聚合 + 加权结果</span></h2>
+    <div id="agg-box"> 加载中…</div>
+    <div class="db-sec"><h3>因子全量回测（top20% → T+1）</h3><div id="bt-box"> 加载中…</div></div>
+    <div class="db-sec"><h3>加权结果（回测排名 × 实战排名融合）</h3><div id="rank-box"> 加载中…</div></div>
+    <details class="db-sec">
+      <summary style="cursor:pointer;font-weight:600;font-size:13px"> 因子 × Pitch 明细（factor_pitch · <span id="fp-count">—</span> 行）</summary>
+      <div id="pitch-box" style="margin-top:8px"> 加载中…</div>
+    </details>
+    <details class="db-sec">
+      <summary style="cursor:pointer;font-weight:600;font-size:13px"> 证据权重配置（evidence_weights）</summary>
+      <div id="ew-box" style="margin-top:8px"> 加载中…</div>
+    </details>
+  </div>
+
+  <!-- 整合库表统计 -->
+  <div class="v2-card anim-fade-in-up d1" style="margin-top:14px">
+    <h2> 整合库表 <span class="tag">unified.db 动态数据库 · 因子实测 / 市场知识 / 资产链路</span></h2>
+    <div class="dt-tabs" id="tables-box" style="margin-top:8px"> 加载中…</div>
+  </div>
+
+  <!-- 数据资产清单 -->
+  <div class="v2-card anim-fade-in-up d2" style="margin-top:14px">
+    <h2> 数据资产清单 <span class="tag">asset_inventory · 源 / 冗余组 / 核心资产</span></h2>
+    <div id="inventory-box" style="margin-top:6px"> 加载中…</div>
+  </div>
+
+  <!-- 数据链路 -->
+  <div class="v2-card anim-fade-in-up d3" style="margin-top:14px">
+    <h2> 数据链路 <span class="tag">data_lineage · 源库 → 消费端（防删错）</span></h2>
+    <div id="lineage-box" style="margin-top:6px"> 加载中…</div>
+  </div>
+
+  <div class="mini" style="text-align:center;margin-top:18px;opacity:.7"><span class="dsq-brand">Deepseek HARNESS Quant</span><span style="color:var(--muted)"> · 作者：LW </span><span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:#2a2a30;border:1px solid #3a3a44;box-shadow:0 2px 6px rgba(0,0,0,.5)"><svg class="cat-stroll" width="22" height="22" viewBox="0 0 24 24" fill="none"><path class="cat-tail" d="M14.5 17.5c3.2.6 5.2-1.2 5.6-3.8" stroke="#111" stroke-width="2.4" stroke-linecap="round" fill="none"/><path d="M7.4 6.8L6 2.8l3.6 2.6M16.6 6.8L18 2.8l-3.6 2.6" fill="#111" stroke="#111" stroke-width="1"/><circle cx="10.5" cy="9.5" r="4.4" fill="#111"/><ellipse cx="11" cy="16" rx="6" ry="4.4" fill="#111"/><circle cx="8.8" cy="9.2" r="0.9" fill="#4ade80"/><circle cx="12.2" cy="9.2" r="0.9" fill="#4ade80"/><path d="M5.8 10.2h-2.6M6.4 11.6L4 12.8M18.2 10.2h-2.6M17.6 11.6l2.4 1.2" stroke="#555" stroke-width="0.7" stroke-linecap="round"/></svg></span><span style="opacity:.5"> · 数据底座 unified.db · 因子实测影响 Pitch 优先级</span></div>
+</div>
+
+<script src="/v2/core/api.js"></script>
+<script src="/v2/core/render.js"></script>
+<script src="/v2/components/icons.js"></script>
+<script src="/v2/components/search.js"></script>
+<script src="/v2/components/sidebar.js"></script>
+<script>
+(function () {
+  LW.sidebar.render('sidebar', {active: 'data'});
+  var R = LW.render;
+  function pv(v, d) { return (v != null && !isNaN(v)) ? (v * 100).toFixed(d || 1) + '%' : '—'; }
+  function rc(v) { return (v != null && !isNaN(v)) ? '<b style="color:' + R.color(v) + '">' + (v > 0 ? '+' : '') + (v * 100).toFixed(2) + '%</b>' : '<span style="opacity:.35">—</span>'; }
+
+  // ★#319 数据库面板（因子实战库 + 加权结果）
+  LW.api.get('/api/live/db_view').then(function (d) {
+    // ★#332 持仓复盘（当前持仓 + 止盈 + 历史决策）
+    var hld = d.holdings || {};
+    var hpos = hld.positions || [];
+    var htp = hld.take_profit || [];
+    var decs = d.decisions || [];
+    var posHtml = hpos.length ? '<table><thead><tr><th>代码</th><th>名称</th><th style="text-align:right">入池日</th><th>类型</th><th style="text-align:right">入池价</th><th style="text-align:right">止损</th><th style="text-align:right">止盈</th></tr></thead><tbody>' +
+      hpos.map(function (p) {
+        return '<tr><td><b>' + R._f(p.code) + '</b></td>' +
+          '<td>' + R._f(p.name) + '</td>' +
+          '<td class="td-num">' + R._f(p.entry_date) + '</td>' +
+          '<td>' + R._f(p.otype) + '</td>' +
+          '<td class="td-num">' + (p.entry_price != null ? p.entry_price : '—') + '</td>' +
+          '<td class="td-num">' + (p.stop != null ? p.stop : '—') + '</td>' +
+          '<td class="td-num">' + (p.take_profit != null ? p.take_profit : (p.target != null ? p.target : '—')) + '</td></tr>';
+      }).join('') + '</tbody></table>' : '<div class="mini" style="opacity:.6">当前空仓（宁缺毋滥，等高质量 Pitch）</div>';
+    var tpHtml = htp.length ? '<div class="mini" style="margin-top:6px">止盈信号：' + htp.map(function (p) { return R._f(p.name || p.code); }).join('、') + '</div>' : '';
+    var decHtml = decs.length ? '<details class="db-sec"><summary style="cursor:pointer;font-weight:600;font-size:13px"> 历史决策记录（' + decs.length + ' 条）</summary><div style="margin-top:6px">' +
+      decs.slice().reverse().slice(0, 30).map(function (x) {
+        var act = (x.action || '').toLowerCase();
+        var col = act === 'buy' ? 'var(--red)' : (act === 'sell' ? 'var(--green)' : 'var(--muted)');
+        return '<div class="dt-line"><span class="db">' + R._f(x.code) + '</span>' +
+          '<span style="min-width:50px;font-weight:600;color:' + col + '">' + R._f(x.action) + '</span>' +
+          '<span class="cs">' + R._f(x.ts || x.date) + ' · ' + R._f(x.note || '').slice(0, 80) + '</span></div>';
+      }).join('') + '</div></details>' : '';
+    document.getElementById('hold-box').innerHTML =
+      '<div class="db-sec"><h3>当前持仓（' + hpos.length + '）</h3>' + posHtml + tpHtml + '</div>' + decHtml;
+
+    var agg = (d.tables && d.tables.factor_agg) || {};
+    var aggCols = agg.columns || [], aggRows = agg.rows || [];
+    // factor_agg: factor/n_pitch/n_done_t5/t1_avg/t5_avg/t5_win/excess_avg/srcs
+    var aggHtml = aggRows.length ? '<table><thead><tr><th>因子</th><th style="text-align:right">pitch</th><th style="text-align:right">T+5到期</th><th style="text-align:right">T+1 平均</th><th style="text-align:right">T+5 平均</th><th style="text-align:right">T+5 胜率</th><th style="text-align:right">超额</th></tr></thead><tbody>' +
+      aggRows.map(function (r) {
+        return '<tr><td><b>' + R._f(r[0]) + '</b></td>' +
+          '<td class="td-num">' + R._f(r[1]) + '</td>' +
+          '<td class="td-num">' + R._f(r[2], 0) + '</td>' +
+          '<td class="td-num">' + rc(r[3]) + '</td>' +
+          '<td class="td-num">' + rc(r[4]) + '</td>' +
+          '<td class="td-num">' + (r[5] != null ? pv(r[5], 0) : '—') + '</td>' +
+          '<td class="td-num">' + rc(r[6]) + '</td></tr>';
+      }).join('') + '</tbody></table>' : '<div class="mini" style="opacity:.6">暂无实战数据（因子被 pitch 后自动入此库）</div>';
+    document.getElementById('agg-box').innerHTML = aggHtml;
+
+    // ★#322 因子全量回测（factor_backtest：top20% → T+1）
+    var bt = (d.tables && d.tables.factor_backtest) || {};
+    var btRows = (bt.rows || []).slice().sort(function (a, b) { return (b[2] || -9) - (a[2] || -9); }).slice(0, 30);
+    var btHtml = btRows.length ? '<table><thead><tr><th>因子</th><th style="text-align:right">T+1 平均</th><th style="text-align:right">胜率</th><th style="text-align:right">样本</th><th style="text-align:right">IC</th><th>区间</th></tr></thead><tbody>' +
+      btRows.map(function (r) {
+        return '<tr><td><b>' + R._f(r[0]) + '</b></td>' +
+          '<td class="td-num">' + rc(r[2]) + '</td>' +
+          '<td class="td-num">' + (r[3] != null ? pv(r[3], 0) : '—') + '</td>' +
+          '<td class="td-num">' + R._f(r[4]) + '</td>' +
+          '<td class="td-num">' + (r[5] != null ? Number(r[5]).toFixed(3) : '—') + '</td>' +
+          '<td>' + R._f(r[6]) + '</td></tr>';
+      }).join('') + '</tbody></table>' : '<div class="mini" style="opacity:.6">暂无回测数据</div>';
+    // ★#412 样本天数提示：factor_backtest 仅 6 天历史（daily_scores 08-06 起），代表性有限，引导看 ICIR120
+    var btHint = '';
+    if (btRows.length) {
+      var _dr = btRows[0][6] || '';
+      var _m = _dr.match(/(\d{4}-\d{2}-\d{2})~(\d{4}-\d{2}-\d{2})/);
+      if (_m) {
+        var _days = Math.round((new Date(_m[2]) - new Date(_m[1])) / 86400000) + 1;
+        if (_days < 30) {
+          btHint = '<div class="mini" style="margin:4px 0 8px;color:#f2c94c;font-weight:600">样本区间 ' + _dr + '（约 ' + _days + ' 天）——代表性有限，因子有效性请以下方「加权结果 · 回测ICIR120」为准</div>';
+        }
+      }
+    }
+    document.getElementById('bt-box').innerHTML = btHint + btHtml;
+
+    // 加权结果（ranking）
+    var rk = d.ranking || [];
+    var rkHtml = rk.length ? '<table><thead><tr><th>排名</th><th>因子</th><th style="text-align:right">回测ICIR120</th><th style="text-align:right">pitch样本</th><th style="text-align:right">实战业绩</th><th style="text-align:right">综合分</th><th>实测权重</th></tr></thead><tbody>' +
+      rk.slice(0, 30).map(function (x) {
+        var live = (x.live_metric != null && !isNaN(x.live_metric)) ? '<b style="color:' + R.color(x.live_metric) + '">' + (x.live_metric > 0 ? '+' : '') + (x.live_metric * 100).toFixed(2) + '%</b>' : '<span style="opacity:.35">—</span>';
+        var eff = x.live_eff > 0 ? '<span class="tag-st tag-new" style="font-size:10px;padding:1px 6px;border-radius:5px;background:rgba(94,106,210,.14);color:#5e6ad2;font-weight:600">实测 ' + Math.round(x.live_eff * 100) + '%</span>' : '<span style="opacity:.35">—</span>';
+        return '<tr><td class="td-num"><b>' + x.rank + '</b></td><td><b>' + R._f(x.factor) + '</b></td>' +
+          '<td class="td-num">' + (x.icir120 != null ? x.icir120.toFixed(2) : '—') + '</td>' +
+          '<td class="td-num">' + x.n_pitch + '</td>' +
+          '<td class="td-num">' + live + '</td>' +
+          '<td class="td-num"><b>' + (x.composite != null ? x.composite.toFixed(1) : '—') + '</b></td>' +
+          '<td>' + eff + '</td></tr>';
+      }).join('') + '</tbody></table>' : '<div class="mini" style="opacity:.6">无排名数据</div>';
+    document.getElementById('rank-box').innerHTML = rkHtml;
+
+    // factor_pitch 明细
+    var fp = (d.tables && d.tables.factor_pitch) || {};
+    var fpRows = fp.rows || [];
+    document.getElementById('fp-count').textContent = fpRows.length;
+    var fpHtml = fpRows.length ? '<table><thead><tr><th>因子</th><th>股票</th><th>入池日</th><th>类型</th><th style="text-align:right">T+1</th><th style="text-align:right">T+5</th><th style="text-align:right">超额</th></tr></thead><tbody>' +
+      fpRows.map(function (r) {
+        return '<tr><td><b>' + R._f(r[0]) + '</b></td>' +
+          '<td>' + R._f(r[1]) + '</td>' +
+          '<td class="td-num">' + R._f(r[2]) + '</td>' +
+          '<td>' + R._f(r[3]) + '</td>' +
+          '<td class="td-num">' + rc(r[8]) + '</td>' +
+          '<td class="td-num">' + rc(r[9]) + '</td>' +
+          '<td class="td-num">' + rc(r[14]) + '</td></tr>';
+      }).join('') + '</tbody></table>' : '<div class="mini" style="opacity:.6">暂无明细</div>';
+    document.getElementById('pitch-box').innerHTML = fpHtml;
+
+    // evidence_weights
+    var ew = (d.tables && d.tables.evidence_weights) || {};
+    var ewHtml = (ew.rows || []).map(function (r) {
+      return '<div class="dt-line"><span class="db">' + R._f(r[0]) + '</span>' +
+        '<span style="min-width:60px;font-variant-numeric:tabular-nums;font-weight:600">' + R._f(r[1]) + '</span>' +
+        '<span class="cs">' + R._f(r[2]) + '</span>' +
+        '<span class="mini" style="color:#a1a1aa;flex:none">' + R._f(r[3]) + '</span></div>';
+    }).join('');
+    document.getElementById('ew-box').innerHTML = ewHtml || '<div class="mini" style="opacity:.6">无配置</div>';
+  }).catch(function (e) {
+    document.getElementById('agg-box').innerHTML = '<div class="mini" style="color:var(--red)"> ' + e + '</div>';
+  });
+
+  // 表统计 + 资产 + 链路（data_assets）
+  LW.api.get('/api/live/data_assets').then(function (d) {
+    var tabs = (d.tables || []).map(function (t) {
+      return '<div class="dt-tab"><div class="n">' + (t.rows != null ? t.rows : '—') + '</div><div class="nm">' + R._f(t.name) + '</div></div>';
+    }).join('');
+    document.getElementById('tables-box').innerHTML = tabs || '<div class="mini" style="opacity:.6">无表数据</div>';
+
+    var inv = (d.inventory || []).map(function (i) {
+      return '<div class="dt-inv"><span class="nm">' + R._f(i.name) + '</span>' +
+        '<span class="kd">' + R._f(i.kind) + '</span>' +
+        '<span class="sz">' + (i.size != null && i.size > 0 ? (i.size > 1024 ? (i.size/1024).toFixed(1) + 'GB' : i.size + 'MB') : '—') + '</span>' +
+        '<span class="dt">' + R._f(i.detail).slice(0, 90) + '</span></div>';
+    }).join('');
+    document.getElementById('inventory-box').innerHTML = inv || '<div class="mini" style="opacity:.6">无资产清单</div>';
+
+    var lin = (d.lineage || []).map(function (l) {
+      return '<div class="dt-line"><span class="db">' + R._f(l.db_name) + '</span>' +
+        '<span class="cs">' + R._f(l.consumers).slice(0, 200) + '</span>' +
+        '<span class="mini" style="color:#a1a1aa;flex:none">' + R._f(l.updated) + '</span></div>';
+    }).join('');
+    document.getElementById('lineage-box').innerHTML = lin || '<div class="mini" style="opacity:.6">无链路数据</div>';
+  }).catch(function (e) {
+    document.getElementById('tables-box').innerHTML = '<div class="mini" style="color:var(--red)"> ' + e + '</div>';
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,172 @@
+/* deck/ui_common.css — 主 UI 统一导航条 + 公共样式（任务包 G U1-5，2026-08-10 总指导）
+ * 各页面生成器 <link rel="stylesheet" href="/ui_common.css"> + <div class="lw-nav" data-page="...">
+ * JS：<script src="/nav_common.js"></script> 自动渲染导航条（页面名 + 回门户 + 数据截至口径）
+ */
+:root {
+  --navy:#f4f4f5; --navy2:#5e6ad2; --gold:#f2c94c; --green:#4ade80;
+  --red:#eb5757; --bg:#0a0a0b; --muted:#a1a1aa; --line:rgba(255,255,255,.08);
+  /* ★#356 StyleKit 设计 token：缓动/圆角/阴影统一（企业简洁风 + 技术等宽数字） */
+  --ease-out: cubic-bezier(0.16,1,0.3,1);       /* expo-out：入场/数字滚动 */
+  --ease-hover: cubic-bezier(0.33,1,0.68,1);    /* hover 微交互 */
+  --r-sm: 8px; --r-md: 12px; --r-lg: 16px;      /* 圆角三档 */
+  --shadow-card: 0 1px 2px rgba(0,0,0,.04), 0 1px 3px rgba(0,0,0,.06);
+  --shadow-hover: 0 12px 24px -8px rgba(0,0,0,.16), 0 4px 8px -4px rgba(0,0,0,.10);
+  --shadow-main: 0 8px 30px -10px rgba(94,106,210,.35);
+  --font-sans: "Inter","PingFang SC","Microsoft YaHei","Segoe UI",-apple-system,"Helvetica Neue",sans-serif;
+  --font-num: "Inter","SF Pro Display","Segoe UI","Helvetica Neue",-apple-system,sans-serif;
+}
+.lw-nav {
+  position:sticky; top:0; z-index:999;
+  display:flex; align-items:center; gap:14px;
+  background:linear-gradient(90deg,#141419,#1d1d28);
+  color:#ffffff; padding:8px 18px; border-radius:10px; margin-bottom:14px;
+  font-size:13px; box-shadow:0 2px 8px rgba(0,0,0,.18);
+}
+.lw-nav .lw-logo { font-weight:700; font-size:14px; color:#ffffff; text-decoration:none; letter-spacing:.5px; }
+.lw-nav .lw-logo b { color:#f2c94c; }
+.lw-nav .lw-page { font-size:13px; opacity:.95; }
+.lw-nav .lw-sp { flex:1; }
+.lw-nav .lw-date { font-size:12px; color:rgba(255,255,255,.65); }
+.lw-nav a.lw-home {
+  display:inline-flex; align-items:center; gap:5px;
+  font-size:12px; color:#ffffff; text-decoration:none; font-weight:600;
+  background:linear-gradient(135deg,#5e6ad2,#8b5cf6);
+  border:1px solid rgba(255,255,255,.25); border-radius:14px; padding:3px 12px;
+  box-shadow:0 1px 4px rgba(0,0,0,.15);
+  transition:transform .15s, box-shadow .15s, filter .15s;
+}
+.lw-nav a.lw-home:hover { transform:translateY(-1px); box-shadow:0 3px 8px rgba(0,0,0,.25); filter:brightness(1.08); }
+.lw-nav a.lw-home:active { transform:translateY(0); }
+.lw-nav .lw-badge {
+  font-size:10px; padding:1px 7px; border-radius:10px;
+  background:rgba(255,255,255,.14); color:#FFE9A8;
+}
+.lw-tip {
+  font-size:12px; color:var(--muted); background:#16161a;
+  border:1px dashed var(--line); border-radius:8px; padding:6px 10px; margin:8px 0;
+  line-height:1.7;
+}
+/* ★P-6 统一空态（2026-08-11 AI-1）：各页无数据时显示，生成器直接复用
+ * 用法：<div class="lw-empty"><b>暂无XX</b>说明文字（如：数据收盘后 17:35 自动更新）</div>
+ */
+.lw-empty {
+  text-align:center; padding:34px 16px; margin:12px 0;
+  background:#131316; border:1px dashed var(--line); border-radius:10px;
+  color:var(--muted); font-size:13px; line-height:1.9;
+}
+.lw-empty b { color:var(--navy); font-size:14px; display:block; margin-bottom:4px; }
+.lw-empty .lw-go { margin-top:8px; font-size:12px; color:var(--navy2); }
+.lw-empty .lw-go a { color:var(--navy2); text-decoration:none; border-bottom:1px dashed var(--navy2); }
+@media (max-width:720px) {
+  .lw-nav { flex-wrap:wrap; gap:6px; padding:6px 10px; }
+  .lw-nav .lw-date { width:100%; }
+}
+
+/* ★#356 注意：以下 65~169 行是 anim_common.css 的历史重复拷贝（两文件同名覆盖，不影响功能）。
+   改动画/行情条样式请同步改 anim_common.css（单一来源），避免"改一处漏一处"。 */
+
+/* ══════════════════════════════════════════════════════════════
+   deck/anim_common.css — StyleKit 动画公共库（2026-08-12 #156）
+   来源：https://www.stylekit.top/zh/animations（用户提供素材站，直接抄代码）
+   一致性规范（全站统一）：
+   · 缓动：入场/数字用 cubic-bezier(0.16,1,0.3,1)（expo-out），hover 用 cubic-bezier(0.33,1,0.68,1)
+   · 时长节奏：微交互 200ms / 入场 500ms / 数字滚动 2s / 常驻 2s
+   · 全部带 prefers-reduced-motion 降级（用户减少动效时禁用）
+   · 动画只增强不干扰数据读取（数字滚动仅首次加载）
+   用法：<link rel="stylesheet" href="/anim_common.css">
+   ══════════════════════════════════════════════════════════════ */
+
+/* 1) 数字滚动（counter-roll：0-9 垂直滚动至目标值）——KPI/统计数字
+   用法：counterRoll(el, val, {decimals, suffix}) 见 timing_dash.html */
+@keyframes anim-counter-roll {
+  from { transform: translateY(0); }
+  to   { transform: translateY(calc(var(--counter-target, -9) * -1em)); }
+}
+.anim-counter-container{display:inline-flex;overflow:hidden;height:1em;line-height:1;
+  font-variant-numeric:tabular-nums}
+.anim-counter-column{display:flex;flex-direction:column}
+.anim-counter-column span{height:1em;display:flex;align-items:center;justify-content:center}
+.anim-counter-digit{will-change:transform;
+  animation:anim-counter-roll 2s cubic-bezier(0.16,1,0.3,1) both;
+  animation-delay:calc(var(--digit-index,0)*150ms)}
+
+/* 2) 子元素错开入场（stagger-children：列表/卡片网格依次上滑淡入）
+   用法：父级 .anim-stagger，子级内联 style="--stagger-index:N"（可覆盖 --stagger-delay） */
+@keyframes anim-stagger-fade-in{
+  from{opacity:0;transform:translateY(15px)}
+  to{opacity:1;transform:translateY(0)}
+}
+.anim-stagger>*{will-change:transform,opacity;opacity:0;
+  animation:anim-stagger-fade-in 500ms cubic-bezier(0.16,1,0.3,1) both;
+  animation-delay:calc(var(--stagger-index,0)*var(--stagger-delay,75ms))}
+
+/* 3) 悬浮抬升（hover-lift：卡片 hover 上移+阴影加深） */
+.anim-hover-lift{will-change:transform,box-shadow;
+  transition:transform 200ms cubic-bezier(0.33,1,0.68,1),
+             box-shadow 200ms cubic-bezier(0.33,1,0.68,1)}
+.anim-hover-lift:hover{transform:translateY(-4px);
+  box-shadow:0 12px 20px -8px rgba(0,0,0,.15),0 4px 6px -4px rgba(0,0,0,.1)}
+
+/* 4) 微光扫过（shimmer：Apple 风格加载占位） */
+@keyframes anim-shimmer{from{background-position:-200% 0}to{background-position:200% 0}}
+.anim-shimmer{background:linear-gradient(90deg,#a1a1aa 25%,#d4d4d8 37%,#a1a1aa 63%);
+  background-size:200% 100%;animation:anim-shimmer 2s linear infinite;border-radius:.375rem}
+
+/* 5) 脉冲光环（pulse-ring：状态指示呼吸灯——绿=正常/琥珀=预警） */
+@keyframes anim-pulse-ring{
+  0%{box-shadow:0 0 0 0 rgba(39,174,96,.45)}
+  70%{box-shadow:0 0 0 9px rgba(39,174,96,0)}
+  100%{box-shadow:0 0 0 0 rgba(39,174,96,0)}
+}
+.anim-pulse-ring{width:9px;height:9px;border-radius:50%;background:#27ae60;
+  animation:anim-pulse-ring 2s ease-out infinite;display:inline-block}
+@keyframes anim-pulse-ring-amber{
+  0%{box-shadow:0 0 0 0 rgba(242,201,76,.45)}
+  70%{box-shadow:0 0 0 9px rgba(242,201,76,0)}
+  100%{box-shadow:0 0 0 0 rgba(242,201,76,0)}
+}
+.anim-pulse-ring.amber{background:#f2c94c;animation:anim-pulse-ring-amber 2s ease-out infinite}
+
+/* 6) 区块淡入上滑（fade-in-up：主区块入场，.d1/.d2/.d3 递进延迟） */
+@keyframes anim-fade-in-up{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+.anim-fade-in-up{animation:anim-fade-in-up 600ms cubic-bezier(0.16,1,0.3,1) both}
+.anim-fade-in-up.d1{animation-delay:80ms}.anim-fade-in-up.d2{animation-delay:160ms}
+.anim-fade-in-up.d3{animation-delay:240ms}
+
+/* 动画降级（用户偏好减少动效时全部禁用） */
+@media (prefers-reduced-motion: reduce){
+  .anim-counter-digit,.anim-stagger>*,.anim-shimmer,.anim-pulse-ring,.anim-fade-in-up{
+    animation:none!important;opacity:1!important;transform:none!important}
+  .anim-hover-lift{transition:none!important}
+}
+
+/* ═══════════ #166 动态行情条（live_ticker）═══════════
+   用户需求：文字一直在动，像金融系统——顶部滚动行情 + 信息轮播 */
+.lt-bar{overflow:hidden;white-space:nowrap;background:#050a18;border-radius:6px;
+  padding:9px 0;margin-bottom:14px;position:relative}
+.lt-track{display:inline-block;white-space:nowrap;
+  animation:lt-scroll 14s linear infinite;will-change:transform}
+.lt-bar:hover .lt-track{animation-play-state:paused}
+@keyframes lt-scroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.lt-item{display:inline-flex;align-items:center;gap:5px;margin:0 18px;font-size:12px;color:#a1a1aa}
+.lt-item b{color:#d4d4d8;font-weight:600}
+.lt-val{font-variant-numeric:tabular-nums;font-weight:700}
+.lt-dot{width:6px;height:6px;border-radius:50%;display:inline-block}
+.lt-msg .lt-val{color:#7dd3fc!important;font-weight:500}
+
+/* 动态信息轮播（5s/条 切换 + 淡入） */
+.lt-rotator{background:#16161a;border:1px solid #2a2a30;border-radius:10px;
+  padding:10px 16px;font-size:12px;color:#d4d4d8;margin-bottom:14px;min-height:38px;
+  display:flex;align-items:center;gap:8px;overflow:hidden}
+.lt-rot-cat{font-weight:700;flex-shrink:0}
+.lt-rot-msg{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  animation:lt-fade .6s ease}
+@keyframes lt-fade{from{opacity:0;transform:translateX(8px)}to{opacity:1;transform:translateX(0)}}
+
+@media (prefers-reduced-motion: reduce){
+  .lt-track{animation:none}.lt-rot-msg{animation:none}
+}
+
+/* #166 v2 彭博分隔符（闪烁竖线） */
+.lt-sep{color:#4b5563;font-size:10px;margin:0 2px;animation:lt-blink 1s steps(2) infinite}
+@keyframes lt-blink{0%,100%{opacity:1}50%{opacity:.15}}

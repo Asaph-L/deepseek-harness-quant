@@ -1,0 +1,247 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">
+<title>LW量化 · 门户</title>
+<link rel="stylesheet" href="/ui_common.css"><link rel="stylesheet" href="/anim_common.css">
+<style>
+:root { --navy:#0A2540; --blue:#2F6FED; --gold:#D4A843; --green:#0F6E56; --red:#C0392B; --bg:#F0F3F8; --muted:#8a94a6; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,"Microsoft YaHei",sans-serif; background:var(--bg); min-height:100vh; color:#0A2540; padding:22px 24px; }
+.wrap { max-width:1120px; margin:0 auto; }
+.brand { display:flex; align-items:baseline; justify-content:space-between; border-bottom:1px solid #dbe2ec; padding-bottom:12px; }
+.brand .logo { font-size:19px; font-weight:700; letter-spacing:.5px; color:var(--navy); }
+.brand .logo small { font-size:11px; font-weight:400; color:var(--muted); margin-left:8px; }
+.brand .st { font-size:11px; color:var(--muted); display:flex; gap:14px; }
+.brand .st b { color:var(--navy); font-weight:600; }
+.nav { display:flex; gap:2px; border-bottom:1px solid #dbe2ec; margin-bottom:16px; }
+.nav-item { padding:9px 20px; font-size:13px; color:#5b6b7c; text-decoration:none; border-bottom:2px solid transparent; }
+.nav-item.on { color:var(--navy); border-bottom-color:var(--navy); font-weight:700; }
+.nav-item:hover { color:var(--blue); }
+.hero { background:linear-gradient(135deg,#0A2540,#185FA5); border-radius:18px; padding:22px 28px; color:#fff; }
+.hero h1 { font-size:20px; } .hero .sub { font-size:12px; color:rgba(255,255,255,.7); margin-top:6px; }
+.dec { background:#fff; border:1px solid #e5e9f0; border-radius:14px; padding:18px 22px; margin-top:14px; }
+.dec-guide { margin-top:12px; font-size:11.5px; color:#5b6b7c; background:#F6F9FF; border-radius:8px; padding:8px 12px; line-height:1.7; }
+.dec h2 { font-size:14px; color:var(--navy); margin-bottom:10px; }
+.d-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
+.d-item { background:#F6F9FF; border-radius:10px; padding:10px 14px; }
+.d-item i { display:block; font-style:normal; font-size:11px; color:var(--muted); }
+.d-item b { font-size:15px; display:block; margin:2px 0; }
+.d-item .ok { color:var(--green); font-weight:500; } .d-item .no { color:var(--red); font-weight:500; } .d-item .warn { color:var(--gold); font-weight:500; }
+.cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px; margin-top:12px; }
+.more-zone { border:1px dashed #d4dbe8; border-radius:14px; padding:14px 18px; background:#fafbfd; }
+.more-summary { cursor:pointer; font-size:13px; font-weight:700; color:#3a5a8c; user-select:none; outline:none; }
+.more-summary:hover { color:#185FA5; }
+.more-zone[open] .more-summary { color:#185FA5; }
+.more-zone .cards { grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); }
+.more-zone .card { padding:12px 16px; border-radius:10px; }
+.more-zone .card p { display:none; }
+.more-zone .card h3 { font-size:12.5px; margin:6px 0 2px; }
+.more-zone .card .go { font-size:11px; margin-top:4px; }
+.card { background:#fff; border:1px solid #e5e9f0; border-radius:14px; padding:18px 20px; text-decoration:none; color:#0A2540; transition:all .18s; display:block; }
+.card:hover { transform:translateY(-3px); box-shadow:0 8px 24px rgba(10,37,64,.12); }
+.card .ico { font-size:26px; }
+.card h3 { font-size:14px; margin:8px 0 5px; }
+.card p { font-size:11.5px; color:var(--muted); line-height:1.6; }
+.card .go { font-size:12px; color:var(--blue); margin-top:8px; font-weight:600; }
+.zone { margin-top:22px; }
+.zone-head { display:flex; align-items:center; gap:10px; font-size:14px; font-weight:700; color:#0A2540; margin-bottom:4px; }
+.zone-head .bar { width:4px; height:16px; border-radius:2px; }
+.zone-head .desc { font-size:11px; color:var(--muted); font-weight:400; }
+.zone.dec-zone .bar { background:#C0392B; } .zone.dec-zone .zone-head { color:#C0392B; }
+.zone.mon .bar { background:#2F6FED; } .zone.mon .zone-head { color:#185FA5; }
+.zone.dat .bar { background:#0F6E56; } .zone.dat .zone-head { color:#0F6E56; }
+.zone.lines .bar { background:#7B5EA7; } .zone.lines .zone-head { color:#7B5EA7; }
+.line-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:10px; }
+.line-card { border:1px solid #e5e9f0; border-radius:14px; overflow:hidden; background:#fff; }
+.line-card.lv { border-top:4px solid #0F6E56; } .line-card.lt { border-top:4px solid #185FA5; }
+.line-head { display:flex; align-items:center; gap:8px; padding:14px 16px; cursor:pointer; background:#F7F9FC; }
+.line-head .line-ico { font-size:18px; } .line-head b { font-size:15px; color:#0A2540; }
+.line-head .line-desc { font-size:11px; color:var(--muted); margin-left:auto; padding-right:8px; }
+.line-arrow { color:#888780; font-size:12px; transition:transform .2s; }
+.line-card.open .line-arrow { transform:rotate(180deg); }
+.line-body { display:none; padding:6px 10px 12px; }
+.line-body.open { display:block; }
+.line-body .strat { display:flex; align-items:center; gap:8px; padding:9px 12px; border-radius:9px; text-decoration:none; color:#3c4858; border-bottom:1px dashed #eef1f6; }
+.line-body .strat:last-child { border-bottom:none; }
+.line-body .strat:hover { background:#EEF4FB; }
+.line-body .strat .st { flex:1; } .line-body .strat .st b { font-size:13px; }
+.line-body .strat .go { color:#185FA5; font-size:13px; }
+.foot { text-align:center; font-size:11px; color:var(--muted); margin-top:26px; }
+/* ★2026-08-11 决策链状态条（百轮#16） */
+.chain-status .chain-label { color:#8a94a6; font-weight:700; margin-bottom:4px; font-size:11px; }
+.chain-nodes { display:flex; flex-wrap:wrap; gap:4px; }
+.chain-chip { padding:2px 8px; border-radius:12px; font-size:10.5px; font-weight:600; }
+.ch-ok { background:#0F6E5622; color:#0F6E56; border:1px solid #0F6E5655; }
+.ch-old { background:#D4A84322; color:#8a6d1a; border:1px solid #D4A84355; }
+.ch-bad { background:#C0392B22; color:#C0392B; border:1px solid #C0392B55; }
+/* ★2026-08-11 全局预警横幅（百轮#41） */
+.alert-status { margin:8px 0 4px; font-size:12px; }
+.alert-ok { background:#0F6E5618; color:#0F6E56; border:1px solid #0F6E5633; border-radius:10px; padding:8px 14px; font-weight:600; }
+.alert-title { background:#C0392B; color:#fff; border-radius:10px 10px 0 0; padding:8px 14px; font-weight:700; font-size:12.5px; }
+.alert-title-high { animation:al-pulse 2s infinite; }
+@keyframes al-pulse { 0%,100%{opacity:1} 50%{opacity:.7} }
+.alert-items { display:flex; flex-wrap:wrap; gap:4px; padding:8px; background:#FFF7F7; border:1px solid #C0392B33; border-radius:0 0 10px 10px; }
+.alert-item { padding:3px 10px; border-radius:12px; font-size:11px; font-weight:600; }
+.alert-high { background:#C0392B22; color:#C0392B; border:1px solid #C0392B55; }
+.alert-mid { background:#D4A84322; color:#8a6d1a; border:1px solid #D4A84355; }
+</style></head><body><div class="wrap">
+<div class="brand">
+  <div class="logo">LW量化<small>决策系统</small></div>
+  <div class="st"><span>数据日 <b id="bd-trade">—</b></span><span>决策链 <b id="bd-chain">—</b></span><span>择时 <b id="bd-timing">—</b></span></div>
+</div>
+<div class="nav"><a class="nav-item on" href="/">门户</a><a class="nav-item" href="/pitch">决策</a><a class="nav-item" href="/holdings">持仓</a><a class="nav-item" href="/factors">因子池</a><a class="nav-item" href="/help">说明</a></div>
+<div class="chain-status" style="margin:0 0 4px;font-size:11.5px"></div>
+<div class="alert-status"></div>
+<!-- ★#166 动态行情条（文字一直在动——金融系统感）+ 信息轮播 -->
+<div class="lt-bar"></div>
+<div class="lt-rotator">⏳ 正在加载实时信息…</div>
+<script src="/live_ticker.js"></script>
+<div class="hero">
+  <h1>LW量化 · 控制门户</h1>
+  <div class="sub">决策 / 持仓 / 因子池 / 说明 —— 数据截至 <b style="color:#0F6E56">2026-08-13</b>（生成 02:14）</div>
+  <!-- ★#179 数据导出中心：一键下载 Excel + 海报 -->
+  <div class="export-bar">
+    <button class="export-btn" onclick="doExport()">⬇️ 导出数据（Excel+海报）</button>
+    <span id="export-msg" class="export-msg"></span>
+  </div>
+</div>
+<script>
+async function doExport(){
+  const msg=document.getElementById('export-msg');
+  msg.textContent='⏳ 正在生成数据包…';
+  try{
+    const r=await fetch('/api/export_data');
+    const d=await r.json();
+    if(d.ok && d.excel){
+      msg.innerHTML='✅ 已生成 <a href="/dl/'+d.excel+'" target="_blank" style="color:#0F6E56;font-weight:600">'+d.excel+'</a> · <a href="/dl/'+d.poster+'" target="_blank" style="color:#0F6E56;font-weight:600">海报</a><div class="mini">'+d.log+'</div>';
+    } else {
+      msg.innerHTML='❌ 导出失败：'+(d.error||d.log||'未知');
+    }
+  }catch(e){ msg.textContent='❌ 服务器未连接：'+e.message; }
+}
+</script>
+<style>
+.export-bar{margin:8px 0 4px;display:flex;align-items:center;gap:12px}
+.export-btn{background:#0A2540;color:#fff;border:none;padding:9px 18px;border-radius:8px;
+  font-size:13px;font-weight:600;cursor:pointer;transition:background .2s}
+.export-btn:hover{background:#1E3A5F}
+.export-msg{font-size:12px;color:#334155}
+</style>
+<div style="background:#F8FAFD;border:1px solid #E5E9F0;border-radius:10px;padding:7px 14px;margin-top:10px;display:flex;flex-wrap:wrap;align-items:center"><b style="font-size:11px;margin-right:8px">⏱ 盘前自检</b><span style="display:inline-flex;align-items:center;gap:5px;margin:2px 14px 2px 0;font-size:11.5px"><b style="color:#0A2540">系统健康</b> <span style="color:#0F6E56;font-weight:700">✅ 全绿</span><span class="mini" style="opacity:.7">扫描 2.7h 前</span></span><span style="display:inline-flex;align-items:center;gap:5px;margin:2px 14px 2px 0;font-size:11.5px"><b style="color:#0A2540">T+5 复核</b> <span style="color:#0F6E56;font-weight:700">2026-08-14（已到期）</span><span class="mini" style="opacity:.7">08-14 首批自动复审降权</span></span><span style="display:inline-flex;align-items:center;gap:5px;margin:2px 14px 2px 0;font-size:11.5px"><b style="color:#0A2540">类型裁决</b> <span style="color:#C0392B;font-weight:700">2 类降权</span><span class="mini" style="opacity:.7">质量折价、价值重估</span></span><span style="display:inline-flex;align-items:center;gap:5px;margin:2px 14px 2px 0;font-size:11.5px"><b style="color:#0A2540">数据就绪</b> <span style="color:#0F6E56;font-weight:700">截至 2026-08-13</span><span class="mini" style="opacity:.7">双库合并完整性探测（门槛≥4000 只）</span></span></div>
+
+<div class="dec">
+  <h2>📌 今日决策摘要（择时 · 闸门 · 审计 · 建议）</h2>
+  <div class="d-grid"><div class="d-item"><i>市场环境（政策/宏观/情绪/宽度）</i><b>2026-08-13</b><span class="mini" style="display:block;margin-top:2px">政策 <b>38</b> ｜ 宏观 <b>88</b> ｜ 情绪 <b>90</b> ｜ 宽度 <b>80</b></span></div><div class="d-item"><i>当前是否适合买入</i><b class="ok">🟢 适合买入</b><span class="mini">（67.6 分）</span></div><div class="d-item"><i>信号闸门 · 数据可信吗</i><span class="ok">🟢 放行</span></div><div class="d-item"><i>数据审计 · 16 项体检</i><b>79.4/100</b><span class="mini">PASS 10 · FAIL 0</span></div></div><div class="dec-guide">📖 四维：政策 <b>38</b> ｜ 宏观 <b>88</b> ｜ 情绪 <b>90</b> ｜ 宽度 <b>80</b>。市场温度 12/100（🔥 恐慌底部（加仓区））；个股宽度 偏冷｜行业宽度 恐慌底部；Regime=strong_uptrend｜社融恶化｜利率宽松。怎么看：① 市场环境=新择时系统四维融合（政策 40%+宏观 25%+情绪 20%+宽度 15%）；② 是否适合买入=🟢适合/🟡谨慎/🔴不适合（非仓位指导）；③ 闸门🟢=信号可信；④ 审计高分=数据无异常。</div><div class="dec-guide" style="margin-top:10px;background:#FFFBF0;border-color:#EADFC8">🔬 <b>类型裁决</b>（实盘 T+1 vs 基准/胜率，）：<span style="display:inline-block;margin:3px 8px 0 0;padding:2px 10px;border-radius:12px;border:1px solid #D4A843;color:#D4A843;font-size:11px;font-weight:700">🟡 短线情绪 +0.71%（43 样本）</span><span style="display:inline-block;margin:3px 8px 0 0;padding:2px 10px;border-radius:12px;border:1px solid #C0392B;color:#C0392B;font-size:11px;font-weight:700">🔴 质量折价 +1.03%（7 样本 ｜降权1天）</span><span style="display:inline-block;margin:3px 8px 0 0;padding:2px 10px;border-radius:12px;border:1px solid #C0392B;color:#C0392B;font-size:11px;font-weight:700">🔴 价值重估 -1.18%（21 样本 ｜降权2天）</span><span style="display:inline-block;margin:3px 8px 0 0;padding:2px 10px;border-radius:12px;border:1px solid #E4572E;color:#E4572E;font-size:11px;font-weight:700">🟠 低估值 +0.63%（8 样本 ｜降权2天）</span><div style="color:#C0392B;font-weight:700;margin-bottom:2px">⚠ 降权提示中：质量折价（低于17年基准） · 价值重估（低于17年基准） → 该类审批从严（Pitch 卡片带 🔻）</div><div style="margin-top:4px;opacity:.75">维持=实盘超基准 · 观察=持平/样本不足 · 降权候选=偏弱 · 降权提示=显著偏弱（审批从严）。详见远期池验证对照卡 →</div><div style="margin-top:4px;opacity:.85;color:#8a6d1a">⏳ 降权复核：2026-08-14 T+5 到期后样本加厚自动复审（解除条件：t5≥5 样本且均值为正胜率≥50%）</div></div>
+</div>
+
+<!-- ★2026-08-11 用户核心批评：科技线/价值线应是两个一级菜单，展开二级菜单=单个策略 -->
+<div class="zone lines" style="grid-column:1/-1">
+  <div class="zone-head"><span class="bar"></span>🛤️ 两线并行 <span class="desc">价值线 = 赚业绩与修复的钱（中线）· 科技线 = 赚情绪与资金的钱（短线）—— 先选线，再展开选策略</span></div>
+</div>
+<div class="line-grid">
+  <div class="line-card lv">
+    <div class="line-head" onclick="toggleLine('value')">
+      <span class="line-ico">🔵</span><b>价值线</b>
+      <span class="line-desc">基本面赚钱 · 中线持有 · 止损宽</span>
+      <span class="line-arrow">▾</span>
+    </div>
+    <div class="line-body" id="lb-value">
+      <a class="strat" href="/dashboard_opp.html"><div class="st"><b>低估值 value</b><span class="mini">17年胜率 62.5% · 止损 -8%</span></div><span class="go">→</span></a>
+      <a class="strat" href="/dashboard_opp.html"><div class="st"><b>重估 revalue</b><span class="mini">53.6% · 追踪 MA20</span></div><span class="go">→</span></a>
+      <a class="strat" href="/dashboard_opp.html"><div class="st"><b>质量折价 quality_gap</b><span class="mini">70.4% 最强 · 回撤 -14%</span></div><span class="go">→</span></a>
+      <a class="strat" href="/dashboard_opp.html"><div class="st"><b>事件驱动 event</b><span class="mini">51.5% · 时间止损 13 周</span></div><span class="go">→</span></a>
+    </div>
+  </div>
+  <div class="line-card lt">
+    <div class="line-head" onclick="toggleLine('tech')">
+      <span class="line-ico">🟠</span><b>科技线</b>
+      <span class="line-desc">情绪与资金短线 · 必须带止损</span>
+      <span class="line-arrow">▾</span>
+    </div>
+    <div class="line-body" id="lb-tech">
+      <a class="strat" href="/dashboard_techpitch.html"><div class="st"><b>短线情绪（涨停反转）</b><span class="mini">limup_ex ICIR 1.53 全库最强 · ATR 止损</span></div><span class="go">→</span></a>
+      <a class="strat" href="/dashboard_techpitch.html"><div class="st"><b>龙虎榜强势</b><span class="mini">净买/机构席位 · 资金止损</span></div><span class="go">→</span></a>
+      <a class="strat" href="/dashboard_techpitch.html"><div class="st"><b>量价共识 pv_consensus</b><span class="mini">53.3% · 观察 3-5 日量能</span></div><span class="go">→</span></a>
+    </div>
+  </div>
+</div>
+<script>
+function toggleLine(l){ document.getElementById('lb-' + l).classList.toggle('open'); }
+document.getElementById('lb-tech').classList.add('open');
+</script>
+
+<div class="zone dec-zone" style="grid-column:1/-1">
+  <div class="zone-head"><span class="bar"></span>⚡ 决策 <span class="desc">需要你拍板的事 —— 先看这里</span></div>
+</div>
+<div class="cards">
+  <a class="card" href="/pitch" style="border-color:#2F6FED"><div class="ico">🎯</div><h3>决策桌</h3><p>择时 / 机会池 / Pitch / 远期池 / 机器池 —— 一页 Tab 全管</p><div class="go">进入决策 →</div></a>
+  <a class='card' href='/pitch' style='border-color:#0F6E56'><div class='ico'>📌</div><h3>今日建议（2026-08-13 · 20 只）</h3><table style='width:100%;border-collapse:collapse'><tr><td style='font-size:11px'><b>600396.SH</b></td><td style='font-size:11px'>华电辽能</td><td style='font-size:11px;text-align:right'>0.05</td></tr><tr><td style='font-size:11px'><b>603156.SH</b></td><td style='font-size:11px'>养元饮品</td><td style='font-size:11px;text-align:right'>0.05</td></tr><tr><td style='font-size:11px'><b>300199.SZ</b></td><td style='font-size:11px'>翰宇药业</td><td style='font-size:11px;text-align:right'>0.05</td></tr><tr><td style='font-size:11px'><b>688578.SH</b></td><td style='font-size:11px'>艾力斯</td><td style='font-size:11px;text-align:right'>0.05</td></tr><tr><td style='font-size:11px'><b>603979.SH</b></td><td style='font-size:11px'>金诚信</td><td style='font-size:11px;text-align:right'>0.05</td></tr><tr><td style='font-size:11px'><b>603129.SH</b></td><td style='font-size:11px'>春风动力</td><td style='font-size:11px;text-align:right'>0.05</td></tr></table><div class='go'>去审批 →</div></a>
+  <a class="card" href="/holdings" style="border-color:#0F6E56"><div class="ico">💼</div><h3>持仓桌</h3><p>KPI + 净值 + 人工/程序分组 + 风控一页</p><div class="go">查看持仓 →</div></a>
+  <a class="card" href="/factors" style="border-color:#8b5cf6"><div class="ico">🧬</div><h3>因子池</h3><p>全景区因子四维 · 反向信号 · 拥挤度 · 衰减预警</p><div class="go">进入因子池 →</div></a>
+  <a class="card" href="/timing_dash.html" style="border-color:#3b82f6"><div class="ico">📊</div><h3>择时面板</h3><p>四维分解 · KPI 走势 · 类型适配 · 日历窗口</p><div class="go">进入面板 →</div></a>
+  <a class="card" href="/dashboard_opp.html"><div class="ico">🎯</div><h3>机会池看板</h3><p>7 类机会统一评分 · 行展开因子证据链</p><div class="go">查看机会池 →</div></a>
+  <a class="card" href="/dashboard_pitchtrack.html"><div class="ico">📈</div><h3>远期收益池</h3><p>Pitch 后 T+1/5/20/60 实盘收益 · 批次复核</p><div class="go">查看远期池 →</div></a>
+</div>
+
+<div class="zone mon" style="grid-column:1/-1">
+  <div class="zone-head"><span class="bar"></span>📊 监控 <span class="desc">系统与市场状态 —— 收盘后看这里</span></div>
+</div>
+<div class="cards">
+  <a class="card" href="/system_overview.html" style="border-color:#D4A843"><div class="ico">🗺️</div><h3>系统全景</h3><p>里程碑 · 数据决策链 · 交付地图</p><div class="go">查看全景 →</div></a>
+  <a class="card" href="/dashboard_live.html"><div class="ico">🖥️</div><h3>系统实时状态</h3><p>数据库/接口/计划任务在线监控 · 5 秒刷新</p><div class="go">查看实时 →</div></a>
+  <a class="card" href="/dashboard_ranks.html"><div class="ico">📊</div><h3>涨跌幅榜 · 引擎对照</h3><p>涨幅/跌幅实时 · 引擎命中率 · 风控拦截率</p><div class="go">查看榜单 →</div></a>
+</div>
+
+<details class="more-zone" style="grid-column:1/-1;margin-top:10px">
+  <summary class="more-summary">📂 更多页面（竞价 / 检测 / 历史 / 观察池 / 回测 / 研究 …）<span class="mini">点开展开</span></summary>
+  <div class="cards" style="margin-top:12px">
+  <a class="card" href="/dashboard_auction.html"><div class="ico">🧭</div><h3>竞价信号</h3><p>竞价强度分布 · 七年实证 · 反信号防守</p><div class="go">查看竞价 →</div></a>
+  <a class="card" href="/dashboard_stockcheck.html"><div class="ico">🔍</div><h3>个股检测</h3><p>输入代码 → 四维交叉评级 A~E · 秒级响应</p><div class="go">检测个股 →</div></a>
+  <a class="card" href="/dashboard_history.html"><div class="ico">🗂</div><h3>操作历史</h3><p>审批 + 持仓卖出全链路留痕 · 复盘动线</p><div class="go">查看历史 →</div></a>
+  <a class="card" href="/dashboard_watch.html"><div class="ico">👁</div><h3>观察池</h3><p>三层池（观察/候选/决策）· 技术四色判定</p><div class="go">查看观察池 →</div></a>
+  <a class="card" href="/dashboard_dynamic.html"><div class="ico">📈</div><h3>因子动态面板</h3><p>有效性/衰退/拥挤 · 市场偏好反推 · 每日刷新</p><div class="go">查看动态 →</div></a>
+  <a class="card" href="/dashboard_backtest.html"><div class="ico">📐</div><h3>回测证据</h3><p>17 年 7 类机会胜率实证（188 期）· 模拟盘净值</p><div class="go">查看回测 →</div></a>
+  <a class="card" href="/dashboard_research_lib.html"><div class="ico">🗂</div><h3>研究成果库</h3><p>25+ 研究成果 · 择时白话卡 · 术语检索</p><div class="go">进入研究 →</div></a>
+  <a class="card" href="/help"><div class="ico">📖</div><h3>说明页</h3><p>Pitch 原理 + 数据流通图 + 术语表 + 操作历史</p><div class="go">进入说明 →</div></a>
+  <a class="card" href="/dashboard.html"><div class="ico">🗄</div><h3>旧版看板</h3><p>历史 dashboard 汇总页（保留访问）</p><div class="go">打开 →</div></a>
+  </div>
+</details>
+
+<div class="foot">LW量化 v2 · 决策 / 持仓 / 因子池 / 说明 · 持股≤5 · 数据截至最近交易日</div>
+</div>
+<script src="/nav_common.js"></script>
+<script src="/chain_status.js"></script>
+<script>
+/* ★#151 品牌条状态（决策链 + 择时 + 数据日） */
+/* ★#163 阶段 3：门户 1 API 聚合（chain + timing 一次 fetch，原 3 次） */
+function brandStatus(){
+  try{ fetch('/api/live/portal_dash').then(function(r){return r.json()}).then(function(d){
+    var c=(d.chain&&d.chain.chain)||[]; var ok=c.filter(function(x){return x.ok}).length;
+    document.getElementById('bd-chain').textContent = ok+'/'+c.length;
+    var td=(c[0]||{}).date; if(td) document.getElementById('bd-trade').textContent=td;
+    var t=(d.timing&&d.timing.timing)||{};
+    var el=document.getElementById('bd-timing');
+    if(t.score!=null){ el.textContent = t.score+' '+t.level;
+      el.style.color = t.level==='适合买入' ? 'var(--green)' : (t.level==='谨慎' ? 'var(--gold)' : 'var(--red)'); }
+  }).catch(function(){});
+  }catch(e){}
+}
+brandStatus(); setInterval(brandStatus, 60000);
+
+/* ★#156 StyleKit 动画接入（门户：hero 淡入 + 卡片 stagger 错开 + hover 抬升） */
+function portalAnim(){
+  try{
+    var hero=document.querySelector('.hero');
+    if(hero) hero.classList.add('anim-fade-in-up');
+    document.querySelectorAll('.cards').forEach(function(g,i){
+      g.style.setProperty('--stagger-delay', (60+i*40)+'ms');
+      var cards=g.querySelectorAll('.card');
+      cards.forEach(function(c,j){
+        c.style.setProperty('--stagger-index', j);
+        c.classList.add('anim-stagger');
+        c.classList.add('anim-hover-lift');
+      });
+    });
+  }catch(e){}
+}
+portalAnim();
+</script>
+</body></html>

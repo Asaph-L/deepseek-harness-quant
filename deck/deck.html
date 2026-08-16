@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepSeek HARNESS Quant · Deck 审批台</title>
+<style>
+  :root{
+    --bg:#f4f6fa; --card:#ffffff; --ink:#1c2733; --sub:#5b6b7c;
+    --line:#e3e9f0; --blue:#1f5eff; --blue-bg:#eaf0ff;
+    --red:#e33e3e; --red-bg:#fdecec; --green:#1fa971; --green-bg:#e7f7f0;
+    --amber:#d97706; --amber-bg:#fdf3e0; --gray-bg:#eef1f5;
+    --radius:14px; --shadow:0 1px 3px rgba(20,40,80,.06),0 6px 24px rgba(20,40,80,.05);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font:14px/1.6 "PingFang SC","Microsoft YaHei",system-ui,sans-serif;padding-bottom:60px}
+  header{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:12px 28px;display:flex;align-items:center;gap:14px}
+  .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#1f5eff,#6a5cff);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px}
+  header h1{font-size:17px;font-weight:700}
+  header .sub{color:var(--sub);font-size:12px}
+  .spacer{flex:1}
+  .pill{font-size:12px;padding:4px 12px;border-radius:99px;font-weight:600}
+  .pill.p0{background:var(--red-bg);color:var(--red)}
+  .pill.date{background:var(--blue-bg);color:var(--blue)}
+  main{max-width:1180px;margin:0 auto;padding:24px 28px}
+  .hint{background:#fff8e6;border:1px solid #f0e0b0;color:#8a6d1a;padding:12px 16px;border-radius:12px;margin-bottom:20px;font-size:13px;display:none}
+  .section-title{font-size:15px;font-weight:700;margin:26px 0 12px;display:flex;align-items:center;gap:8px}
+  .section-title .tag{font-size:11px;background:var(--gray-bg);color:var(--sub);padding:2px 8px;border-radius:99px;font-weight:600}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px 18px;transition:transform .15s,box-shadow .15s}
+  .card:hover{transform:translateY(-2px);box-shadow:0 4px 10px rgba(20,40,80,.08),0 10px 30px rgba(20,40,80,.07)}
+  .card.decided{opacity:.72;border-style:dashed}
+  .card.decided-buy{border-color:#c9e6d6;background:#fbfefc}
+  .card.decided-drop{border-color:#e8c9c9;background:#fefbfb}
+  .row1{display:flex;align-items:center;gap:10px}
+  .code{font-weight:800;font-size:16px;font-family:Consolas,monospace}
+  .name{font-weight:600;font-size:15px}
+  .otype{font-size:11px;background:var(--blue-bg);color:var(--blue);padding:2px 9px;border-radius:99px;font-weight:600}
+  .score{font-size:20px;font-weight:800;color:var(--blue);font-family:Consolas,monospace}
+  .score small{font-size:11px;color:var(--sub);font-weight:600}
+  .badges{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 4px}
+  .badge{font-size:11px;padding:2px 9px;border-radius:99px;font-weight:700}
+  .b-pass{background:var(--green-bg);color:var(--green)}
+  .b-watch{background:var(--amber-bg);color:var(--amber);border:1px solid #f0d9a8}
+  .b-block{background:var(--red-bg);color:var(--red);border:1px solid #f3c4c4}
+  .b-nodata{background:var(--gray-bg);color:var(--sub)}
+  .b-rank{background:var(--gray-bg);color:var(--sub)}
+  .b-consensus{background:linear-gradient(135deg,#ffe9f0,#fde8e4);color:#c2405e}
+  .meta{color:var(--sub);font-size:12px;margin:6px 0}
+  .factors{background:var(--gray-bg);border-radius:10px;padding:8px 12px;font-size:12px;color:#33414f;margin:8px 0;font-family:Consolas,monospace;white-space:pre-wrap}
+  .bt-evidence{background:#f6f9ff;border:1px solid #dbe7ff;border-radius:10px;padding:8px 10px;margin:8px 0}
+  .bt-evidence .ev-title{font-size:11.5px;font-weight:700;color:var(--blue);margin-bottom:6px}
+  .ev-table{width:100%;border-collapse:collapse;font-size:11.5px}
+  .ev-table th{color:var(--sub);font-weight:600;text-align:left;padding:3px 6px;border-bottom:1px solid #dbe7ff;font-size:10.5px}
+  .ev-table td{padding:3px 6px;border-bottom:1px solid #eef3fc}
+  .ev-table tr:last-child td{border-bottom:none}
+  .ev-table .c-red{color:var(--red)}.ev-table .c-green{color:var(--green)}
+  .ev-risk{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+  .ev-risk .b-nodata{font-size:10px;background:#eef1f5;color:#66788a}
+  .ev-stop{margin-top:10px;padding:8px 10px;background:#FFF9EC;border:1px solid #EBD9AC;border-radius:8px}
+  .ev-stop .ev-title{font-size:11px;color:#8a6d1a;font-weight:600;margin-bottom:4px}
+  .ev-stop .stop-line{font-size:12px;font-weight:700;color:#7a5b12;margin-bottom:4px}
+  .ev-stop .stop-meta{font-size:11px;color:#8a6d1a}
+  .ev-stop .stop-fail{font-size:11px;color:#a53a2a;margin-top:2px}
+  .evidence{font-size:12px;color:var(--sub);margin-top:6px}
+  .btns{display:flex;gap:10px;margin-top:12px}
+  .btn{flex:1;border:none;border-radius:10px;padding:9px 0;font-size:14px;font-weight:700;cursor:pointer;transition:filter .15s}
+  .btn:hover{filter:brightness(1.06)}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn.buy{background:linear-gradient(135deg,#ff5a5a,#e33e3e);color:#fff}
+  .btn.drop{background:#fff;color:#7d8b99;border:1.5px solid #d7dfe8}
+  .btn.drop:hover{color:#c03535;border-color:#e0a8a8}
+  .stamp{font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;margin-left:auto}
+  .stamp.buy{background:var(--green-bg);color:var(--green)}
+  .stamp.drop{background:var(--red-bg);color:var(--red)}
+  .empty{background:var(--card);border:1px dashed var(--line);border-radius:var(--radius);padding:40px;text-align:center;color:var(--sub)}
+  .modal-bg{position:fixed;inset:0;background:rgba(15,25,40,.45);display:none;align-items:center;justify-content:center;z-index:100}
+  .modal-bg.show{display:flex}
+  .modal{background:#fff;border-radius:16px;padding:22px 24px;width:400px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+  .modal h3{font-size:16px;margin-bottom:4px}
+  .modal .m-sub{color:var(--sub);font-size:12px;margin-bottom:14px}
+  .modal label{font-size:12px;color:var(--sub);display:block;margin:10px 0 4px;font-weight:600}
+  .modal input,.modal textarea{width:100%;border:1.5px solid var(--line);border-radius:9px;padding:8px 10px;font-size:13px;font-family:inherit}
+  .modal input:focus,.modal textarea:focus{outline:none;border-color:var(--blue)}
+  .modal .btns{display:flex;gap:10px;margin-top:16px}
+  .modal .btn{flex:1}
+  .btn.confirm{background:linear-gradient(135deg,#ff5a5a,#e33e3e);color:#fff}
+  .btn.cancel{background:var(--gray-bg);color:var(--sub)}
+  footer{color:var(--sub);font-size:12px;text-align:center;margin-top:30px}
+  .statbar{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 16px;min-width:110px}
+  .stat .v{font-size:19px;font-weight:800;font-family:Consolas,monospace}
+  .stat .k{font-size:11px;color:var(--sub);font-weight:600}
+  .toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:#1c2733;color:#fff;padding:10px 22px;border-radius:99px;font-size:13px;opacity:0;transition:opacity .3s;z-index:200;pointer-events:none}
+  .toast.show{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">LW</div>
+  <div>
+    <h1>Deck 审批台</h1>
+    <div class="sub">DeepSeek HARNESS Quant · Pitch 候选人工审批</div>
+  </div>
+  <div class="spacer"></div>
+  <span class="pill p0">P0 · 外包 #1</span>
+  <span class="pill date" id="poolDate">—</span>
+</header>
+
+<main>
+  <div class="hint" id="hint"></div>
+
+  <div class="statbar" id="statbar"></div>
+
+  <div class="section-title">💼 当前持仓（持股 ≤ 5 纪律）
+    <span class="tag" id="posCount">—</span></div>
+  <div class="grid" id="posGrid"></div>
+
+  <div class="section-title">🎯 今日 Pitch 候选（已过风控四重过滤）
+    <span class="tag" id="pitchCount">—</span></div>
+  <div class="grid" id="pitchGrid"></div>
+
+  <!-- ★2026-08-11 双线并行：科技线 Pitch 候选（短线情绪/龙虎榜，独立审批） -->
+  <div class="section-title">🚀 科技线 Pitch 候选（短线情绪+龙虎榜 · 带 ATR 止损）
+    <span class="tag" id="techCount">—</span></div>
+  <div class="grid" id="techGrid"></div>
+
+  <div class="section-title">📋 机会大池子 Top（按评分排序）
+    <span class="tag" id="poolCount">—</span></div>
+  <div class="grid" id="poolGrid"></div>
+</main>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h3 id="mTitle">买入决策</h3>
+    <div class="m-sub" id="mSub">—</div>
+    <label>目标价（可选）</label>
+    <input id="mTarget" type="number" step="0.01" placeholder="例如 25.50">
+    <label>止损位（可选）</label>
+    <input id="mStop" type="number" step="0.01" placeholder="例如 19.80">
+    <label>备注（可选）</label>
+    <textarea id="mNote" rows="2" placeholder="决策理由..."></textarea>
+    <div class="btns">
+      <button class="btn cancel" onclick="closeModal()">取消</button>
+      <button class="btn confirm" id="mConfirm">确认买入</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<footer>审批记录 append 写入 logs/deck_decisions.json ｜ 数据源 logs/opportunity_pool.json</footer>
+
+<script>
+const $ = s => document.querySelector(s);
+const API = {
+  pool: '/api/pool',
+  decisions: '/api/decisions',
+  decide: '/api/decide',
+  pitch_v2: '/api/pitch_v2',
+  portfolio: '/api/portfolio',
+  sell: '/api/portfolio/sell',
+};
+let POOL = null, DECISIONS = [], PITCH2 = null, PORTFOLIO = null, TECH = null;
+let pendingAction = null, pendingCode = null, pendingCard = null;
+
+function toast(msg){
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+async function fetchJSON(url, opts){
+  const r = await fetch(url, opts);
+  if(!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+
+async function init(){
+  try{
+    POOL = await fetchJSON(API.pool);
+  }catch(e){
+    $('#hint').style.display = 'block';
+    $('#hint').innerHTML = '⚠️ 无法读取数据 —— 请通过本地服务器打开：<code>cd deepseek-harness-quant && ./.venv/Scripts/python.exe deck/deck_server.py</code>，然后访问 <b>http://127.0.0.1:8787/deck.html</b>（浏览器直接打开文件时无法读取本地 JSON）';
+    return;
+  }
+  try{ DECISIONS = await fetchJSON(API.decisions); }catch(e){ DECISIONS = []; }
+  try{ PITCH2 = await fetchJSON(API.pitch_v2); }catch(e){ PITCH2 = null; }
+  try{ PORTFOLIO = await fetchJSON(API.portfolio); }catch(e){ PORTFOLIO = null; }
+  // ★2026-08-11 双线并行：科技线 Pitch 候选（/api/tech_pitch）
+  try{ TECH = await fetchJSON('/api/tech_pitch'); }catch(e){ TECH = {entries: []}; }
+  $('#poolDate').textContent = '数据日 ' + (POOL.date || '—');
+  renderPositions();
+  renderStats();
+  renderGrid('pitch', POOL.pitch || []);
+  renderGrid('tech', (TECH.entries || []).filter(t => !decidedInfo(t.code)));
+  const pool = (POOL.opportunities || []).filter(o => !(POOL.pitch||[]).some(p => p.code === o.code)).slice(0, 12);
+  renderGrid('pool', pool);
+}
+
+function renderStats(){
+  const s = POOL.stats || {};
+  const typeNames = {reversal:'反转',value:'低估值',breakout:'突破',revalue:'重估',event:'事件',quality_gap:'质量折价'};
+  let html = '';
+  for(const [k,v] of Object.entries(s)){
+    html += `<div class="stat"><div class="v">${v}</div><div class="k">${typeNames[k]||k}</div></div>`;
+  }
+  html += `<div class="stat"><div class="v">${POOL.n ?? '—'}</div><div class="k">机会总数</div></div>`;
+  $('#statbar').innerHTML = html;
+}
+
+// 💼 T-2：持仓卡片渲染
+function renderPositions(){
+  const grid = $('#posGrid');
+  const tag = $('#posCount');
+  const pos = (PORTFOLIO && PORTFOLIO.positions || []).filter(p => p.status === 'holding' || p.status === 'over_limit');
+  const holding = pos.filter(p => p.status === 'holding');
+  tag.textContent = `${holding.length}/${(PORTFOLIO && PORTFOLIO.max_positions) || 5} 只`;
+  if(!pos.length){
+    grid.innerHTML = `<div class="empty">暂无持仓 —— 在下方 Pitch 候选点"买入"后自动入持仓（审批写入 deck_decisions.json → portfolio.json）</div>`;
+    return;
+  }
+  grid.innerHTML = pos.map(p => `
+    <div class="card ${p.status === 'over_limit' ? 'decided' : ''}" data-code="${p.code}">
+      <div class="row1">
+        <span class="code">${p.code}</span>
+        <span class="name">${p.name||''}</span>
+        ${p.status === 'over_limit' ? '<span class="badge b-block">超限未入仓</span>' : '<span class="badge b-pass">持有中</span>'}
+      </div>
+      <div class="badges">
+        <span class="badge b-rank">入 ${p.entry_date||'—'}</span>
+        <span class="badge ${p.risk_level==='WATCH'?'b-watch':p.risk_level==='BLOCK'?'b-block':'b-nodata'}">风控 ${p.risk_level||'—'}</span>
+        ${p.target ? `<span class="badge b-consensus">目标 ${p.target}</span>` : ''}
+        ${p.stop ? `<span class="badge b-watch">止损 ${p.stop}</span>` : ''}
+      </div>
+      <div class="meta">审批 ${p.decide_ts||'—'}${p.note ? ' ｜ ' + p.note : ''}</div>
+      <div class="btns">
+        <button class="btn drop" onclick="doSell('${p.code}')">卖出</button>
+      </div>
+    </div>`).join('');
+}
+
+async function doSell(code){
+  const price = prompt(`卖出 ${code}，成交价（可留空）：`);
+  if(price !== null){
+    try{
+      const r = await fetchJSON(API.sell, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({code, price: price ? parseFloat(price) : null, reason: 'deck_manual'}),
+      });
+      if(r.ok){ toast(`✅ 已卖出 ${code}`); PORTFOLIO = await fetchJSON(API.portfolio); renderPositions(); }
+      else toast('卖出失败：' + (r.error||''));
+    }catch(e){ toast('❌ 卖出失败：' + e.message); }
+  }
+}
+
+function decidedInfo(code){
+  const recs = DECISIONS.filter(d => d.code === code);
+  if(!recs.length) return null;
+  return recs[recs.length - 1];
+}
+
+function riskBadge(o){
+  const lv = o.risk_level;
+  if(!lv) return `<span class="badge b-nodata">风控未挂载</span>`;
+  if(lv === 'PASS') return `<span class="badge b-pass">风控 PASS</span>`;
+  if(lv === 'WATCH') return `<span class="badge b-watch">⚠ WATCH 复核</span>`;
+  if(lv === 'BLOCK') return `<span class="badge b-block">✖ BLOCK 一票否决</span>`;
+  if(lv === 'NO_DATA') return `<span class="badge b-nodata">风控 NO_DATA</span>`;
+  return `<span class="badge b-nodata">${lv}</span>`;
+}
+
+function factorDetail(o){
+  const f = o.factors || {};
+  const keys = Object.keys(f);
+  if(!keys.length) return '';
+  const lines = keys.map(k => {
+    let v = f[k];
+    if(typeof v === 'number') v = v.toFixed(4);
+    return `  ${k}: ${v}`;
+  }).join('\n');
+  return `<div class="factors">${lines}</div>`;
+}
+
+// 📈 Pitch v2 回测证据区块（1/2/3 年持有 + 风险清单）
+function pct(v, digits){ return v==null ? '—' : (v*100).toFixed(digits||0)+'%'; }
+function evidenceBlock(o, isPitch){
+  if(!isPitch || !PITCH2 || !PITCH2.pitch) return '';
+  const rec = PITCH2.pitch.find(p => p.code === o.code);
+  if(!rec) return '';
+  const h = rec.horizons || {};
+  const hs = ['1y','2y','3y'].map(y => {
+    const v = h[y];
+    if(!v || !v.n) return `<tr><td>${y}</td><td colspan="4" style="color:var(--sub)">样本不足</td></tr>`;
+    const wrCls = v.winrate >= 0.55 ? 'c-red' : (v.winrate <= 0.45 ? 'c-green' : '');
+    return `<tr>
+      <td><b>${y}</b></td>
+      <td>${v.n}</td>
+      <td class="${wrCls}" style="font-weight:700">${pct(v.winrate)}</td>
+      <td style="color:${v.avg_ret>0?'var(--red)':'var(--green)'}">${pct(v.avg_ret)}</td>
+      <td style="color:var(--green)">${pct(v.max_dd)}</td></tr>`;
+  }).join('');
+  const ben = rec.beneish;
+  const benBadge = ben && ben.level
+    ? `<span class="badge ${ben.level==='HIGH'?'b-block':ben.level==='WATCH'?'b-watch':'b-pass'}">Beneish ${ben.level}${ben.m_score!=null?' '+ben.m_score:''}</span>`
+    : '';
+  // ★2026-08-10 类型定制止损方案
+  const sp = rec.stop_plan || {};
+  const stopHtml = sp.desc ? `<div class="ev-stop">
+    <div class="ev-title">🛑 止损方案（${sp.otype||'?'}类定制 · 逻辑失效止损）</div>
+    <div class="stop-line">${sp.desc}</div>
+    <div class="stop-meta">${sp.stop_loss_pct!=null?`硬止损 <b>${(sp.stop_loss_pct*100).toFixed(0)}%</b>`:'触发条件驱动'}${sp.time_stop_weeks?` · 时间止损 ${sp.time_stop_weeks} 周`:''}${sp.pivot_check_pct?` · 突破点下方 ${(sp.pivot_check_pct*100).toFixed(0)}%`:''}${sp.trailing_ma?` · 移动均线 MA${sp.trailing_ma}`:''}${sp.atr_stop_mult?` · ATR ${sp.atr_stop_mult}×`:''}</div>
+    ${(sp.logic_fail_rules||[]).map(r=>`<div class="stop-fail">✕ ${r.name}：${r.rule}（${r.action}）</div>`).join('')}
+  </div>` : '';
+  return `<div class="bt-evidence">
+    <div class="ev-title">📈 回测证据（季初 T+1 开盘买入，2020 起）</div>
+    <table class="ev-table">
+      <tr><th>持有</th><th>样本</th><th>胜率</th><th>均收益</th><th>最大回撤</th></tr>
+      ${hs}
+    </table>
+    <div class="ev-risk">${benBadge}${(rec.risk_flags||[]).slice(0,3).map(f=>`<span class="badge b-nodata">${f}</span>`).join('')}</div>
+    ${stopHtml}
+  </div>`;
+}
+
+function renderGrid(kind, list){
+  const grid = $(kind === 'pitch' ? '#pitchGrid' : (kind === 'tech' ? '#techGrid' : '#poolGrid'));
+  const countTag = $(kind === 'pitch' ? '#pitchCount' : (kind === 'tech' ? '#techCount' : '#poolCount'));
+  countTag.textContent = `${list.length} 只`;
+  if(!list.length){
+    grid.innerHTML = `<div class="empty">暂无${kind === 'pitch' ? '价值 Pitch 候选' : (kind === 'tech' ? '科技线候选' : '机会')} —— 运行 <code>python factors/opportunities/scan.py --pitch</code> 生成</div>`;
+    return;
+  }
+  grid.innerHTML = list.map(o => cardHTML(o, kind === 'pitch' || kind === 'tech')).join('');
+}
+
+function cardHTML(o, isPitch){
+  const d = decidedInfo(o.code);
+  const decidedCls = d ? (d.action === 'buy' ? 'decided decided-buy' : 'decided decided-drop') : '';
+  const stamp = d ? `<span class="stamp ${d.action}">${d.action === 'buy' ? '已买入' : '已放弃'} ${(d.ts||'').slice(0,10)}</span>` : '';
+  const rank = isPitch ? '' : `<span class="badge b-rank">#${o.rank_global}</span>`;
+  const cons = o.n_types_hit > 1 ? `<span class="badge b-consensus">共识 ×${o.n_types_hit}</span>` : '';
+  const btnDisabled = d ? 'disabled' : '';
+  return `
+  <div class="card ${decidedCls}" data-code="${o.code}">
+    <div class="row1">
+      <span class="code">${o.code}</span>
+      <span class="name">${o.name||''}</span>
+      ${stamp}
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
+      <span class="otype">${o.otype_name||o.otype}</span>
+      <span class="score">${(o.score??0).toFixed(1)}<small> 分</small></span>
+      <div style="margin-left:auto;color:var(--sub);font-size:12px">
+        空间 ${o.upside_est??'—'}% ｜ 胜率 ${((o.winrate_est??0)*100).toFixed(0)}%
+      </div>
+    </div>
+    <div class="badges">${riskBadge(o)}${rank}${cons}</div>
+    <div class="meta">${o.trigger||''}</div>
+    ${factorDetail(o)}
+    ${evidenceBlock(o, isPitch)}
+    ${o.evidence ? `<div class="evidence">📚 ${o.evidence}</div>` : ''}
+    ${o.risk_note ? `<div class="evidence" style="color:${o.risk_level==='BLOCK'?'var(--red)':'var(--amber)'}">${o.risk_note}</div>` : ''}
+    <div class="btns">
+      <button class="btn buy" ${btnDisabled} onclick="openBuy('${o.code}','${(o.name||'').replace(/'/g,'')}')">买入</button>
+      <button class="btn drop" ${btnDisabled} onclick="doDrop('${o.code}')">放弃</button>
+    </div>
+  </div>`;
+}
+
+function openBuy(code, name){
+  const d = decidedInfo(code);
+  if(d) return;
+  pendingAction = 'buy'; pendingCode = code;
+  $('#mTitle').textContent = '买入 · ' + code;
+  $('#mSub').textContent = name || '';
+  $('#mTarget').value = ''; $('#mStop').value = ''; $('#mNote').value = '';
+  $('#modalBg').classList.add('show');
+}
+
+function closeModal(){ $('#modalBg').classList.remove('show'); pendingAction = null; }
+
+async function doDrop(code){
+  if(decidedInfo(code)) return;
+  await submit({code, action:'drop', note:''});
+}
+
+async function submit(rec){
+  try{
+    const r = await fetchJSON(API.decide, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(rec),
+    });
+    if(!r.ok){ toast('保存失败：' + (r.error||'未知')); return; }
+    DECISIONS.push(r.record);
+    toast(`✅ 已记录：${rec.code} ${rec.action === 'buy' ? '买入' : '放弃'}`);
+    refreshCards();
+  }catch(e){
+    toast('❌ 写入失败：' + e.message + '（服务器未启动？）');
+  }
+}
+
+$('#mConfirm').onclick = async () => {
+  const rec = {
+    code: pendingCode, action: 'buy',
+    target: $('#mTarget').value ? parseFloat($('#mTarget').value) : null,
+    stop: $('#mStop').value ? parseFloat($('#mStop').value) : null,
+    note: $('#mNote').value || '',
+  };
+  closeModal();
+  await submit(rec);
+};
+
+function refreshCards(){
+  renderGrid('pitch', POOL.pitch || []);
+  renderGrid('tech', (TECH.entries || []).filter(t => !decidedInfo(t.code)));
+  const pool = (POOL.opportunities || []).filter(o => !(POOL.pitch||[]).some(p => p.code === o.code)).slice(0, 12);
+  renderGrid('pool', pool);
+  fetchJSON(API.portfolio).then(d => { PORTFOLIO = d; renderPositions(); }).catch(()=>{});
+}
+
+init();
+</script>
+</body>
+</html>

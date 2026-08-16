@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>涨跌幅榜 · 引擎/风控对照</title>
+<style>
+:root{--bg:#f4f6fa;--card:#ffffff;--ink:#1c2733;--sub:#5b6b7c;--line:#e3e9f2;--blue:#185FA5;
+      --green:#0F6E56;--red:#C0392B;--gold:#D4A843;--radius:12px}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);padding:20px}
+.wrap{max-width:1280px;margin:0 auto}
+.header{background:linear-gradient(135deg,#0A2540,#185FA5);border-radius:14px;padding:18px 22px;color:#fff}
+.header h1{font-size:19px}.header .sub{font-size:12px;color:rgba(255,255,255,.75);margin-top:5px;line-height:1.7}
+.kpi{display:inline-block;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:8px 14px;margin:10px 8px 0 0;font-size:12px}
+.kpi b{font-size:16px;display:block}
+/* 对照横幅 */
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+@media(max-width:800px){.cmp{grid-template-columns:1fr}}
+.cmp-card{background:var(--card);border-radius:var(--radius);padding:14px 18px;border:1px solid var(--line)}
+.cmp-card h3{font-size:13px;margin-bottom:8px}
+.cmp-card .big{font-size:26px;font-weight:800}
+.cmp-card .desc{font-size:11px;color:var(--sub);margin-top:4px;line-height:1.6}
+/* 双榜 */
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+@media(max-width:900px){.cols{grid-template-columns:1fr}}
+.board{background:var(--card);border-radius:var(--radius);padding:12px 14px;border:1px solid var(--line)}
+.board h2{font-size:13px;margin-bottom:8px;display:flex;justify-content:space-between}
+.board h2 .cnt{color:var(--sub);font-size:11px;font-weight:400}
+table{width:100%;border-collapse:collapse}
+th{font-size:10px;color:var(--sub);text-align:left;padding:4px 6px;border-bottom:2px solid var(--line)}
+td{padding:5px 6px;border-bottom:1px solid var(--line);font-size:12px}
+.up{color:var(--red)}.down{color:var(--green)}
+.hit{background:#F0FFF6}.blocked{background:#FFF0F0}
+.tag{font-size:9.5px;padding:1px 6px;border-radius:8px;margin-left:4px}
+.tag.hit{background:#e6f4f0;color:var(--green)}
+.tag.block{background:#fdeaea;color:var(--red)}
+.note{background:#EAF3FF;border:1px solid #B8D4F0;border-radius:8px;padding:8px 12px;font-size:11px;color:#3a6ea5;margin-top:12px;line-height:1.7}
+.foot{text-align:center;color:var(--sub);font-size:11px;margin-top:14px}
+.livebar{background:#EAF3FF;border:1px solid #B8D4F0;border-radius:8px;padding:8px 12px;font-size:12px;color:#3a6ea5;margin-top:10px}
+</style>
+</head>
+<body>
+<div class="lw-nav" data-page="ranks"></div>
+<script src="/nav_common.js"></script>
+<div class="wrap">
+<div class="header">
+  <h1>📊 涨跌幅榜 · 引擎/风控对照 <span style="font-weight:400;font-size:13px;opacity:.8">机会引擎命中多少涨幅榜 · 风控层拦截多少跌幅榜</span></h1>
+  <div class="sub">红=涨 绿=跌（A 股习惯）· 榜内标记 🎯=机会池命中（引擎选得出） ⛔=风控标记（挡得住）· 实时接口自动更新</div>
+  <div id="kpis" class="kpi">⏳ 加载中…</div>
+</div>
+<div id="livebar" class="livebar">⏳ 正在连接实时接口…</div>
+
+<div id="cmp"></div>
+<div id="boards"></div>
+<div id="trend" style="margin-top:14px"></div>
+
+<div class="note">ℹ️ <b>怎么读对照：</b>① <b>命中率</b> = 当日涨幅榜 Top100 中，之前被机会池选中的比例——命中率高说明"机会引擎选得出"；
+  ② <b>拦截率</b> = 当日跌幅榜 Top100 中，被风控标记（Beneish 造假 HIGH/WATCH + 质量 BLOCK/WATCH）的比例——拦截率高说明"风控挡得住"；
+  ③ 命中均涨 vs 未命中均涨：涨幅榜上被选中的股票平均涨幅是否更高（选股是否有 alpha）。
+  <b>注意：对照需逐日积累才有效（当前数据源截至最近交易日）；历史验证见远期池页回放区。</b></div>
+<div class="foot">数据源 /api/live/ranks（rank_live.py）· 每 4h + 手动更新自动刷新</div>
+</div>
+
+<script>
+async function refresh(){
+  try{
+    const r = await fetch('/api/live/ranks');
+    const d = await r.json();
+    if(!d.ok){ document.getElementById('livebar').textContent = '❌ ' + (d.error||'失败'); return; }
+    const ec = d.engine_check, rc = d.risk_check;
+    document.getElementById('kpis').innerHTML =
+      '<span class="kpi">榜单日期<b>' + d.date + '</b></span>' +
+      '<span class="kpi">全市场<b>' + d.n_stocks + '</b>只</span>' +
+      '<span class="kpi" style="color:#FF8A7A">命中涨幅榜<b>' + ec.hit_gain + '/' + d.top_n + ' (' + ec.hit_rate_pct + '%)</b></span>' +
+      '<span class="kpi" style="color:#7AD0B4">拦截跌幅榜<b>' + rc.blocked_loss + '/' + d.top_n + ' (' + rc.block_rate_pct + '%)</b></span>';
+    // 对照卡
+    document.getElementById('cmp').innerHTML = `
+      <div class="cmp-card"><h3>🎯 机会引擎命中率</h3>
+        <div class="big up">${ec.hit_gain}/${d.top_n}（${ec.hit_rate_pct}%）</div>
+        <div class="desc">涨幅榜中被机会池选中的比例（池 ${ec.pool_size} 只 · 池日期 ${ec.pool_date}）<br>
+        命中均涨 <b class="up">${ec.avg_gain_hit_pct??'—'}%</b> vs 未命中 <b class="up">${ec.avg_gain_miss_pct??'—'}%</b>${ec.avg_gain_hit_pct!=null && ec.avg_gain_miss_pct!=null ? (ec.avg_gain_hit_pct>ec.avg_gain_miss_pct?' → 选股有 alpha ✅':' → 选股无优势 ⚠️') : ''}</div></div>
+      <div class="cmp-card"><h3>⛔ 风控层拦截率</h3>
+        <div class="big down">${rc.blocked_loss}/${d.top_n}（${rc.block_rate_pct}%）</div>
+        <div class="desc">跌幅榜中被风控标记的比例（Beneish HIGH/WATCH + 质量 BLOCK/WATCH）<br>
+        被拦截名单：${rc.blocked_loss_codes.map(x=>x.code).join('、')||'无'}</div></div>`;
+    // 双榜
+    const g = d.top_gainers.map(x => `<tr class="${ec.hit_gain_codes.includes(x.code)?'hit':''}">
+      <td>${ec.hit_gain_codes.includes(x.code)?'<span class="tag hit">🎯命中</span>':''}${x.code}</td>
+      <td>${x.name}</td><td class="up" style="font-weight:700">+${x.ret_pct}%</td></tr>`).join('');
+    const l = d.top_losers.map(x => {
+      const bl = rc.blocked_loss_codes.find(b=>b.code===x.code);
+      return `<tr class="${bl?'blocked':''}">
+      <td>${bl?'<span class="tag block">⛔拦截</span>':''}${x.code}</td>
+      <td>${x.name}</td><td class="down" style="font-weight:700">${x.ret_pct}%</td></tr>`;
+    }).join('');
+    document.getElementById('boards').innerHTML = `
+      <div class="cols">
+        <div class="board"><h2>🔴 涨幅榜 Top ${d.top_n} <span class="cnt">${d.date}</span></h2>
+          <table><thead><tr><th>代码</th><th>名称</th><th>涨幅</th></tr></thead><tbody>${g}</tbody></table></div>
+        <div class="board"><h2>🟢 跌幅榜 Top ${d.top_n} <span class="cnt">${d.date}</span></h2>
+          <table><thead><tr><th>代码</th><th>名称</th><th>跌幅</th></tr></thead><tbody>${l}</tbody></table></div>
+      </div>`;
+    // ★2026-08-10 逐日对照趋势（历史积累）
+    const hist = d.history || [];
+    if(hist.length){
+      const rows = hist.slice().reverse().map(h => {
+        const hr = h.hit_rate_pct, br = h.block_rate_pct;
+        const hrBar = `<div style="background:#e5e9f0;border-radius:4px;height:6px;width:90px;display:inline-block;vertical-align:middle"><div style="background:#C0392B;height:6px;border-radius:4px;width:${Math.min(hr||0,100)}%"></div></div>`;
+        const brBar = `<div style="background:#e5e9f0;border-radius:4px;height:6px;width:90px;display:inline-block;vertical-align:middle"><div style="background:#0F6E56;height:6px;border-radius:4px;width:${Math.min(br||0,100)}%"></div></div>`;
+        return `<tr><td>${h.date}</td><td class="up" style="font-weight:700">${hr==null?'—':hr+'%'}</td><td>${hrBar}</td><td>${h.hit_gain==null?'—':h.hit_gain}</td><td class="down" style="font-weight:700">${br==null?'—':br+'%'}</td><td>${brBar}</td><td>${h.blocked_loss==null?'—':h.blocked_loss}</td><td>${h.pool_size==null?'—':h.pool_size}</td></tr>`;
+      }).join('');
+      document.getElementById('trend').innerHTML = `<h2>📈 逐日对照趋势 <span class="cnt">最近 ${hist.length} 个交易日（自动积累）</span></h2>
+        <table><thead><tr><th>日期</th><th>命中率</th><th></th><th>命中数</th><th>拦截率</th><th></th><th>拦截数</th><th>池大小</th></tr></thead>
+        <tbody>${rows}</tbody></table>
+        <div class="mini">命中率=涨幅榜∩机会池 / Top100；拦截率=跌幅榜∩风控标记 / Top100。单日波动大，需逐日积累看趋势。</div>`;
+    }
+    document.getElementById('livebar').textContent = '🟢 更新于 ' + d.ts + ' ｜ ' + (d.note||'');
+  }catch(e){
+    document.getElementById('livebar').textContent = '⚠️ 接口暂不可用：' + e.message + '（每 60s 自动重试）';
+  }
+}
+refresh();
+setInterval(refresh, 60000);
+</script>
+</body>
+</html>

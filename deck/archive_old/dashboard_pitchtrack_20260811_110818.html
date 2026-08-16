@@ -1,0 +1,304 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">
+<title>Pitch 远期收益池 · 20260811</title>
+<style>
+:root { --navy:#0A2540; --up:#C0392B; --down:#0F6E56; --bg:#F0F3F8; --muted:#8a94a6; --line:#e5e9f0; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,"Microsoft YaHei",sans-serif; background:var(--bg); color:#0A2540; padding:20px; }
+.wrap { max-width:1280px; margin:0 auto; }
+.header { background:linear-gradient(135deg,#0A2540,#185FA5); border-radius:14px; padding:18px 22px; color:#fff; }
+.header h1 { font-size:18px; } .header .sub { font-size:12px; color:rgba(255,255,255,.7); margin-top:4px; }
+.legend { display:inline-block; font-size:11px; background:rgba(255,255,255,.1); border-radius:6px; padding:3px 8px; margin-left:10px; }
+.legend .up { color:#FF8A7A; } .legend .down { color:#7AD0B4; }
+.kpi { display:inline-block; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.25); border-radius:10px; padding:8px 16px; margin:10px 8px 0 0; font-size:12px; }
+.kpi b { font-size:16px; display:block; }
+.kpi-row { margin:10px 0; }
+.ov-wrap { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px; margin:12px 0; }
+.ov-card { background:#fff; border:1px solid #e5e9f0; border-radius:12px; padding:12px 14px; }
+.ov-t { font-size:12px; font-weight:600; color:#0A2540; margin-bottom:8px; }
+.hz-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+.hz { background:#F6F9FF; border-radius:8px; padding:6px 8px; text-align:center; }
+.hz i { display:block; font-style:normal; font-size:10px; color:#8a94a6; }
+.hz b { font-size:13px; display:block; }
+.ov-note { font-size:11px; color:#8a94a6; margin-bottom:10px; }
+.section { background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 18px; margin-top:14px; }
+.section h2 { font-size:14px; margin-bottom:10px; }
+.section h2 .tag { font-size:11px; color:var(--muted); font-weight:400; }
+table { width:100%; border-collapse:collapse; }
+th { font-size:10px; color:var(--muted); padding:6px 8px; text-align:left; border-bottom:2px solid var(--line); }
+td { padding:6px 8px; border-bottom:1px solid var(--line); font-size:12px; }
+.mini { font-size:11px; color:var(--muted); }
+.up { color:#C0392B; }   /* 涨=红（A股习惯） */
+.down { color:#0F6E56; } /* 跌=绿（A股习惯） */
+.note { background:#FFF8E6; border:1px solid #F0D9A8; border-radius:10px; padding:10px 14px; font-size:12px; color:#8a6d1a; margin-top:12px; }
+.stk-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+@media(max-width:900px){.stk-grid{grid-template-columns:1fr}}
+.stk-col { background:#F8FAFD; border-radius:10px; padding:10px 12px; }
+.stk-t { font-size:12px; font-weight:600; color:#0A2540; margin-bottom:8px; }
+.stk-row { display:flex; align-items:center; gap:8px; margin-bottom:5px; }
+.stk-bar { display:flex; align-items:center; gap:8px; margin-bottom:5px; }
+.stk-track { flex:1; height:14px; background:#EEF1F6; border-radius:7px; overflow:hidden; }
+.stk-fill { height:100%; border-radius:7px; }
+.replay-note { background:#EAF3FF; border:1px solid #B8D4F0; border-radius:8px; padding:8px 12px; font-size:11px; color:#3a6ea5; margin-bottom:10px; line-height:1.7; }
+.qcard { border:1px solid var(--line); border-radius:10px; padding:10px 14px; margin-bottom:8px; }
+.qhead { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+.qbadges { display:flex; flex-wrap:wrap; gap:6px; }
+.badge { font-size:11px; padding:3px 10px; border-radius:20px; border:1px solid var(--line); background:#f7f9fc; }
+.badge.up { background:#FDEAEA; color:#C0392B; border-color:#E8B4B0; font-weight:600; }
+.badge.down { background:#E6F4F0; color:#0F6E56; border-color:#A8D5C8; font-weight:600; }
+.badge.none { color:#b8c0cc; background:#fafbfd; }
+.conclusion { margin-top:10px; font-size:12px; color:#37445c; background:#F7F9FC; border-radius:8px; padding:8px 12px; }
+.livebar { background:#EAF3FF; border:1px solid #B8D4F0; border-radius:8px; padding:8px 12px; font-size:12px; color:#3a6ea5; margin-top:12px; }
+.otype-hint { font-size:10px; color:#b8c0cc; }
+<link rel="stylesheet" href="/ui_common.css"></style></head><body>
+<div class="lw-nav" data-page="pitchtrack"></div>
+<script src="/nav_common.js"></script>
+<div class="wrap">
+<div class="header">
+  <h1>📈 Pitch 远期收益池 <span style="font-weight:400;font-size:13px;opacity:.8">历史 Pitch 未来走势追踪</span></h1>
+  <div class="mini" style="margin:4px 0 2px">★本页 = <b>Pitch 选股实盘验证</b>（进过 Pitch 的票 T+1/5/20/60 实际涨跌）｜ 策略体系验证（17 年胜率/模拟盘）见 <a href="/dashboard_backtest.html">回测证据页 →</a></div>
+  <div class="sub">凡进入 Pitch 的股票自动入池 · 追踪 T+1/5/20/60 实际收益 · 每日自动更新 · 更新于 2026-08-11 02:08:40
+    <span class="legend">图例：<span class="up">■ 涨/盈利</span> <span class="down">■ 跌/亏损</span>（A 股习惯：红涨绿跌）</span></div>
+  <span class="kpi">入池股票<b>11</b>只</span>
+  <span class="kpi">已有 T+1 数据<b>5</b>只</span>
+  <span class="kpi">T+1 平均<b>+2.14%</b></span>
+</div>
+<div class="ov-wrap"><div class="ov-card"><div class="ov-t">全部 Pitch（实盘跟踪）</div><div class="hz-grid"><div class="hz"><i>+1日</i><b class="up">+2.14%</b><span class="mini">胜率 100% · n=5</span></div><div class="hz"><i>+5</i><b class="mini">—</b><span class="mini">0</span></div><div class="hz"><i>+20</i><b class="mini">—</b><span class="mini">0</span></div><div class="hz"><i>+60</i><b class="mini">—</b><span class="mini">0</span></div></div></div><div class="ov-card"><div class="ov-t">🔵 价值线</div><div class="hz-grid"><div class="hz"><i>+1日</i><b class="up">+2.14%</b><span class="mini">胜率 100% · n=5</span></div><div class="hz"><i>+5</i><b class="mini">—</b><span class="mini">0</span></div><div class="hz"><i>+20</i><b class="mini">—</b><span class="mini">0</span></div><div class="hz"><i>+60</i><b class="mini">—</b><span class="mini">0</span></div></div></div><div class="ov-card"><div class="ov-t">🟠 科技线</div><div class="hz-grid"><div class="hz"><i>+1</i><b class="mini">—</b><span class="mini">0</span></div><div class="hz"><i>+5</i><b class="mini">—</b><span class="mini">0</span></div><div class="hz"><i>+20</i><b class="mini">—</b><span class="mini">0</span></div><div class="hz"><i>+60</i><b class="mini">—</b><span class="mini">0</span></div></div></div></div><div class="ov-note">样本随实盘跟踪积累自动更新；胜率 = 收益&gt;0 占比（A 股红涨绿跌）。</div>
+<div class="section">
+  <h2>📈 堆叠形态：远期池收益叠加 <span class="tag">组合视角 · 所有入池股滚动平均</span></h2>
+  <div class="stk-grid">
+    <div class="stk-col"><div class="stk-t">按入池日序 · 组合平均收益（累计）</div><div class="stk-row"><span class="mini" style="width:80px">2026-08-07</span><div class="stk-track"><div class="stk-fill" style="width:1%;background:#C0392B"></div></div><b style="width:70px;text-align:right">+0.2%</b></div><div class="stk-row"><span class="mini" style="width:80px">2026-08-07</span><div class="stk-track"><div class="stk-fill" style="width:11%;background:#C0392B"></div></div><b style="width:70px;text-align:right">+2.6%</b></div><div class="stk-row"><span class="mini" style="width:80px">2026-08-07</span><div class="stk-track"><div class="stk-fill" style="width:8%;background:#C0392B"></div></div><b style="width:70px;text-align:right">+2.0%</b></div><div class="stk-row"><span class="mini" style="width:80px">2026-08-07</span><div class="stk-track"><div class="stk-fill" style="width:8%;background:#C0392B"></div></div><b style="width:70px;text-align:right">+2.0%</b></div><div class="stk-row"><span class="mini" style="width:80px">2026-08-07</span><div class="stk-track"><div class="stk-fill" style="width:9%;background:#C0392B"></div></div><b style="width:70px;text-align:right">+2.1%</b></div><div class="stk-row"><span class="mini" style="width:80px">2026-08-10</span><div class="stk-track"><div class="stk-fill" style="width:7%;background:#C0392B"></div></div><b style="width:70px;text-align:right">+1.8%</b></div><div class="stk-row"><span class="mini" style="width:80px">2026-08-10</span><div class="stk-track"><div class="stk-fill" style="width:6%;background:#C0392B"></div></div><b style="width:70px;text-align:right">+1.5%</b></div><div class="stk-row"><span class="mini" style="width:80px">2026-08-10</span><div class="stk-track"><div class="stk-fill" style="width:5%;background:#C0392B"></div></div><b style="width:70px;text-align:right">+1.3%</b></div><div class="stk-row"><span class="mini" style="width:80px">2026-08-10</span><div class="stk-track"><div class="stk-fill" style="width:5%;background:#C0392B"></div></div><b style="width:70px;text-align:right">+1.2%</b></div><div class="stk-row"><span class="mini" style="width:80px">2026-08-10</span><div class="stk-track"><div class="stk-fill" style="width:4%;background:#C0392B"></div></div><b style="width:70px;text-align:right">+1.1%</b></div><div class="stk-row"><span class="mini" style="width:80px">2026-08-10</span><div class="stk-track"><div class="stk-fill" style="width:4%;background:#C0392B"></div></div><b style="width:70px;text-align:right">+1.0%</b></div></div>
+    <div class="stk-col"><div class="stk-t">各只最新收益排序</div><div class="stk-bar"><span class="mini" style="width:90px">海容冷链</span><div class="stk-track"><div class="stk-fill" style="width:20%;background:#C0392B"></div></div><b style="color:#C0392B;width:70px;text-align:right">+5.1%</b></div><div class="stk-bar"><span class="mini" style="width:90px">老百姓</span><div class="stk-track"><div class="stk-fill" style="width:11%;background:#C0392B"></div></div><b style="color:#C0392B;width:70px;text-align:right">+2.8%</b></div><div class="stk-bar"><span class="mini" style="width:90px">富森美</span><div class="stk-track"><div class="stk-fill" style="width:7%;background:#C0392B"></div></div><b style="color:#C0392B;width:70px;text-align:right">+1.9%</b></div><div class="stk-bar"><span class="mini" style="width:90px">海航控股</span><div class="stk-track"><div class="stk-fill" style="width:3%;background:#C0392B"></div></div><b style="color:#C0392B;width:70px;text-align:right">+0.8%</b></div><div class="stk-bar"><span class="mini" style="width:90px">仁和药业</span><div class="stk-track"><div class="stk-fill" style="width:1%;background:#C0392B"></div></div><b style="color:#C0392B;width:70px;text-align:right">+0.2%</b></div><div class="stk-bar"><span class="mini" style="width:90px">海航控股</span><div class="stk-track"><div class="stk-fill" style="width:0%;background:#C0392B"></div></div><b style="color:#C0392B;width:70px;text-align:right">+0.0%</b></div><div class="stk-bar"><span class="mini" style="width:90px">富森美</span><div class="stk-track"><div class="stk-fill" style="width:0%;background:#C0392B"></div></div><b style="color:#C0392B;width:70px;text-align:right">+0.0%</b></div><div class="stk-bar"><span class="mini" style="width:90px">若羽臣</span><div class="stk-track"><div class="stk-fill" style="width:0%;background:#C0392B"></div></div><b style="color:#C0392B;width:70px;text-align:right">+0.0%</b></div><div class="stk-bar"><span class="mini" style="width:90px">松发股份</span><div class="stk-track"><div class="stk-fill" style="width:0%;background:#C0392B"></div></div><b style="color:#C0392B;width:70px;text-align:right">+0.0%</b></div><div class="stk-bar"><span class="mini" style="width:90px">藏格矿业</span><div class="stk-track"><div class="stk-fill" style="width:0%;background:#C0392B"></div></div><b style="color:#C0392B;width:70px;text-align:right">+0.0%</b></div><div class="stk-bar"><span class="mini" style="width:90px">西部黄金</span><div class="stk-track"><div class="stk-fill" style="width:0%;background:#C0392B"></div></div><b style="color:#C0392B;width:70px;text-align:right">+0.0%</b></div></div>
+  </div>
+  <div class="ov-note">左：随时间入池股票增多，组合平均收益走势（一眼看 Pitch 整体是否在赚钱）；右：单只最新收益横向对比（最赚钱/最亏一目了然）。红=涨/盈利，绿=跌/亏损（A 股习惯）。</div>
+</div>
+<div class="section">
+  <h2>📋 实盘远期收益明细 <span class="tag">🟢 真实 Pitch 入池记录（非模拟）· 科技线经主观确认后自动入池</span></h2>
+  <table><thead><tr><th>股票</th><th>入池日</th><th>类型</th><th>评分</th><th>风控/Beneish</th><th>止损（触发/方案）</th><th>T+1</th><th>T+5</th><th>T+20</th><th>T+60</th><th>最新</th></tr></thead>
+  <tbody><tr>
+  <td><b>600221.SH</b><span class="mini"> 海航控股</span></td>
+  <td>2026-08-10</td>
+  <td>价值重估<span class="mini" style="color:#0F6E56;font-weight:500">🔵价值</span></td>
+  <td><b>89.5</b></td>
+  <td class="mini">WATCH · B:LOW</td>
+  <td><span class="mini">—</span><br><span class="mini">—</span></td>
+  <td><span class="mini">—</span></td>
+  <td >—</td>
+  <td >—</td>
+  <td >—</td>
+  <td >—</td>
+  <td class="up"><b>+0.00%</b><span class="mini"> 2026-08-10</span></td>
+</tr><tr>
+  <td><b>002818.SZ</b><span class="mini"> 富森美</span></td>
+  <td>2026-08-10</td>
+  <td>价值重估<span class="mini" style="color:#0F6E56;font-weight:500">🔵价值</span></td>
+  <td><b>89.1</b></td>
+  <td class="mini">PASS · B:LOW</td>
+  <td><span class="mini">—</span><br><span class="mini">—</span></td>
+  <td><span class="mini">—</span></td>
+  <td >—</td>
+  <td >—</td>
+  <td >—</td>
+  <td >—</td>
+  <td class="up"><b>+0.00%</b><span class="mini"> 2026-08-10</span></td>
+</tr><tr>
+  <td><b>003010.SZ</b><span class="mini"> 若羽臣</span></td>
+  <td>2026-08-10</td>
+  <td>价值重估<span class="mini" style="color:#0F6E56;font-weight:500">🔵价值</span></td>
+  <td><b>88.8</b></td>
+  <td class="mini">WATCH · B:LOW</td>
+  <td><span class="mini">—</span><br><span class="mini">—</span></td>
+  <td><span class="mini">—</span></td>
+  <td >—</td>
+  <td >—</td>
+  <td >—</td>
+  <td >—</td>
+  <td class="up"><b>+0.00%</b><span class="mini"> 2026-08-10</span></td>
+</tr><tr>
+  <td><b>603268.SH</b><span class="mini"> 松发股份</span></td>
+  <td>2026-08-10</td>
+  <td>价值重估<span class="mini" style="color:#0F6E56;font-weight:500">🔵价值</span></td>
+  <td><b>88.1</b></td>
+  <td class="mini">WATCH · B:HIGH</td>
+  <td><span class="mini">—</span><br><span class="mini">—</span></td>
+  <td><span class="mini">—</span></td>
+  <td >—</td>
+  <td >—</td>
+  <td >—</td>
+  <td >—</td>
+  <td class="up"><b>+0.00%</b><span class="mini"> 2026-08-10</span></td>
+</tr><tr>
+  <td><b>000408.SZ</b><span class="mini"> 藏格矿业</span></td>
+  <td>2026-08-10</td>
+  <td>价值重估<span class="mini" style="color:#0F6E56;font-weight:500">🔵价值</span></td>
+  <td><b>87.6</b></td>
+  <td class="mini">WATCH · B:LOW</td>
+  <td><span class="mini">—</span><br><span class="mini">—</span></td>
+  <td><span class="mini">—</span></td>
+  <td >—</td>
+  <td >—</td>
+  <td >—</td>
+  <td >—</td>
+  <td class="up"><b>+0.00%</b><span class="mini"> 2026-08-10</span></td>
+</tr><tr>
+  <td><b>601069.SH</b><span class="mini"> 西部黄金</span></td>
+  <td>2026-08-10</td>
+  <td>价值重估<span class="mini" style="color:#0F6E56;font-weight:500">🔵价值</span></td>
+  <td><b>90.5</b></td>
+  <td class="mini">PASS · B:LOW</td>
+  <td><span class="mini">—</span><br><span class="mini">—</span></td>
+  <td><span class="mini">—</span></td>
+  <td >—</td>
+  <td >—</td>
+  <td >—</td>
+  <td >—</td>
+  <td class="up"><b>+0.00%</b><span class="mini"> 2026-08-10</span></td>
+</tr><tr>
+  <td><b>000650.SZ</b><span class="mini"> 仁和药业</span></td>
+  <td>2026-08-07</td>
+  <td>低估值<span class="mini" style="color:#0F6E56;font-weight:500">🔵价值</span></td>
+  <td><b>94.8</b></td>
+  <td class="mini">PASS · B:LOW</td>
+  <td><span class="mini">—</span><br><span class="mini">—</span></td>
+  <td><span class="mini">—</span></td>
+  <td class="up">+0.18%</td>
+  <td >—</td>
+  <td >—</td>
+  <td >—</td>
+  <td class="up"><b>+0.18%</b><span class="mini"> 2026-08-10</span></td>
+</tr><tr>
+  <td><b>603187.SH</b><span class="mini"> 海容冷链</span></td>
+  <td>2026-08-07</td>
+  <td>低估值<span class="mini" style="color:#0F6E56;font-weight:500">🔵价值</span></td>
+  <td><b>91.6</b></td>
+  <td class="mini">WATCH · B:LOW</td>
+  <td><span class="mini">—</span><br><span class="mini">—</span></td>
+  <td><span class="mini">—</span></td>
+  <td class="up">+5.10%</td>
+  <td >—</td>
+  <td >—</td>
+  <td >—</td>
+  <td class="up"><b>+5.10%</b><span class="mini"> 2026-08-10</span></td>
+</tr><tr>
+  <td><b>600221.SH</b><span class="mini"> 海航控股</span></td>
+  <td>2026-08-07</td>
+  <td>价值重估<span class="mini" style="color:#0F6E56;font-weight:500">🔵价值</span></td>
+  <td><b>89.3</b></td>
+  <td class="mini">WATCH · B:LOW</td>
+  <td><span class="mini">—</span><br><span class="mini">—</span></td>
+  <td><span class="mini">—</span></td>
+  <td class="up">+0.75%</td>
+  <td >—</td>
+  <td >—</td>
+  <td >—</td>
+  <td class="up"><b>+0.75%</b><span class="mini"> 2026-08-10</span></td>
+</tr><tr>
+  <td><b>002818.SZ</b><span class="mini"> 富森美</span></td>
+  <td>2026-08-07</td>
+  <td>价值重估<span class="mini" style="color:#0F6E56;font-weight:500">🔵价值</span></td>
+  <td><b>88.5</b></td>
+  <td class="mini">PASS · B:LOW</td>
+  <td><span class="mini">—</span><br><span class="mini">—</span></td>
+  <td><span class="mini">—</span></td>
+  <td class="up">+1.86%</td>
+  <td >—</td>
+  <td >—</td>
+  <td >—</td>
+  <td class="up"><b>+1.86%</b><span class="mini"> 2026-08-10</span></td>
+</tr><tr>
+  <td><b>603883.SH</b><span class="mini"> 老百姓</span></td>
+  <td>2026-08-07</td>
+  <td>低估值<span class="mini" style="color:#0F6E56;font-weight:500">🔵价值</span></td>
+  <td><b>88.4</b></td>
+  <td class="mini">PASS · B:LOW</td>
+  <td><span class="mini">—</span><br><span class="mini">—</span></td>
+  <td><span class="mini">—</span></td>
+  <td class="up">+2.82%</td>
+  <td >—</td>
+  <td >—</td>
+  <td >—</td>
+  <td class="up"><b>+2.82%</b><span class="mini"> 2026-08-10</span></td>
+</tr></tbody></table>
+  <div class="otype-hint">T+N = 入池后第 N 个交易日收益；— = 还没到那个时间点。最新 = 到现在为止的实际涨幅。</div>
+</div>
+<div class="section">
+  <h2>🔵 历史回放回测 <span class="tag">假装回到过去选股 → 看后来真实涨跌（PIT 模拟，仅验证参考，非实盘）</span></h2>
+  <div class="kpi-row">
+    <span class="kpi">回放季度<b>5</b>个</span>
+    <span class="kpi">平均 T+3月<b class="up">+5.71%</b></span>
+    <span class="kpi">正收益季度<b>5/5</b></span>
+  </div>
+  <div class="replay-note">🧠 <b>这是什么？</b> 在过去的每个季度初，只允许用<b>当时已公开的数据</b>（行情 + 已披露财报）跑 Pitch 选股，
+    然后统计这些股票<b>后来 1/3/6 个月的真实涨跌</b>——用来检验"Pitch 选股到底靠不靠谱"。回放窗口：2025-06 ~ 2026-07（5 个季度）</div>
+  <div class="qcard">
+  <div class="qhead"><b>2025-06-03</b><span class="mini">触发: 反转 11 · 低估值 125 · 突破 26 · 价值重估 103</span></div>
+  <div class="qbadges"><span class="badge up">价值重估 +33.0%</span><span class="badge up">低估值 +13.9%</span><span class="badge up">质量折价 +26.5%</span><span class="badge none">量价共识 —</span><span class="badge up">事件驱动 +27.0%</span><span class="badge up">突破 +25.1%</span><span class="badge up">反转 +2.0%</span></div>
+</div><div class="qcard">
+  <div class="qhead"><b>2025-09-01</b><span class="mini">触发: 反转 0 · 低估值 172 · 突破 145 · 价值重估 111</span></div>
+  <div class="qbadges"><span class="badge up">价值重估 +26.1%</span><span class="badge up">低估值 +6.9%</span><span class="badge up">质量折价 +13.8%</span><span class="badge none">量价共识 —</span><span class="badge up">事件驱动 +27.7%</span><span class="badge up">突破 +5.7%</span><span class="badge none">反转 —</span></div>
+</div><div class="qcard">
+  <div class="qhead"><b>2026-01-05</b><span class="mini">触发: 反转 2 · 低估值 168 · 突破 65 · 价值重估 110</span></div>
+  <div class="qbadges"><span class="badge up">价值重估 +11.7%</span><span class="badge down">低估值 -4.0%</span><span class="badge up">质量折价 +2.2%</span><span class="badge none">量价共识 —</span><span class="badge up">事件驱动 +7.8%</span><span class="badge down">突破 -10.7%</span><span class="badge down">反转 -11.5%</span></div>
+</div><div class="qcard">
+  <div class="qhead"><b>2026-04-01</b><span class="mini">触发: 反转 11 · 低估值 158 · 突破 18 · 价值重估 107</span></div>
+  <div class="qbadges"><span class="badge down">价值重估 -1.7%</span><span class="badge up">低估值 +0.7%</span><span class="badge down">质量折价 -16.6%</span><span class="badge none">量价共识 —</span><span class="badge down">事件驱动 -9.6%</span><span class="badge down">突破 -16.4%</span><span class="badge down">反转 -3.9%</span></div>
+</div><div class="qcard">
+  <div class="qhead"><b>2026-07-01</b><span class="mini">触发: 反转 7 · 低估值 143 · 突破 29 · 价值重估 117</span></div>
+  <div class="qbadges"><span class="badge up">价值重估 +8.2%</span><span class="badge up">低估值 +4.2%</span><span class="badge up">质量折价 +17.6%</span><span class="badge none">量价共识 —</span><span class="badge up">事件驱动 +17.2%</span><span class="badge down">突破 -18.8%</span><span class="badge down">反转 -18.9%</span></div>
+</div>
+  <div class="conclusion">📊 <b>一句话结论</b>：回放期内表现最好的是 <b class='up'>价值重估历史回放平均 +15.5%（5 个季度）</b>；最弱的是 <b class='down'>反转 -8.1%（4 个季度）</b></div>
+</div>
+<div class="note">ℹ️ <b>怎么用这个页面？</b> ① 上面是<b>实盘池</b>：每只进过 Pitch 的股票都在这里，每天自动更新实际涨跌——涨的多说明 Pitch 选股准；
+  ② 下面是<b>回放回测</b>：把同一套选股逻辑拿到过去跑一遍，看历史上它会选什么、后来涨没涨。
+  <b>长期看：如果 T+20/T+60 平均为正 → Pitch 有效；持续为负 → 要回查评分逻辑。</b></div>
+<div class="mini" style="margin-top:12px;text-align:center">数据源 logs/pitch_track_pool_*.json（实盘）· logs/pitch_replay_*.json（回放）· dev_auto 8.65/8.60 自动更新</div>
+<!-- ★F1 实时接口：每 60s 拉 /api/live/forward，显示数据源状态；有更新自动刷新页面 -->
+<div id="livebar" class="livebar">⏳ 正在连接实时接口…</div>
+<script>
+async function liveRefresh(){
+  try{
+    const r = await fetch('/api/live/forward');
+    const d = await r.json();
+    if(!d.ok) throw new Error(d.error||'');
+    // ★2026-08-10 T+1 就绪倒计时：bars 未到今日 → 显示今日 15:00 收盘倒计时（18:30 管道后自动填充）
+    let cd = '';
+    const today = new Date().toISOString().slice(0,10);
+    if(d.bars_latest && d.bars_latest < today){
+      const now = new Date();
+      const close = new Date(now); close.setHours(15,0,0,0);
+      if(now < close){
+        const s = Math.floor((close-now)/1000);
+        const hh = String(Math.floor(s/3600)).padStart(2,'0');
+        const mm = String(Math.floor(s%3600/60)).padStart(2,'0');
+        const ss = String(s%60).padStart(2,'0');
+        cd = ' ｜ ⏳ T+1 就绪倒计时 <b style="color:#D4A843">' + hh + ':' + mm + ':' + ss + '</b>（今日 15:00 收盘）';
+      } else {
+        cd = ' ｜ <b style="color:#D4A843">今日已收盘，18:30 管道后 T+1 自动填充</b>';
+      }
+    }
+    document.getElementById('livebar').innerHTML =
+      '🟢 <b>实时状态：</b>数据源（bars.db）最新 <b>' + (d.bars_latest||'—') + '</b>' +
+      ' ｜ 池内 ' + d.n_entries + ' 条' +
+      ' ｜ 池更新 ' + (d.pool_ts||'—') + cd;
+    window._fwdCd = cd;
+  }catch(e){
+    document.getElementById('livebar').textContent = '⚠️ 实时接口暂不可用（页面每 60s 自动重试）';
+  }
+}
+liveRefresh();
+setInterval(liveRefresh, 60000);
+// ★倒计时每秒刷新（不重新拉 API，仅更新倒计时文本）
+setInterval(function(){
+  const lb = document.getElementById('livebar');
+  if(!lb || !window._fwdCd) return;
+  const m = lb.textContent.match(/倒计时.*?(\d{2}:\d{2}:\d{2})/);
+  if(!m) return;
+  const t = m[1].split(':').map(Number);
+  let s = t[0]*3600 + t[1]*60 + t[2] - 1;
+  if(s < 0) s = 0;
+  const hh = String(Math.floor(s/3600)).padStart(2,'0');
+  const mm = String(Math.floor(s%3600/60)).padStart(2,'0');
+  const ss = String(s%60).padStart(2,'0');
+  lb.textContent = lb.textContent.replace(m[1], hh+':'+mm+':'+ss);
+}, 1000);
+</script>
+</div></body></html>

@@ -1,0 +1,37 @@
+{
+ "chart": "turn_low_timing_vs_not_20260815.png",
+ "title": "择时 vs 无择时净值对比（T+1）",
+ "data": {
+  "source": "因子池面板 (bars.db qfq)",
+  "range": "2019-01~2026-08",
+  "factor_coverage": {
+   "2019-2026": "99%+",
+   "2011-2018": "0%（数据边界，不含）"
+  },
+  "n_codes": 5817
+ },
+ "backtest": {
+  "rebalance_days": 40,
+  "top_n": 20,
+  "weight": "equal",
+  "cost_buy": 0.0,
+  "cost_sell": 0.0,
+  "stamp": 0.0,
+  "slip": 0.0,
+  "t_plus_1": true,
+  "fix_qfq_jump": true,
+  "min_price": null,
+  "stop_loss": null,
+  "lookahead": "none"
+ },
+ "repro": {
+  "script": "validation/gen_backtest_charts.py",
+  "params_hash": "sha256:bb5088b65f42",
+  "seed": null,
+  "env": "deepseek-harness-quant .venv"
+ },
+ "author": "主系统审计员",
+ "date": "2026-08-15",
+ "status": "定稿",
+ "note": "干净数据（2019+）下择时纯损害：收益 -61%、回撤无改善（-13.8% 对 -13.8%）、夏普 0.79→0.42；全历史 -47.3% 对照为 NaN 污染已作废"
+}

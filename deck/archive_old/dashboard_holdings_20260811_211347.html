@@ -1,0 +1,62 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">
+<title>持有池 · 2026-08-06</title>
+<style>
+:root { --navy:#0A2540; --gold:#D4A843; --green:#0F6E56; --red:#C0392B; --bg:#F0F3F8; --muted:#8a94a6; --line:#e5e9f0; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,"Microsoft YaHei",sans-serif; background:var(--bg); color:#0A2540; padding:20px; }
+.wrap { max-width:1200px; margin:0 auto; }
+.header { background:linear-gradient(135deg,#0A2540,#185FA5); border-radius:14px; padding:18px 22px; color:#fff; }
+.header h1 { font-size:18px; } .header .sub { font-size:12px; color:rgba(255,255,255,.7); margin-top:4px; }
+.kpi { display:inline-block; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.25); border-radius:10px; padding:8px 16px; margin:10px 8px 0 0; font-size:12px; }
+.kpi b { font-size:16px; display:block; }
+.section { background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 18px; margin-top:14px; }
+.section h2 { font-size:14px; margin-bottom:10px; }
+.section h2 .tag { font-size:11px; color:var(--muted); font-weight:400; }
+.flag { background:#C0392B22; color:#C0392B; border:1px solid #C0392B; border-radius:8px; padding:8px 12px; margin:4px 0; font-size:12px; }
+.ok { color:var(--green); font-size:12px; }
+.gate { background:#C0392B; color:#fff; border-radius:8px; padding:10px 14px; margin-bottom:10px; font-size:13px; }
+.sim-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.sim-card { border:1px solid var(--line); border-radius:10px; padding:12px 16px; }
+.sim-card h3 { font-size:13px; margin-bottom:6px; }
+.sim-card b { font-size:20px; }
+.mini { font-size:11px; color:var(--muted); }
+.advice-box { background:#F6F9FF; border:1px solid var(--line); border-radius:10px; padding:12px 16px; font-size:13px; line-height:1.8; }
+<link rel="stylesheet" href="/ui_common.css"></style></head><body>
+<div class="lw-nav" data-page="holdings"></div>
+<script src="/nav_common.js"></script>
+<div class="wrap">
+<div class="header">
+  <h1>💼 持有池 <span style="font-weight:400;font-size:13px;opacity:.8">组合风控 · 模拟盘 · 今日指令</span>
+    <a class="btn-link" href="/dashboard_watch.html" style="font-size:12px;margin-left:10px">去观察池选股 →</a>
+    <a class="btn-link" href="/pitch.html#pitch" style="font-size:12px;margin-left:6px">Pitch 审批 →</a></h1>
+  <div class="sub">数据 2026-08-06 ｜ 纪律：持股≤5 · 类型差异化权重 · 极严格 Pitch</div>
+  <span class="kpi"><span class="mini">持仓数</span><b>50</b></span><span class="kpi"><span class="mini">单股集中度</span><b>2%</b></span><span class="kpi"><span class="mini">前5集中度</span><b>33%</b></span><span class="kpi"><span class="mini">组合波动</span><b>0.072</b></span>
+</div>
+<div class="section">
+  <h2>🛡 组合风控 <span class="tag">position_risk.json</span></h2>
+  <div class="flag">🔴 深度回撤个股 27 只（-60 日回撤>阈值）</div>
+  <div class="mini" style="margin-top:6px">个股风险明细（波动/回撤/ATR 距离）：50 只 · 生成 2026-08-06</div>
+</div>
+<div class="section">
+  <h2>📈 模拟盘双轨 <span class="tag">80 个月回测 · 配置轨 vs 优选轨</span></h2>
+  <svg viewBox="0 0 680 220" style="width:100%;background:#fff;border-radius:10px">
+<line x1="50" y1="14" x2="664" y2="14" stroke="#e5e9f0" stroke-width="0.6"/><text x="44" y="17" font-size="9" fill="#8a94a6" text-anchor="end">70.26</text><line x1="50" y1="58" x2="664" y2="58" stroke="#e5e9f0" stroke-width="0.6"/><text x="44" y="61" font-size="9" fill="#8a94a6" text-anchor="end">52.94</text><line x1="50" y1="102" x2="664" y2="102" stroke="#e5e9f0" stroke-width="0.6"/><text x="44" y="105" font-size="9" fill="#8a94a6" text-anchor="end">35.62</text><line x1="50" y1="146" x2="664" y2="146" stroke="#e5e9f0" stroke-width="0.6"/><text x="44" y="149" font-size="9" fill="#8a94a6" text-anchor="end">18.29</text><line x1="50" y1="190" x2="664" y2="190" stroke="#e5e9f0" stroke-width="0.6"/><text x="44" y="193" font-size="9" fill="#8a94a6" text-anchor="end">0.97</text><polyline points="50.0,189.9 57.8,189.9 65.5,190.0 73.3,189.9 81.1,189.9 88.9,189.7 96.6,189.3 104.4,189.2 112.2,189.5 119.9,189.4 127.7,189.4 135.5,189.5 143.3,189.7 151.0,189.6 158.8,189.5 166.6,189.5 174.4,189.3 182.1,189.2 189.9,189.2 197.7,189.0 205.4,189.1 213.2,189.1 221.0,188.8 228.8,188.7 236.5,188.8 244.3,188.7 252.1,188.9 259.8,189.1 267.6,188.8 275.4,188.5 283.2,188.4 290.9,188.5 298.7,188.5 306.5,188.5 314.3,188.5 322.0,188.5 329.8,188.3 337.6,188.2 345.3,188.3 353.1,188.4 360.9,188.4 368.7,188.4 376.4,188.3 384.2,188.3 392.0,188.3 399.7,188.4 407.5,188.4 415.3,188.4 423.1,188.4 430.8,188.4 438.6,188.4 446.4,188.4 454.2,188.4 461.9,188.4 469.7,188.4 477.5,188.4 485.2,187.5 493.0,187.1 500.8,186.8 508.6,187.1 516.3,187.2 524.1,186.8 531.9,186.8 539.6,186.9 547.4,186.6 555.2,186.3 563.0,185.9 570.7,185.4 578.5,185.3 586.3,185.2 594.1,185.2 601.8,185.1 609.6,184.5 617.4,184.1 625.1,184.9 632.9,184.4 640.7,184.6 648.5,184.9 656.2,185.4 664.0,185.0" fill="none" stroke="#2F6FED" stroke-width="1.8" opacity="0.9"/><polyline points="50.0,189.9 57.8,189.8 65.5,189.7 73.3,189.7 81.1,189.6 88.9,189.3 96.6,188.5 104.4,187.5 112.2,187.1 119.9,186.8 127.7,185.8 135.5,186.0 143.3,185.9 151.0,185.5 158.8,185.1 166.6,184.6 174.4,184.4 182.1,183.7 189.9,183.0 197.7,181.3 205.4,179.8 213.2,178.5 221.0,175.9 228.8,172.7 236.5,172.2 244.3,171.2 252.1,170.5 259.8,174.0 267.6,174.9 275.4,174.6 283.2,173.6 290.9,172.6 298.7,173.1 306.5,173.0 314.3,172.3 322.0,171.5 329.8,169.1 337.6,165.5 345.3,162.6 353.1,162.7 360.9,162.0 368.7,161.4 376.4,160.4 384.2,160.5 392.0,159.6 399.7,161.5 407.5,162.3 415.3,163.6 423.1,168.9 430.8,171.0 438.6,169.4 446.4,167.8 454.2,165.9 461.9,164.0 469.7,165.1 477.5,168.4 485.2,167.0 493.0,166.1 500.8,163.5 508.6,162.2 516.3,161.4 524.1,159.5 531.9,155.3 539.6,154.5 547.4,152.2 555.2,147.8 563.0,144.5 570.7,137.2 578.5,132.6 586.3,127.1 594.1,120.6 601.8,111.4 609.6,93.4 617.4,71.2 625.1,59.5 632.9,21.9 640.7,14.0 648.5,27.2 656.2,37.7 664.0,48.4" fill="none" stroke="#D4A843" stroke-width="1.8" opacity="0.9"/><text x="50" y="212" font-size="9" fill="#8a94a6">2020-01</text><text x="143" y="212" font-size="9" fill="#8a94a6">2021-01</text><text x="237" y="212" font-size="9" fill="#8a94a6">2022-01</text><text x="330" y="212" font-size="9" fill="#8a94a6">2023-01</text><text x="423" y="212" font-size="9" fill="#8a94a6">2024-01</text><text x="516" y="212" font-size="9" fill="#8a94a6">2025-01</text><text x="610" y="212" font-size="9" fill="#8a94a6">2026-01</text></svg>
+  <div class="sim-grid" style="margin-top:10px">
+    <div class="sim-card"><h3>配置轨 <span class="mini">全市场等权×择时</span></h3>
+      <b>17.4%</b> 年化 ｜ 夏普 1.021 ｜ 回撤 -15.7% ｜ 净值 2.92</div>
+    <div class="sim-card"><h3>优选轨 <span class="mini">Pitch Top 等权持有</span></h3>
+      <b style="color:#D4A843">83.3%</b> 年化 ｜ 夏普 2.208 ｜ 回撤 -34.8% ｜ 净值 56.73</div></div>
+  <div class="mini" style="margin-top:8px">优选轨 = Pitch Top 等权持有 N 月滚动（T+1 开盘买入，PIT 对齐）；诚实披露：回测含成本、非实盘，乐观偏差已在元数据标注</div>
+</div>
+<div class="section">
+  <h2>📋 今日指令 <span class="tag">daily_signal.json</span></h2>
+  <div class="gate">⛔ 闸门阻断：数据审计 FAIL 1 项（['OHLC 关系/正数']）→ 数据不可信，阻断策略/回测执行</div>
+  <div class="advice-box">满仓：大波段上行/震荡——决策池全仓买入，池外一律不碰（买入指令=全仓）</div>
+  <div class="mini" style="margin-top:8px">决策链：L3 观察池 → L4 动态择时 → L5 底座池 → L6 今日信号；持仓表（成本/止损）审批买入后自动启用（D8）</div>
+</div>
+<div class="section"><h2>💼 当前持仓 <span class="tag">审批买入自动更新 · 止盈止损引擎联动</span></h2><table><thead><tr><th>股票</th><th>收益</th><th>止损位</th><th>止盈位</th><th>止盈/止损状态</th><th>买入日</th></tr></thead><tbody id="pos-tbody"><tr><td><b>300972.SZ</b><span class="mini"> 300972.SZ</span></td><td>—</td><td class="mini">止损 —</td><td class="mini">止盈 —</td><td><span class=mini>持有中</span></td><td class="mini">2026-08-11</td></tr><tr><td><b>600368.SH</b><span class="mini"> 600368.SH</span></td><td>—</td><td class="mini">止损 —</td><td class="mini">止盈 —</td><td><span class=mini>持有中</span></td><td class="mini">2026-08-11</td></tr><tr><td><b>600221.SH</b><span class="mini"> 600221.SH</span></td><td>—</td><td class="mini">止损 —</td><td class="mini">止盈 —</td><td><span class=mini>持有中</span></td><td class="mini">2026-08-11</td></tr><tr><td><b>002112.SZ</b><span class="mini"> 002112.SZ</span></td><td>—</td><td class="mini">止损 -7%</td><td class="mini">止盈 —</td><td><span class=mini>持有中</span></td><td class="mini">2026-08-11</td></tr></tbody></table></div>
+<div class="mini" style="margin-top:12px;text-align:center">数据源 report/position_risk.json · logs/sim_tracks.json · output/daily_signal.json · output/portfolio.json</div>
+</div>
+<!-- ★F5 页面 API 化：JS 拉 /api/live/holdings 实时刷新（60s 轮询），数据变化无需重新生成 HTML -->
+<script src="/live_patch.js" data-page="holdings"></script>
+</body></html>

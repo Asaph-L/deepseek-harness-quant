@@ -1,0 +1,20 @@
+# DeepSeek HARNESS Quant · 依赖清单（v2.5）
+# 安装：python -m pip install -r requirements.txt
+
+# ---- 数据源 ----
+baostock>=0.8.9            # 行情主源（稳）
+akshare>=1.15.0            # 覆盖源（业绩快报/机构调研等）
+tushare>=1.4.0             # 财报主源（ann_date → Point-in-Time，需 token）
+
+# ---- 回测与绩效 ----
+backtrader>=1.9.78         # 主回测引擎（实测通过）
+vectorbt>=1.0.0            # 参数扫描/Ablation 加速（实测通过，注意 freq='D' 与 1.1 API）
+quantstats>=0.0.81         # 绩效指标（实测通过）
+
+# ---- 数据处理 ----
+numpy>=1.26
+pandas>=2.2
+pyyaml>=6.0                # 读取 config/params.yaml
+
+# ---- 可选 ----
+matplotlib>=3.8            # 图表

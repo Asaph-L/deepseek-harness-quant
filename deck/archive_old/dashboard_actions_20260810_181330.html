@@ -1,0 +1,112 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">
+<title>待处理面板 · Action Center · 20260810</title>
+<style>
+:root { --navy:#0A2540; --green:#0F6E56; --red:#C0392B; --gold:#D4A843; --bg:#F0F3F8; --muted:#8a94a6; --line:#e5e9f0; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,"Microsoft YaHei",sans-serif; background:var(--bg); color:#0A2540; padding:20px; }
+.wrap { max-width:1180px; margin:0 auto; }
+.header { background:linear-gradient(135deg,#0A2540,#185FA5); border-radius:14px; padding:18px 22px; color:#fff; }
+.header h1 { font-size:19px; } .header .sub { font-size:12px; color:rgba(255,255,255,.75); margin-top:5px; }
+.kpi { display:inline-block; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.25); border-radius:10px; padding:8px 16px; margin:10px 8px 0 0; font-size:12px; }
+.kpi b { font-size:17px; display:block; }
+.kpi.red b { color:#FF8A7A; } .kpi.orange b { color:#FFC069; }
+.section { background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 18px; margin-top:14px; }
+.section h2 { font-size:14px; margin-bottom:10px; }
+.section h2 .tag { font-size:11px; color:var(--muted); font-weight:400; }
+table { width:100%; border-collapse:collapse; }
+th { font-size:10px; color:var(--muted); padding:6px 8px; text-align:left; border-bottom:2px solid var(--line); }
+td { padding:7px 8px; border-bottom:1px solid var(--line); font-size:12px; }
+.mini { font-size:11px; color:var(--muted); }
+.b-new { background:var(--red); color:#fff; border-radius:8px; padding:1px 6px; font-size:10px; }
+.btn-link { color:#185FA5; font-size:12px; text-decoration:none; font-weight:600; }
+.section.red { border-left:4px solid var(--red); }
+.section.orange { border-left:4px solid var(--gold); }
+.section.green { border-left:4px solid var(--green); }
+.empty { color:#b8c0cc; text-align:center; padding:14px; font-size:12px; }
+.note { background:#EAF3FF; border:1px solid #B8D4F0; border-radius:8px; padding:8px 12px; font-size:11px; color:#3a6ea5; margin-top:12px; line-height:1.7; }
+<link rel="stylesheet" href="/ui_common.css"></style></head><body>
+<div class="lw-nav" data-page="actions"></div>
+<script src="/nav_common.js"></script>
+<div class="wrap">
+<div class="header">
+  <h1>⚡ 待处理面板 <span style="font-weight:400;font-size:13px;opacity:.8">需要你及时操作的事项</span></h1>
+  <div class="sub">止损触发 → 待审批 Pitch → 新突破科技股，按优先级排列 · 数据自动更新（每 4 小时 + 手动更新）</div>
+  <span class="kpi red">止损触发<b>0</b></span>
+  <span class="kpi orange">待审批 Pitch<b>6</b></span>
+  <span class="kpi">新突破科技股<b>1</b></span>
+  <span class="kpi">监测中<b>5</b>只</span>
+</div>
+
+<div class="section red">
+  <h2>🔴 止损条件触发 <span class="tag">回撤保护线 / 时间止损 / 逻辑失效 · 监测 5 只 · 2026-08-10 18:09:38</span></h2>
+  <table><thead><tr><th>股票</th><th>类型</th><th>触发条件</th><th>操作</th></tr></thead>
+  <tbody><tr><td colspan=4 class="mini">无触发（监测正常）</td></tr></tbody></table>
+  <div class="note">🟡 另有 1 只接近触发（预警）：海航控股</div>
+</div>
+
+<div class="section orange">
+  <h2>💼 实盘持仓卖出信号 <span class="tag">position_stop_check（持仓执行层）· —</span></h2>
+  <table><thead><tr><th>股票</th><th>类型</th><th>信号</th><th>浮盈</th><th>持有</th><th>操作</th></tr></thead>
+  <tbody><tr><td colspan=6 class="mini">无卖出信号（持仓正常或无持仓）</td></tr></tbody></table>
+</div>
+
+<div class="section orange">
+  <h2>🟠 待审批 Pitch <span class="tag">价值池 5 · 科技池 1 · 未审批</span></h2>
+  <table><thead><tr><th>股票</th><th>类型</th><th>评分</th><th>止损方案</th><th>操作</th></tr></thead>
+  <tbody><tr>
+  <td><b>603066.SH</b><span class="mini"> 音飞储存</span></td>
+  <td>价值重估</td>
+  <td><b>96.7</b></td>
+  <td class="mini">业绩证伪触发即离场 · 估值兑现止盈 · 13 周未兑现离场 · 回撤超 1</td>
+  <td><a class="btn-link" href="/pitch.html#pitch">审批 →</a></td>
+</tr><tr>
+  <td><b>605138.SH</b><span class="mini"> 盛泰集团</span></td>
+  <td>价值重估</td>
+  <td><b>96.1</b></td>
+  <td class="mini">业绩证伪触发即离场 · 估值兑现止盈 · 13 周未兑现离场 · 回撤超 1</td>
+  <td><a class="btn-link" href="/pitch.html#pitch">审批 →</a></td>
+</tr><tr>
+  <td><b>301109.SZ</b><span class="mini"> 军信股份</span></td>
+  <td>低估值</td>
+  <td><b>91.6</b></td>
+  <td class="mini">财务证伪/估值陷阱触发即离场 · 6 个月未修复离场 · 回撤超 15% 离</td>
+  <td><a class="btn-link" href="/pitch.html#pitch">审批 →</a></td>
+</tr><tr>
+  <td><b>600221.SH</b><span class="mini"> 海航控股</span></td>
+  <td>价值重估</td>
+  <td><b>89.5</b></td>
+  <td class="mini">业绩证伪触发即离场 · 估值兑现止盈 · 13 周未兑现离场 · 回撤超 1</td>
+  <td><a class="btn-link" href="/pitch.html#pitch">审批 →</a></td>
+</tr><tr>
+  <td><b>002697.SZ</b><span class="mini"> 红旗连锁</span></td>
+  <td>低估值</td>
+  <td><b>89.2</b></td>
+  <td class="mini">财务证伪/估值陷阱触发即离场 · 6 个月未修复离场 · 回撤超 15% 离</td>
+  <td><a class="btn-link" href="/pitch.html#pitch">审批 →</a></td>
+</tr><tr>
+  <td><b>300996.SZ</b><span class="mini"> 普联软件</span></td>
+  <td>突破 <span class="b-new">创业板</span></td>
+  <td><b>59.0</b></td>
+  <td class="mini">强制 10% 最大回撤 + 突破点下方 8% + 假突破三级退出（预警→清仓</td>
+  <td><a class="btn-link" href="/pitch.html#pitch">审批 →</a></td>
+</tr></tbody></table>
+</div>
+
+<div class="section green">
+  <h2>🟡 新突破科技股 <span class="tag">实时监控新增 · 符合突破条件立即提示</span></h2>
+  <table><thead><tr><th>股票</th><th>类型</th><th>评分</th><th>板块</th><th>操作</th></tr></thead>
+  <tbody><tr>
+  <td><b>300996.SZ</b><span class="mini"> 普联软件</span></td>
+  <td>突破 <span class="b-new">创业板</span></td>
+  <td><b>59.0</b></td>
+  <td class="mini">强制 10% 最大回撤 + 突破点下方 8% + 假突破三级退出（预警→清仓</td>
+  <td><a class="btn-link" href="/dashboard_techpitch.html#new">看详情 →</a></td>
+</tr></tbody></table>
+  
+</div>
+
+<div class="note">ℹ️ <b>怎么用：</b>① 止损触发 = 系统检测到入池股达到定制止损条件（如回撤超保护线/财务证伪/时间到）→ 点"检测"看详情决定是否离场；
+  ② 待审批 Pitch = 价值/科技候选等待你的买入决策（点"审批"进入双池并列页）；
+  ③ 新突破科技股 = 刚满足突破条件的新面孔（追高风险，仓位减半）。全部完成后自动清空对应区块。</div>
+<div class="mini" style="margin-top:12px;text-align:center">数据源 stop_alerts_*.json · pitch_v2_*.json · tech_pitch_*.json · breakout_alerts_*.json · 自动刷新 dev_auto</div>
+</div></body></html>

@@ -1,0 +1,37 @@
+{
+ "chart": "cta_sensitivity_sharpe_20260815.png",
+ "title": "CTA 择时敏感性网格（夏普）",
+ "data": {
+  "source": "因子池面板 (bars.db qfq)",
+  "range": "2019-01~2026-08",
+  "factor_coverage": {
+   "2019-2026": "99%+",
+   "2011-2018": "0%（数据边界，不含）"
+  },
+  "n_codes": 5817
+ },
+ "backtest": {
+  "rebalance_days": 40,
+  "top_n": "-",
+  "weight": "equal",
+  "cost_buy": 0.0,
+  "cost_sell": 0.0,
+  "stamp": 0.0,
+  "slip": 0.0,
+  "t_plus_1": true,
+  "fix_qfq_jump": true,
+  "min_price": null,
+  "stop_loss": null,
+  "lookahead": "none"
+ },
+ "repro": {
+  "script": "validation/gen_backtest_charts.py",
+  "params_hash": "sha256:be464d44e47c",
+  "seed": null,
+  "env": "deepseek-harness-quant .venv"
+ },
+ "author": "主系统审计员",
+ "date": "2026-08-15",
+ "status": "定稿",
+ "note": "12 个参数组合夏普 0.40~0.63，全部低于同口径无择时 0.79——择时纯损害结论参数稳健"
+}

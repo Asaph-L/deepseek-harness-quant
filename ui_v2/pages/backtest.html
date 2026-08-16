@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Deepseek HARNESS Quant · 回测</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="/v2/assets/ui_common.css">
+<link rel="stylesheet" href="/v2/assets/anim_common.css">
+<link rel="stylesheet" href="/v2/assets/app.css">
+<style>
+  .bt-ctl { display:flex; flex-wrap:wrap; gap:12px; margin:12px 0; align-items:end; }
+  .bt-ctl label { font-size:12px; color:#a1a1aa; }
+  .bt-ctl select, .bt-ctl input { margin-left:4px; padding:6px 8px; border:1px solid #2a2a30; border-radius:8px; font-size:12px; outline:none; }
+  .bt-ctl select:focus, .bt-ctl input:focus { border-color:var(--navy2); }
+  .bt-kpi { display:flex; flex-wrap:wrap; gap:16px; margin:12px 0; }
+  .bt-kpi .k { min-width:104px; }
+  .bt-kpi .lb { font-size:11px; color:#a1a1aa; }
+  .bt-kpi .vl { font-size:22px; font-weight:700; font-variant-numeric:tabular-nums; }
+  .bt-stat { width:100%; border-collapse:collapse; font-size:12px; }
+  .bt-stat td { padding:7px 10px; border-bottom:1px solid rgba(255,255,255,.08); }
+  .bt-stat td:first-child { color:#a1a1aa; }
+  .bt-stat td:last-child { text-align:right; font-weight:600; font-variant-numeric:tabular-nums; }
+  .bt-legend { display:flex; gap:16px; font-size:12px; color:#a1a1aa; margin:6px 0; }
+  .bt-legend .sw { display:inline-block; width:14px; height:3px; border-radius:2px; margin-right:5px; vertical-align:2px; }
+  .vtag { font-size:11px; padding:2px 8px; border-radius:6px; font-weight:600; margin-left:6px; white-space:nowrap; }
+  .vtag-yx { background:rgba(39,174,96,.12); color:#4ade80; }
+  .vtag-wx { background:rgba(235,87,87,.12); color:#eb5757; }
+  .bt-filter { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0; align-items:center; }
+</style>
+</head>
+<body style="background:var(--bg);margin:0">
+<div id="sidebar"></div>
+<div class="v2-wrap">
+  <div class="v2-h"><span class="bar"></span><h1>回测</h1><span class="sub">策略回测 · 参数化运行 · 历史归档</span></div>
+
+  <!-- 策略回测（参数 + 运行 + 结果） -->
+  <div class="v2-card anim-fade-in-up d0" style="margin-top:14px">
+    <h2> 策略回测 <span class="tag">按参数即时跑 · 复用缓存秒级重跑</span></h2>
+    <div class="bt-ctl">
+      <label>筛选
+        <select id="bt-cat-filter" style="width:86px">
+          <option value="">全部</option>
+          <option value="策略">策略</option>
+          <option value="复刻">复刻</option>
+          <option value="因子">因子</option>
+        </select>
+      </label>
+      <input id="bt-search" placeholder="搜索策略…" style="width:110px;padding:6px 8px;border:1px solid #2a2a30;border-radius:8px;background:#131316;color:#d4d4d8;font-size:12px;outline:none">
+      <label>策略
+        <select id="bt-strategy"><option value="">加载中…</option></select>
+      </label>
+      <label>TopN <input id="bt-topn" type="number" value="5" min="1" max="20" style="width:56px"></label>
+      <label>股票数 <input id="bt-stocks" type="number" value="300" min="50" max="3000" step="50" style="width:76px"></label>
+      <label>起 <input id="bt-start" value="2021-01-01" style="width:92px"></label>
+      <label>止 <input id="bt-end" value="2025-12-31" style="width:92px"></label>
+      <button class="v2-btn" id="bt-run" style="margin-left:4px">运行回测</button>
+    </div>
+    <div class="mini" id="bt-strategy-desc" style="color:#a1a1aa;margin-top:8px;line-height:1.8">加载策略目录…</div>
+    <div id="bt-result"><div class="mini" style="opacity:.6">选择参数后点「运行回测」（首次加载数据约 5-15s，重复跑 1-2s）</div></div>
+  </div>
+
+  <!-- 历史记录 -->
+  <div class="v2-card anim-fade-in-up d1" style="margin-top:14px">
+    <h2> 历史记录 <span class="tag" id="bt-count">…</span></h2>
+    <div class="bt-filter" id="bt-filter"></div>
+    <div id="bt-archive"><span class="mini" style="opacity:.6">加载中…</span></div>
+  </div>
+</div>
+
+<script src="/v2/core/api.js"></script>
+<script src="/v2/core/render.js"></script>
+<script src="/v2/components/icons.js"></script>
+<script src="/v2/components/search.js"></script>
+<script src="/v2/components/sidebar.js"></script>
+<script>
+(function () {
+  LW.sidebar.render('sidebar', {active: 'backtest'});
+  var R = LW.render;
+
+  /* ---------- SVG 图 ---------- */
+  function cummax(arr) { var m = -Infinity, o = []; arr.forEach(function (v) { m = Math.max(m, v); o.push(m); }); return o; }
+  function drawdown(nav) { var cm = cummax(nav); return nav.map(function (v, i) { return v / cm[i] - 1; }); }
+  function svgSeries(seriesList, opts) {
+    opts = opts || {};
+    var W = opts.w || 940, H = opts.h || 220, PL = 56, PR = 16, PT = 12, PB = 26;
+    var all = [];
+    seriesList.forEach(function (s) { all = all.concat(s.data); });
+    if (!all.length) return '<div class="mini">无数据</div>';
+    var lo = opts.lo != null ? opts.lo : Math.min.apply(null, all);
+    var hi = opts.hi != null ? opts.hi : Math.max.apply(null, all);
+    if (hi - lo < 1e-9) hi = lo + 1;
+    function px(i, n) { return PL + i * (W - PL - PR) / Math.max(n - 1, 1); }
+    function py(v) { return PT + (1 - (v - lo) / (hi - lo)) * (H - PT - PB); }
+    var grid = '';
+    for (var g = 0; g <= 4; g++) {
+      var gy = (PT + g * (H - PT - PB) / 4).toFixed(1);
+      grid += '<line x1="' + PL + '" y1="' + gy + '" x2="' + (W - PR) + '" y2="' + gy + '" stroke="#d4d4d8" stroke-width="1"/>';
+    }
+    var zero = (opts.zeroLine && lo < 0 && hi > 0) ? '<line x1="' + PL + '" y1="' + py(0).toFixed(1) + '" x2="' + (W - PR) + '" y2="' + py(0).toFixed(1) + '" stroke="#a1a1aa" stroke-width="1" stroke-dasharray="4,3"/>' : '';
+    var lines = seriesList.map(function (s) {
+      var pts = [];
+      for (var i = 0; i < s.data.length; i++) pts.push(px(i, s.data.length).toFixed(1) + ',' + py(s.data[i]).toFixed(1));
+      if (s.fill) {
+        var area = pts.join(' ') + ' ' + px(s.data.length - 1, s.data.length).toFixed(1) + ',' + py(lo).toFixed(1) +
+          ' ' + px(0, s.data.length).toFixed(1) + ',' + py(lo).toFixed(1);
+        return '<polygon points="' + area + '" fill="' + (s.fillColor || 'rgba(39,174,96,.12)') + '" stroke="' + (s.color || '#27ae60') + '" stroke-width="' + (s.width || 1.2) + '"/>';
+      }
+      return '<polyline points="' + pts.join(' ') + '" fill="none" stroke="' + (s.color || '#5e6ad2') +
+        '" stroke-width="' + (s.width || 2) + '"' + (s.dash ? ' stroke-dasharray="5,4"' : '') + '/>';
+    }).join('');
+    var lbl = '<text x="' + PL + '" y="' + (H - 8) + '" font-size="10" fill="#a1a1aa">' + (opts.x0 || '') + '</text>' +
+      '<text x="' + (W - PR) + '" y="' + (H - 8) + '" font-size="10" fill="#a1a1aa" text-anchor="end">' + (opts.x1 || '') + '</text>' +
+      '<text x="' + (W - PR) + '" y="' + (PT + 8) + '" font-size="10" fill="#a1a1aa" text-anchor="end">' + (opts.hiLabel || hi.toFixed(2)) + '</text>';
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto">' + grid + zero + lines + lbl + '</svg>';
+  }
+
+  function pct(v) { return (v == null || isNaN(v)) ? '—' : (v * 100).toFixed(2) + '%'; }
+  function kpiVl(v, color) { return '<div class="k"><div class="lb">' + v.lb + '</div><div class="vl" style="color:' + color + '">' + v.v + '</div></div>'; }
+
+  function renderResult(d) {
+    var m = d.metrics || {};
+    var ann = m.annual_return || 0;
+    var annC = ann >= 0 ? '#eb5757' : '#27ae60';
+    var dd = drawdown(d.nav);
+    var kpi =
+      '<div class="bt-kpi">' +
+      kpiVl({ lb: '年化收益', v: pct(ann) }, annC) +
+      kpiVl({ lb: '超额年化', v: d.excess_annual != null ? pct(d.excess_annual) : '—' }, (d.excess_annual >= 0 ? '#eb5757' : '#27ae60')) +
+      kpiVl({ lb: '最大回撤', v: pct(m.max_drawdown) }, '#27ae60') +
+      kpiVl({ lb: '夏普', v: m.sharpe != null ? m.sharpe.toFixed(2) : '—' }, '#f4f4f5') +
+      kpiVl({ lb: '索提诺', v: m.sortino != null ? m.sortino.toFixed(2) : '—' }, '#f4f4f5') +
+      kpiVl({ lb: '卡玛', v: m.calmar != null ? m.calmar.toFixed(2) : '—' }, '#f4f4f5') +
+      kpiVl({ lb: '期末净值', v: m.final_nav != null ? m.final_nav.toFixed(2) : '—' }, '#f4f4f5') +
+      kpiVl({ lb: '月胜率', v: pct(m.monthly_win_rate) }, '#f4f4f5') +
+      kpiVl({ lb: '耗时', v: d.elapsed_s + 's' }, '#a1a1aa') +
+      '</div>';
+    var legend = '<div class="bt-legend"><span><span class="sw" style="background:#5e6ad2"></span>策略净值</span>' +
+      '<span><span class="sw" style="background:#f2c94c"></span>全池等权基准</span>' +
+      '<span><span class="sw" style="background:#27ae60"></span>超额净值（策略/基准）</span>' +
+      '<span style="margin-left:auto">' + d.params.stocks + ' 只 · ' + d.params.start + '~' + d.params.end + '</span></div>';
+    var navSeries = [{ data: d.nav, color: '#5e6ad2', width: 2 }];
+    if (d.bench_nav && d.bench_nav.length) navSeries.push({ data: d.bench_nav, color: '#f2c94c', width: 1.4, dash: true });
+    if (d.excess_nav && d.excess_nav.length) navSeries.push({ data: d.excess_nav, color: '#27ae60', width: 1.2, dash: true });
+    var navChart = svgSeries(navSeries, { x0: d.dates[0], x1: d.dates[d.dates.length - 1] });
+    var ddVals = dd.map(function (v) { return v * 100; });
+    var ddChart = svgSeries([{ data: ddVals, color: '#27ae60', width: 1.2, fill: true }], {
+      x0: d.dates[0], x1: d.dates[d.dates.length - 1], hiLabel: '回撤 ' + Math.min.apply(null, ddVals).toFixed(1) + '%'
+    });
+    var stat = '<table class="bt-stat"><tbody>' +
+      '<tr><td>累计收益</td><td style="color:' + annC + '">' + pct(m.total_return) + '</td></tr>' +
+      '<tr><td>年化收益</td><td style="color:' + annC + '">' + pct(ann) + '</td></tr>' +
+      '<tr><td>最大回撤</td><td style="color:#27ae60">' + pct(m.max_drawdown) + '</td></tr>' +
+      '<tr><td>年化波动率</td><td>' + pct(m.volatility) + '</td></tr>' +
+      '<tr><td>夏普 / 索提诺 / 卡玛</td><td>' + m.sharpe.toFixed(2) + ' / ' + m.sortino.toFixed(2) + ' / ' + m.calmar.toFixed(2) + '</td></tr>' +
+      '<tr><td>日胜率 / 月胜率</td><td>' + pct(m.win_rate) + ' / ' + pct(m.monthly_win_rate) + '</td></tr>' +
+      '<tr><td>最佳日 / 最差日</td><td>' + pct(m.best_day) + ' / ' + pct(m.worst_day) + '</td></tr>' +
+      '<tr><td>期末净值 / 样本</td><td>' + m.final_nav.toFixed(2) + ' / ' + m.n_days + ' 日</td></tr>' +
+      '</tbody></table>';
+    document.getElementById('bt-result').innerHTML =
+      kpi + legend +
+      '<div style="display:grid;grid-template-columns:1fr 220px;gap:14px;align-items:start">' +
+        '<div>' + navChart + '<div class="mini" style="margin-top:4px;color:#a1a1aa">净值曲线（策略 vs 基准）</div>' +
+        '<div style="margin-top:10px">' + ddChart + '<div class="mini" style="margin-top:4px;color:#a1a1aa">回撤 %（水下面积）</div></div>' +
+        '<div>' + stat + '</div>' +
+      '</div>' +
+      '<div class="mini" style="opacity:.6;margin-top:8px">含成本（佣金万2.6+印花税0.05%+滑点0.1%）；回测非实盘，仅供研究</div>';
+  }
+
+  /* ★2026-08-16 策略目录：动态加载（/api/live/backtest_strategies）+ 分类筛选 + 搜索 + 记忆 + 描述 */
+  var STRATS = {};
+  function applyStrategyMeta() {
+    var id = document.getElementById('bt-strategy').value;
+    var s = STRATS[id] || {};
+    var d = s.defaults || {};
+    if (d.topn != null) document.getElementById('bt-topn').value = d.topn;
+    if (d.stocks != null) document.getElementById('bt-stocks').value = d.stocks;
+    var runBtn = document.getElementById('bt-run');
+    var desc = document.getElementById('bt-strategy-desc');
+    if (desc) {
+      desc.innerHTML =
+        '<b style="color:var(--navy2)">' + R._f(s.name || id) + '</b> · <span style="color:' + catColor(s.category) + '">' + R._f(s.category || '') + '</span>' +
+        (s.instant === false ? ' · <b style="color:var(--gold)">批处理（约 1-3 分钟，结果入归档）</b>' : '') +
+        ' <span style="color:var(--muted)">· ' + R._f(s.desc || '') + '</span>';
+    }
+    if (runBtn) runBtn.disabled = s.instant === false;
+  }
+  function renderStrategyOptions() {
+    var cat = document.getElementById('bt-cat-filter').value;
+    var kw = (document.getElementById('bt-search').value || '').trim();
+    var saved = null;
+    try { saved = localStorage.getItem('bt.strategy'); } catch (e) {}
+    var ids = Object.keys(STRATS).filter(function (id) {
+      var s = STRATS[id];
+      if (cat && s.category !== cat) return false;
+      if (kw && (s.name + ' ' + (s.desc || '') + ' ' + (s.factors || []).join(' ')).toLowerCase().indexOf(kw.toLowerCase()) < 0) return false;
+      return true;
+    });
+    var sel = document.getElementById('bt-strategy');
+    sel.innerHTML = ids.map(function (id) {
+      var s = STRATS[id];
+      return '<option value="' + id + '">' + R._f(s.name) + '（' + R._f(s.category) + '）</option>';
+    }).join('') || '<option value="">无匹配策略</option>';
+    var target = ids.indexOf(saved) >= 0 ? saved : ids[0];
+    if (target) sel.value = target;
+    applyStrategyMeta();
+  }
+  function loadStrategies() {
+    return LW.api.get('/api/live/backtest_strategies').then(function (d) {
+      STRATS = (d && d.strategies) || {};
+      renderStrategyOptions();
+    }).catch(function () {
+      // 兜底：目录接口不可用时不阻塞（仅内置两个）
+      STRATS = {
+        tech3: { name: '技术三因子', category: '策略', instant: true, desc: 'rps_120 反转 + lowvol_60 反转 + near_high_250 正向（月频）', factors: ['rps_120', 'lowvol_60', 'near_high_250'], defaults: { topn: 5, stocks: 300 } },
+        script1: { name: '大市值三因子', category: '复刻', instant: true, desc: '营收增长率 + 市值 + Beta（月频）', factors: ['营收增长率', '市值', 'Beta'], defaults: { topn: 5, stocks: 300 } }
+      };
+      renderStrategyOptions();
+    });
+  }
+  document.getElementById('bt-cat-filter').addEventListener('change', renderStrategyOptions);
+  document.getElementById('bt-search').addEventListener('input', renderStrategyOptions);
+  document.getElementById('bt-strategy').addEventListener('change', function () {
+    try { localStorage.setItem('bt.strategy', this.value); } catch (e) {}
+    applyStrategyMeta();
+  });
+  loadStrategies();
+
+  document.getElementById('bt-run').onclick = function () {
+    var q = 'strategy=' + encodeURIComponent(document.getElementById('bt-strategy').value) +
+      '&topn=' + document.getElementById('bt-topn').value +
+      '&stocks=' + document.getElementById('bt-stocks').value +
+      '&start=' + encodeURIComponent(document.getElementById('bt-start').value) +
+      '&end=' + encodeURIComponent(document.getElementById('bt-end').value);
+    document.getElementById('bt-result').innerHTML = '<div class="mini" style="opacity:.7;padding:16px 0">回测运行中…（首次加载数据约 5-15s，勿重复点击）</div>';
+    LW.api.get('/api/live/backtest_run?' + q, { timeout: 180000 }).then(function (d) {
+      if (!d.ok) { document.getElementById('bt-result').innerHTML = '<div class="mini" style="color:var(--red)">失败：' + (d.error || '未知') + '</div>'; return; }
+      renderResult(d);
+      loadArchive();   // 运行后刷新历史记录
+    }).catch(function (e) { document.getElementById('bt-result').innerHTML = '<div class="mini" style="color:var(--red)">失败：' + e + '</div>'; });
+  };
+
+  /* ---------- 历史记录（只看最新 + 类型 + 有效/无效 + 关键词） ---------- */
+  var latest = [], history = [], afLatest = false, afCat = '全部', afVerd = '全部', afKw = '';
+  function catColor(c) { return c === '复刻' ? '#8b5cf6' : c === '因子' ? '#2d9cdb' : c === '策略' ? '#27ae60' : '#a1a1aa'; }
+  function cardHtml(a) {
+    var ann = a.annual_return != null ? pct(a.annual_return) : '—';
+    var dd = a.max_drawdown != null ? pct(a.max_drawdown) : '—';
+    var shp = a.sharpe != null ? a.sharpe.toFixed(2) : '—';
+    var annC = a.annual_return >= 0 ? '#eb5757' : '#27ae60';
+    var facs = (a.factors || []).slice(0, 5).map(function (f) { return '<span class="tag-st tag-dim" style="margin-left:4px">' + R._f(f) + '</span>'; }).join('');
+    function fname(p) { return String(p || '').split(/[\\/]/).pop(); }
+    var btn = a.has_html
+      ? '<a class="v2-btn" href="/dl/backtest_archive/' + encodeURIComponent(fname(a.html)) + '" target="_blank">打开报告</a>'
+      : '<a class="v2-btn" style="background:#16161a;color:var(--navy)" href="/dl/backtest_archive/' + encodeURIComponent(fname(a.json)) + '" target="_blank">查看JSON</a>';
+    var latestBadge = a.is_latest ? '<span class="vtag" style="background:rgba(94,106,210,.14);color:#8b5cf6">最新</span>' : '';
+    return '<div class="v2-card" style="margin-top:0;padding:14px 16px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap">' +
+        '<span><b>' + R._f(a.title || a.name || '回测') + '</b>' + latestBadge +
+          '<span class="vtag" style="background:' + catColor(a.category) + '1a;color:' + catColor(a.category) + '">' + a.category + '</span>' +
+          '<span class="vtag ' + (a.verdict === '有效' ? 'vtag-yx' : 'vtag-wx') + '">' + a.verdict + '</span>' +
+        '</span>' +
+        '<span class="mini" style="opacity:.6">' + R._f(a.generated_at || '') + '</span></div>' +
+      '<div class="mini" style="margin:6px 0 4px;color:#a1a1aa">' + facs + '</div>' +
+      '<div class="mini" style="margin:6px 0;color:#a1a1aa">年化 <b style="color:' + annC + '">' + ann + '</b> · 回撤 <b style="color:#27ae60">' + dd + '</b> · 夏普 <b>' + shp + '</b></div>' + btn + '</div>';
+  }
+  function renderArchive() {
+    var src = afLatest ? latest : history;
+    var kw = afKw.trim().toLowerCase();
+    var list = src.filter(function (a) {
+      var catOk = afCat === '全部' || a.category === afCat;
+      var verdOk = afVerd === '全部' || a.verdict === afVerd;
+      var kwOk = !kw || (a.name || '').toLowerCase().indexOf(kw) >= 0 ||
+        (a.title || '').toLowerCase().indexOf(kw) >= 0 || (a.factors || []).join(',').toLowerCase().indexOf(kw) >= 0;
+      return catOk && verdOk && kwOk;
+    });
+    var host = document.getElementById('bt-archive');
+    if (!list.length) { host.innerHTML = '<div class="mini" style="opacity:.6;padding:10px 0">无匹配记录。</div>'; return; }
+    host.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px">' +
+      list.slice(0, 100).map(cardHtml).join('') + '</div>';
+  }
+  function loadArchive() {
+    LW.api.get('/api/live/backtest_archive').then(function (d) {
+      latest = (d && d.latest) || [];
+      history = (d && d.history) || [];
+      var all = latest.concat(history);
+      var cats = ['全部'].concat(Array.from(new Set(all.map(function (a) { return a.category; }))));
+      var verds = ['全部', '有效', '无效'];
+      document.getElementById('bt-count').textContent = '最新 ' + latest.length + ' · 历史 ' + history.length;
+      document.getElementById('bt-filter').innerHTML =
+        '<label class="mini" style="display:flex;align-items:center;gap:4px;cursor:pointer">' +
+          '<input type="checkbox" id="bt-latest"> 只看最新</label>' +
+        '<span class="mini">类型</span>' +
+        '<select id="bt-cat" class="lf-btn" style="cursor:pointer">' + cats.map(function (c) { return '<option>' + c + '</option>'; }).join('') + '</select>' +
+        '<span class="mini">有效</span>' +
+        '<select id="bt-verd" class="lf-btn" style="cursor:pointer">' + verds.map(function (c) { return '<option>' + c + '</option>'; }).join('') + '</select>' +
+        '<input id="bt-kw" placeholder="搜索名称/标题/因子" style="flex:1;min-width:160px;padding:6px 10px;border:1px solid #2a2a30;border-radius:8px;font-size:12px;outline:none">';
+      document.getElementById('bt-latest').onchange = function () { afLatest = this.checked; renderArchive(); };
+      document.getElementById('bt-cat').onchange = function () { afCat = this.value; renderArchive(); };
+      document.getElementById('bt-verd').onchange = function () { afVerd = this.value; renderArchive(); };
+      document.getElementById('bt-kw').oninput = function () { afKw = this.value; renderArchive(); };
+      renderArchive();
+    }).catch(function () { document.getElementById('bt-archive').innerHTML = '<div class="mini" style="opacity:.6">历史加载失败</div>'; });
+  }
+  loadArchive();
+})();
+</script>
+
+<div class="mini" style="text-align:center;margin-top:18px;opacity:.7"><span class="dsq-brand">Deepseek HARNESS Quant</span><span style="color:var(--muted)"> · 作者：LW </span><span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:#2a2a30;border:1px solid #3a3a44;box-shadow:0 2px 6px rgba(0,0,0,.5)"><svg class="cat-stroll" width="22" height="22" viewBox="0 0 24 24" fill="none"><path class="cat-tail" d="M14.5 17.5c3.2.6 5.2-1.2 5.6-3.8" stroke="#111" stroke-width="2.4" stroke-linecap="round" fill="none"/><path d="M7.4 6.8L6 2.8l3.6 2.6M16.6 6.8L18 2.8l-3.6 2.6" fill="#111" stroke="#111" stroke-width="1"/><circle cx="10.5" cy="9.5" r="4.4" fill="#111"/><ellipse cx="11" cy="16" rx="6" ry="4.4" fill="#111"/><circle cx="8.8" cy="9.2" r="0.9" fill="#4ade80"/><circle cx="12.2" cy="9.2" r="0.9" fill="#4ade80"/><path d="M5.8 10.2h-2.6M6.4 11.6L4 12.8M18.2 10.2h-2.6M17.6 11.6l2.4 1.2" stroke="#555" stroke-width="0.7" stroke-linecap="round"/></svg></span><span style="opacity:.5"> · 低频主观量化 · 宁缺毋滥</span></div>
+</body>
+</html>

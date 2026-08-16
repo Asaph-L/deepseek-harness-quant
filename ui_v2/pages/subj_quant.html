@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Deepseek HARNESS Quant · 板块研究</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="/v2/assets/ui_common.css">
+<link rel="stylesheet" href="/v2/assets/anim_common.css">
+<link rel="stylesheet" href="/v2/assets/app.css">
+<style>
+  .sq-grid { display:grid; grid-template-columns:340px 1fr; gap:14px; margin-top:14px; }
+  @media (max-width:920px){ .sq-grid{grid-template-columns:1fr;} }
+  .sq-timing-state { font-size:34px; font-weight:800; letter-spacing:2px; }
+  .sq-factor { display:flex; align-items:center; gap:12px; padding:10px 12px; border:1px solid rgba(255,255,255,.08);
+    border-radius:8px; background:#131316; margin-bottom:6px; }
+  .sq-factor .rank { width:22px; height:22px; border-radius:50%; background:#1c1c22; color:var(--navy);
+    display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; flex-shrink:0; }
+  .sq-factor .name { font-weight:700; font-size:13px; min-width:70px; color:var(--navy); }
+  .badge { font-size:11px; padding:2px 9px; border-radius:11px; font-weight:700; }
+  .b-good { background:rgba(39,174,96,.12); color:#4ade80; }
+  .b-wait { background:#16161a; color:#a1a1aa; }
+  .b-bad { background:rgba(235,87,87,.12); color:#f87171; }
+  .sq-empty { padding:16px; text-align:center; color:#a1a1aa; border:1px dashed #2a2a30; border-radius:8px; }
+  .sq-dd-item { padding:9px 12px; font-size:13px; color:#d4d4d8; cursor:pointer; border-bottom:1px solid rgba(255,255,255,.08); }
+  .sq-dd-item:hover { background:rgba(94,106,210,.14); }
+  .sq-dd-item .n { color:#a1a1aa; font-size:11px; margin-left:6px; }
+  .sq-mode { padding:8px 18px; border:1px solid #2a2a30; background:#131316; border-radius:8px; cursor:pointer;
+    font-size:14px; font-weight:600; color:#a1a1aa; }
+  .sq-mode.on { background:#5e6ad2; color:#ffffff; border-color:#5e6ad2; }
+  .sq-hit.met { border-left:3px solid #27ae60; }
+  .sq-hit.not { border-left:3px solid #2a2a30; opacity:.65; }
+  /* 搜索卡提升层级，避免下拉被后续卡片遮挡 */
+  .sq-search-card { position:relative; z-index:60; }
+  .sq-search-card .dropdown { z-index:999; }
+  .sq-spinner { display:inline-block; width:15px; height:15px; border:2px solid #2a2a30; border-top-color:#5e6ad2;
+    border-radius:50%; animation:sq-spin .7s linear infinite; vertical-align:-2px; margin-right:6px; }
+  @keyframes sq-spin { to { transform: rotate(360deg); } }
+  .sq-confirm { padding:9px 20px; border:none; border-radius:8px; background:#5e6ad2; color:#ffffff;
+    font-size:14px; font-weight:600; cursor:pointer; white-space:nowrap; }
+  .sq-confirm:hover { background:#4f5ad8; }
+  .sq-confirm:disabled { background:rgba(94,106,210,.25); cursor:not-allowed; }
+</style>
+</head>
+<body style="background:var(--bg);margin:0">
+<div id="sidebar"></div>
+<div class="v2-wrap">
+  <div class="v2-h"><span class="bar"></span><h1>板块研究 <span class="tag" style="background:rgba(242,201,76,.12);color:#f2c94c;border:1px solid rgba(242,201,76,.35);font-size:11px;padding:2px 8px;border-radius:10px;vertical-align:middle">BETA</span></h1><span class="sub">主观框定方向 · 机器客观判断因子与择时</span></div>
+
+  <div class="mini" style="line-height:2;color:#a1a1aa;margin-top:4px">
+    人主观圈方向，机器客观算两件事：<b>板块模式</b>（圈板块 → 择时 + 板块内强因子）· <b>个股模式</b>（圈个股 → 命中因子 + 历史命中率）。
+    <span style="color:#f2c94c;font-weight:600">（Beta 研究参考，不进入实盘决策链）</span>
+  </div>
+
+  <!-- 模式切换 -->
+  <div style="margin-top:12px;display:flex;gap:8px">
+    <button id="mode-sector" class="sq-mode on">板块研究</button>
+    <button id="mode-stock" class="sq-mode">个股诊断</button>
+  </div>
+
+  <!-- ─────── 板块模式 ─────── -->
+  <div id="panel-sector">
+    <div class="v2-card sq-search-card anim-fade-in-up d0" style="margin-top:14px">
+      <h2> 选择板块 <span class="tag">证监会 83 大类 · 实时搜索</span></h2>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
+        <div style="position:relative;flex:1;max-width:460px">
+          <input id="sector-search" placeholder="搜索或浏览：C27 / 医药 / 电子 / 银行…" style="width:100%;box-sizing:border-box;border:1px solid #2a2a30;border-radius:8px;padding:9px 12px;font-size:14px;color:#d4d4d8;background:#131316">
+          <div id="sector-dropdown" class="dropdown" style="position:absolute;top:100%;left:0;right:0;background:#131316;border:1px solid #2a2a30;border-radius:8px;margin-top:4px;max-height:340px;overflow:auto;display:none;box-shadow:0 10px 28px rgba(0,0,0,.14)"></div>
+        </div>
+        <button id="sector-confirm" class="sq-confirm" disabled>确定</button>
+        <span id="sector-info" class="mini" style="color:#a1a1aa"></span>
+      </div>
+    </div>
+
+    <div class="sq-grid">
+      <div class="v2-card anim-fade-in-up d1">
+        <h2> 板块择时 <span class="tag">60日动量 + 均线</span></h2>
+        <div id="timing-box" style="margin-top:10px"><div class="sq-empty">先选一个板块</div></div>
+      </div>
+      <div class="v2-card anim-fade-in-up d1">
+        <h2> 板块内强因子 <span class="tag">七大机会类型 · 历史胜率排名</span></h2>
+        <div id="factors-box" style="margin-top:10px"><div class="sq-empty">先选一个板块</div></div>
+      </div>
+    </div>
+
+    <div class="v2-card anim-fade-in-up d2" style="margin-top:14px">
+      <h2> Pitch 层 <span class="tag">板块强因子选股 · 候选买入</span></h2>
+      <div id="pitch-box" style="margin-top:10px"><div class="sq-empty">先选板块并点「确定」</div></div>
+    </div>
+
+    <div class="v2-card anim-fade-in-up d2" style="margin-top:14px">
+      <h2> 散户因子 <span class="tag">个股低换手=核心 · 热度板块=陷阱 · 因子池最新研究</span></h2>
+      <div id="retail-box" style="margin-top:10px"><div class="sq-empty">先选板块并点「确定」</div></div>
+    </div>
+  </div>
+
+  <!-- ─────── 个股模式 ─────── -->
+  <div id="panel-stock" style="display:none">
+    <div class="v2-card sq-search-card anim-fade-in-up d0" style="margin-top:14px">
+      <h2> 选择个股 <span class="tag">人主观选股 · 机器判断命中率</span></h2>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
+        <div style="position:relative;flex:1;max-width:460px">
+          <input id="stock-search" placeholder="输入代码 600519 / 名称 茅台 …" style="width:100%;box-sizing:border-box;border:1px solid #2a2a30;border-radius:8px;padding:9px 12px;font-size:14px;color:#d4d4d8;background:#131316">
+          <div id="stock-dropdown" class="dropdown" style="position:absolute;top:100%;left:0;right:0;background:#131316;border:1px solid #2a2a30;border-radius:8px;margin-top:4px;max-height:340px;overflow:auto;display:none;box-shadow:0 10px 28px rgba(0,0,0,.14)"></div>
+        </div>
+        <button id="stock-confirm" class="sq-confirm" disabled>确定</button>
+      </div>
+    </div>
+
+    <div class="v2-card anim-fade-in-up d1" style="margin-top:14px">
+      <h2> 个股因子诊断 <span class="tag">命中哪些机会类型 + 历史命中率</span></h2>
+      <div id="stock-box" style="margin-top:10px"><div class="sq-empty">先搜一只股票</div></div>
+    </div>
+  </div>
+
+  <div class="mini" style="text-align:center;margin-top:20px;opacity:.6">板块研究台 · Beta · 数据源 bars.db + stock_basic.db + finance.db</div>
+</div>
+
+<script src="/v2/core/api.js"></script>
+<script src="/v2/core/render.js"></script>
+<script src="/v2/components/icons.js"></script>
+<script src="/v2/components/sidebar.js"></script>
+<script>
+(function () {
+  LW.sidebar.render('sidebar', { active: 'pitch' });
+  var R = LW.render;
+  var sectorsData = [];
+
+  // ── 模式切换 ──
+  function setMode(m) {
+    document.getElementById('mode-sector').classList.toggle('on', m === 'sector');
+    document.getElementById('mode-stock').classList.toggle('on', m === 'stock');
+    document.getElementById('panel-sector').style.display = m === 'sector' ? '' : 'none';
+    document.getElementById('panel-stock').style.display = m === 'stock' ? '' : 'none';
+  }
+  document.getElementById('mode-sector').onclick = function () { setMode('sector'); };
+  document.getElementById('mode-stock').onclick = function () { setMode('stock'); };
+
+  // ── 通用下拉（浏览 + 实时过滤）──
+  function bindSearch(inputId, ddId, dataFn, renderFn, onPick) {
+    var input = document.getElementById(inputId);
+    var dd = document.getElementById(ddId);
+    function show(list) {
+      if (!list.length) { dd.style.display = 'none'; return; }
+      dd.innerHTML = list.slice(0, 30).map(renderFn).join('');
+      dd.style.display = 'block';
+      dd.querySelectorAll('[data-key]').forEach(function (it) {
+        it.onclick = function () { onPick(it.getAttribute('data-key'), it.getAttribute('data-name')); };
+      });
+    }
+    input.addEventListener('input', function () { show(dataFn(this.value)); });
+    input.addEventListener('focus', function () { show(dataFn(this.value)); });
+    document.addEventListener('click', function (e) {
+      if (!e.target.closest('#' + inputId) && !e.target.closest('#' + ddId)) dd.style.display = 'none';
+    });
+  }
+
+  // ── 板块 ──
+  function loadSectors() {
+    LW.api.get('/api/sector_research/sectors').then(function (d) {
+      if (d && d.sectors) sectorsData = d.sectors;
+    });
+  }
+  function filterSectors(q) {
+    q = String(q || '').trim().toLowerCase();
+    return sectorsData.filter(function (s) {
+      return !q || s.code.toLowerCase().indexOf(q) >= 0 || s.name.toLowerCase().indexOf(q) >= 0;
+    });
+  }
+  var selectedSector = null;
+  bindSearch('sector-search', 'sector-dropdown', filterSectors,
+    function (s) { return '<div class="sq-dd-item" data-key="' + s.code + '" data-name="' + s.name + '">' + s.code + ' · ' + s.name + '<span class="n">' + s.n + ' 只</span></div>'; },
+    function (code, name) {
+      selectedSector = code;
+      document.getElementById('sector-search').value = code + ' · ' + name;
+      document.getElementById('sector-dropdown').style.display = 'none';
+      document.getElementById('sector-confirm').disabled = false;
+    });
+  document.getElementById('sector-confirm').onclick = function () {
+    if (selectedSector) analyzeSector(selectedSector);
+  };
+
+  function analyzeSector(code) {
+    document.getElementById('sector-confirm').disabled = true;
+    document.getElementById('sector-info').innerHTML = '<span class="sq-spinner"></span>分析中…';
+    document.getElementById('timing-box').innerHTML = '<div class="sq-empty"><span class="sq-spinner"></span>计算板块择时…</div>';
+    document.getElementById('factors-box').innerHTML = '<div class="sq-empty"><span class="sq-spinner"></span>计算板块内强因子（约需几秒）…</div>';
+    document.getElementById('pitch-box').innerHTML = '<div class="sq-empty"><span class="sq-spinner"></span>生成板块 Pitch 候选…</div>';
+    document.getElementById('retail-box').innerHTML = '<div class="sq-empty"><span class="sq-spinner"></span>计算散户因子（股东户数+换手率）…</div>';
+    LW.api.get('/api/sector_research/analyze?code=' + code, { bypass: true }).then(function (d) {
+      if (!d || !d.ok) { document.getElementById('sector-info').textContent = (d && d.error) || '分析失败'; return; }
+      renderTiming(d.timing);
+      renderFactors(d.factors);
+      renderPitch(d.pitch);
+      renderRetail(d.retail, d.crowd);
+      document.getElementById('sector-info').textContent = '已分析 ' + code + ' · 数据日 ' + (d.timing && d.timing.asof || '');
+      document.getElementById('sector-confirm').disabled = false;
+    }).catch(function (e) {
+      document.getElementById('sector-info').textContent = '分析失败: ' + e;
+      document.getElementById('sector-confirm').disabled = false;
+    });
+  }
+
+  var pitchData = null;
+
+  function renderPitch(p) {
+    pitchData = p;
+    var box = document.getElementById('pitch-box');
+    if (!p || !p.ok || !p.pitch || !p.pitch.length) {
+      box.innerHTML = '<div class="sq-empty">' + ((p && p.note) || '无候选（该板块当前无股票命中强因子）') + '</div>';
+      return;
+    }
+    var sf = p.strong_factors || [];
+    var sfChips = sf.map(function (f) {
+      return '<span class="badge ' + (f.winrate > 52 ? 'b-good' : 'b-wait') + '">' + f.name + ' ' + f.winrate + '%</span>';
+    }).join(' ');
+    box.innerHTML =
+      '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">' +
+        '<span class="mini" style="color:#a1a1aa">筛选因子：</span>' +
+        '<select id="pitch-factor" style="border:1px solid #2a2a30;border-radius:6px;padding:5px 10px;font-size:12px;color:#d4d4d8;background:#131316">' +
+          '<option value="">全部强因子</option>' +
+          sf.map(function (f) { return '<option value="' + f.otype + '">命中「' + f.name + '」</option>'; }).join('') +
+        '</select>' +
+        '<span class="mini" style="color:#a1a1aa">价格：</span>' +
+        '<input id="pitch-pmin" type="number" placeholder="最低" style="width:70px;border:1px solid #2a2a30;border-radius:6px;padding:5px 8px;font-size:12px">' +
+        '<span class="mini" style="color:#a1a1aa">~</span>' +
+        '<input id="pitch-pmax" type="number" placeholder="最高" style="width:70px;border:1px solid #2a2a30;border-radius:6px;padding:5px 8px;font-size:12px">' +
+        '<span class="mini" style="color:#a1a1aa;margin-left:auto">命中 ' + p.n_pitch + ' / ' + p.n_total + ' 只 · 已排散户涌入 ' + (p.n_excluded || 0) + ' 只</span>' +
+      '</div>' +
+      '<div class="mini" style="color:#a1a1aa;margin-bottom:8px">强因子：' + sfChips + '</div>' +
+      '<div id="pitch-list"></div>';
+    document.getElementById('pitch-factor').onchange = applyPitchFilter;
+    document.getElementById('pitch-pmin').oninput = applyPitchFilter;
+    document.getElementById('pitch-pmax').oninput = applyPitchFilter;
+    applyPitchFilter();
+  }
+
+  function applyPitchFilter() {
+    if (!pitchData) return;
+    var fac = document.getElementById('pitch-factor').value;
+    var pmin = parseFloat(document.getElementById('pitch-pmin').value) || 0;
+    var pmax = parseFloat(document.getElementById('pitch-pmax').value) || Infinity;
+    var list = pitchData.pitch.filter(function (r) {
+      if (r.price < pmin || r.price > pmax) return false;
+      if (fac && (r.hits_otype || []).indexOf(fac) < 0) return false;
+      return true;
+    });
+    var el = document.getElementById('pitch-list');
+    el.innerHTML = list.length ? list.map(function (r) {
+      return '<div class="sq-factor"><span class="code" style="font-family:ui-monospace,Consolas,monospace;font-size:12px;font-weight:700;color:var(--navy)">' + r.code + '</span>' +
+        '<b style="font-size:13px">' + R._f(r.name) + '</b>' +
+        '<span class="mini" style="color:#a1a1aa">' + R._f(r.price, '—') + '</span>' +
+        '<span class="mini" style="color:#a1a1aa">命中 ' + (r.hits || []).join(' + ') + '</span>' +
+        '<span style="margin-left:auto"><span class="badge b-good">' + r.score + '</span></span></div>';
+    }).join('') : '<div class="sq-empty">无匹配（调整筛选条件）</div>';
+  }
+
+  function renderRetail(r, crowd) {
+    var box = document.getElementById('retail-box');
+    if (!r || !r.ok) { box.innerHTML = '<div class="sq-empty">' + ((r && r.note) || '无散户数据') + '</div>'; return; }
+    function lst(items, color, unit) {
+      if (!items || !items.length) return '<div class="sq-empty" style="padding:8px;font-size:12px">暂无</div>';
+      return items.map(function (x) {
+        return '<div class="sq-factor" style="padding:7px 10px;margin-bottom:4px">' +
+          '<span style="font-family:ui-monospace,Consolas,monospace;font-size:11px;font-weight:700;color:' + color + '">' + x.code + '</span>' +
+          '<b style="font-size:12px">' + R._f(x.name) + '</b>' +
+          '<span class="mini" style="margin-left:auto;color:' + color + ';font-weight:600">' + unit(x) + '</span>' +
+          '</div>';
+      }).join('');
+    }
+    var crowdTxt = '';
+    if (crowd && crowd.ok) {
+      var heatColor = crowd.heat === '热门' ? '#eb5757' : (crowd.heat === '冷门' ? '#4ade80' : '#f2c94c');
+      crowdTxt = '<div class="mini" style="margin-bottom:10px;padding:8px 10px;background:rgba(242,201,76,.12);border:1px solid rgba(242,201,76,.35);border-radius:8px;line-height:1.8">' +
+        '<b style="color:#f2c94c">热度板块因子</b>：该板块占全市场成交额 <b>' + R._f(crowd.share_pct, '—') + '%</b>（60日均值 ' + R._f(crowd.avg_share_pct, '—') + '%）→ ' +
+        '<b style="color:' + heatColor + '">' + R._f(crowd.heat) + '</b>。' +
+        '★因子池最新研究：<b>冷门板块=流动性陷阱</b>（市场共识抛弃，反做踩雷）；散户错误的正确因子是<b>个股低换手</b>，不是板块热度。</div>';
+    }
+    box.innerHTML =
+      crowdTxt +
+      '<div class="mini" style="color:#a1a1aa;margin-bottom:10px">' +
+        '散户涌入 <b style="color:#f87171">' + r.n_inflow + ' 只</b>（排雷） · 主力吸筹 <b style="color:#4ade80">' + r.n_outflow + ' 只</b> · 板块共 ' + r.n_total + ' 只</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">' +
+        '<div><div class="pt-dim-h" style="color:#5e6ad2">低换手 · 核心（已剔 ST/亏损 ' + (r.n_filtered || 0) + ' 只）</div>' + lst(r.lowturn, '#5e6ad2', function (x) { return '换手 ' + x.turnover + '% · ROE ' + x.roe + '%'; }) + '</div>' +
+        '<div><div class="pt-dim-h" style="color:#f87171">散户涌入 · 排雷（户数大增）</div>' + lst(r.inflow, '#f87171', function (x) { return '户数 +' + x.chg + '%'; }) + '</div>' +
+        '<div><div class="pt-dim-h" style="color:#4ade80">主力吸筹 · 参考（户数大减）</div>' + lst(r.outflow, '#4ade80', function (x) { return '户数 ' + x.chg + '%'; }) + '</div>' +
+      '</div>';
+  }
+
+  function renderTiming(t) {
+    var box = document.getElementById('timing-box');
+    if (!t || !t.ok) { box.innerHTML = '<div class="sq-empty">' + (t && t.note ? t.note : '板块成分不足') + '</div>'; return; }
+    var color = t.color === 'red' ? '#eb5757' : t.color === 'yellow' ? '#f2c94c' : '#27ae60';
+    box.innerHTML =
+      '<div style="text-align:center;padding:8px 0 4px">' +
+        '<div class="sq-timing-state" style="color:' + color + '">' + R._f(t.label) + '</div>' +
+        '<div class="mini" style="margin-top:6px;color:#a1a1aa">60日动量 <b>' + (t.mom60 > 0 ? '+' : '') + R._f(t.mom60, '—') + '%</b> · 均线 <b>' + R._f(t.ma_state, '—') + '</b></div>' +
+        '<div class="mini" style="color:#a1a1aa;margin-top:4px">成分 ' + t.n + ' 只 · 数据日 ' + R._f(t.asof, '') + '</div>' +
+      '</div>' +
+      '<div class="mini" style="margin-top:8px;padding:8px 10px;background:#16161a;border-radius:8px;line-height:1.8;color:#a1a1aa">可进 = 动量正 + 均线多头；回避 = 动量负 + 均线空头；其余观望。个股买卖仍按各自止损/止盈执行。</div>';
+  }
+
+  function renderFactors(fs) {
+    var box = document.getElementById('factors-box');
+    if (!fs || !fs.length) { box.innerHTML = '<div class="sq-empty">无数据</div>'; return; }
+    box.innerHTML = fs.map(function (f, i) {
+      var badge;
+      if (!f.ok) badge = '<span class="badge b-wait">' + (f.note || '待接入') + '</span>';
+      else {
+        var cls = f.winrate > 55 ? 'b-good' : (f.winrate < 48 ? 'b-bad' : 'b-wait');
+        var label = f.winrate > 55 ? '强' : (f.winrate < 48 ? '弱' : '中性');
+        badge = '<span class="badge ' + cls + '">胜率 ' + f.winrate + '% · 超额 ' + (f.excess > 0 ? '+' : '') + f.excess + '%</span>' +
+                '<span class="mini" style="color:#a1a1aa">' + label + ' · n=' + f.n + '</span>';
+      }
+      return '<div class="sq-factor"><span class="rank">' + (i + 1) + '</span><span class="name">' + R._f(f.name) + '</span>' +
+        '<span class="mini" style="color:#a1a1aa">' + R._f(f.otype) + '</span>' +
+        '<span style="margin-left:auto;display:flex;align-items:center;gap:8px">' + badge + '</span></div>';
+    }).join('');
+  }
+
+  // ── 个股 ──
+  function searchStocks(q) {
+    if (!q || !q.trim()) return [];
+    return new Promise(function (res) {
+      LW.api.get('/api/sector_research/stock_search?q=' + encodeURIComponent(q.trim()), { bypass: true })
+        .then(function (d) { res(d && d.stocks ? d.stocks : []); });
+    });
+  }
+  var selectedStock = null;
+  var stockInput = document.getElementById('stock-search');
+  var stockDd = document.getElementById('stock-dropdown');
+  var stockTimer = null;
+  stockInput.addEventListener('input', function () {
+    clearTimeout(stockTimer);
+    var q = this.value;
+    if (!q.trim()) { stockDd.style.display = 'none'; return; }
+    stockTimer = setTimeout(function () {
+      searchStocks(q).then(function (list) {
+        if (!list.length) { stockDd.style.display = 'none'; return; }
+        stockDd.innerHTML = list.map(function (s) {
+          return '<div class="sq-dd-item" data-key="' + s.code + '" data-name="' + s.name + '">' + s.code + ' · ' + s.name + '</div>';
+        }).join('');
+        stockDd.style.display = 'block';
+        stockDd.querySelectorAll('[data-key]').forEach(function (it) {
+          it.onclick = function () {
+            selectedStock = it.getAttribute('data-key');
+            stockInput.value = it.getAttribute('data-key') + ' · ' + it.getAttribute('data-name');
+            stockDd.style.display = 'none';
+            document.getElementById('stock-confirm').disabled = false;
+          };
+        });
+      });
+    }, 250);
+  });
+  document.getElementById('stock-confirm').onclick = function () {
+    if (selectedStock) diagnoseStock(selectedStock);
+  };
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('#stock-search') && !e.target.closest('#stock-dropdown')) stockDd.style.display = 'none';
+  });
+
+  function diagnoseStock(code) {
+    var box = document.getElementById('stock-box');
+    document.getElementById('stock-confirm').disabled = true;
+    box.innerHTML = '<div class="sq-empty"><span class="sq-spinner"></span>诊断中（读取财务/量价因子）…</div>';
+    LW.api.get('/api/sector_research/stock?code=' + encodeURIComponent(code), { bypass: true }).then(function (d) {
+      document.getElementById('stock-confirm').disabled = false;
+      if (!d || !d.ok) { box.innerHTML = '<div class="sq-empty">' + (d && d.error || '诊断失败') + '</div>'; return; }
+      var f = d.factors || {};
+      var rows = (d.hits || []).map(function (h) {
+        var cls = h.met ? 'sq-hit met' : 'sq-hit not';
+        var badge = h.met
+          ? '<span class="badge ' + (h.neg ? 'b-bad' : (h.winrate > 55 ? 'b-good' : 'b-wait')) + '">命中率 ' + h.winrate + '%</span>'
+          : '<span class="badge b-wait">未命中</span>';
+        return '<div class="sq-factor ' + cls + '"><span class="name">' + R._f(h.name) + '</span>' +
+          '<span class="mini" style="color:#a1a1aa">' + R._f(h.note) + '</span>' +
+          '<span style="margin-left:auto;display:flex;gap:8px;align-items:center">' + badge +
+          (h.met && h.excess != null ? '<span class="mini" style="color:#a1a1aa">6月超额 ' + (h.excess > 0 ? '+' : '') + h.excess + '%</span>' : '') + '</span></div>';
+      }).join('');
+      box.innerHTML =
+        '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px">' +
+          '<b style="font-size:16px;color:var(--navy)">' + R._f(d.name) + '</b>' +
+          '<span class="mini" style="color:#a1a1aa">' + R._f(d.code) + ' · ' + R._f(d.sector) + '</span>' +
+          '<span class="mini" style="color:#a1a1aa">现价 <b style="color:var(--navy)">' + R._f(d.price, '—') + '</b></span>' +
+        '</div>' +
+        '<div class="mini" style="color:#a1a1aa;margin-bottom:10px;line-height:1.9">' +
+          'PB <b>' + R._f(f.pb, '—') + '</b> · ROE <b>' + R._f(f.roe, '—') + '%</b> · 单季净利同比 <b>' + R._f(f.sq_nyoy, '—') + '%</b>' +
+          ' · 60日回撤 <b>' + R._f(f.dd60, '—') + '%</b> · 距52周高点 <b>' + R._f(f.nh250, '—') + '%</b> · 20日波动率 <b>' + R._f(f.vol20, '—') + '%</b>' +
+        '</div>' + rows;
+    }).catch(function (e) { box.innerHTML = '<div class="sq-empty">诊断失败: ' + e + '</div>'; });
+  }
+
+  loadSectors();
+})();
+</script>
+
+<div class="mini" style="text-align:center;margin-top:18px;opacity:.7"><span class="dsq-brand">Deepseek HARNESS Quant</span><span style="color:var(--muted)"> · 作者：LW </span><span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:#2a2a30;border:1px solid #3a3a44;box-shadow:0 2px 6px rgba(0,0,0,.5)"><svg class="cat-stroll" width="22" height="22" viewBox="0 0 24 24" fill="none"><path class="cat-tail" d="M14.5 17.5c3.2.6 5.2-1.2 5.6-3.8" stroke="#111" stroke-width="2.4" stroke-linecap="round" fill="none"/><path d="M7.4 6.8L6 2.8l3.6 2.6M16.6 6.8L18 2.8l-3.6 2.6" fill="#111" stroke="#111" stroke-width="1"/><circle cx="10.5" cy="9.5" r="4.4" fill="#111"/><ellipse cx="11" cy="16" rx="6" ry="4.4" fill="#111"/><circle cx="8.8" cy="9.2" r="0.9" fill="#4ade80"/><circle cx="12.2" cy="9.2" r="0.9" fill="#4ade80"/><path d="M5.8 10.2h-2.6M6.4 11.6L4 12.8M18.2 10.2h-2.6M17.6 11.6l2.4 1.2" stroke="#555" stroke-width="0.7" stroke-linecap="round"/></svg></span><span style="opacity:.5"> · 低频主观量化 · 宁缺毋滥</span></div>
+</body>
+</html>

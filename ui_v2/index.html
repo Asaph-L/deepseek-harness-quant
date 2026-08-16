@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Deepseek HARNESS Quant · UI v2 骨架</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="/v2/assets/ui_common.css">
+<link rel="stylesheet" href="/v2/assets/anim_common.css">
+<style>
+  /* V1 骨架页专用（后续页面收敛到统一组件，不堆样式） */
+  .v2-wrap { max-width: 1100px; margin: 0 auto; padding: 20px; }
+  .v2-card { background: #131316; border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; margin-top: 16px; }
+  .v2-card h2 { font-size: 15px; margin-bottom: 8px; }
+  .v2-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 14px; }
+  .v2-tile { border: 1px solid var(--line); border-radius: 10px; padding: 14px; text-align: center; cursor: pointer; text-decoration: none; color: var(--navy); transition: transform .15s, box-shadow .15s; display: block; }
+  .v2-tile:hover { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(0,0,0,.08); }
+  .v2-tile .ico { font-size: 26px; }
+  .v2-tile .nm { font-weight: 600; margin-top: 6px; font-size: 13px; }
+  .v2-tile .st { font-size: 12px; color: var(--muted); margin-top: 3px; }
+</style>
+</head>
+<body style="background:var(--bg);margin:0">
+<div id="sidebar"></div>
+<div class="v2-wrap">
+  <div class="v2-h"><span class="bar"></span><h1>UI v2 骨架</h1><span class="sub">骨架已就位 · 5 页建设中 · 引擎/API 零改动</span></div>
+  <div class="mini" style="opacity:.7">本页验证：标准 CSS 引用  / 统一 API 客户端  / 渲染兜底  / 顶栏状态条 </div>
+
+  <div class="v2-grid" id="page-grid"></div>
+
+  <div class="v2-card">
+    <h2> 数据链路自检 <span class="tag" style="font-size:12px;color:var(--muted)">api.js 统一客户端（超时/重试/缓存）</span></h2>
+    <div id="api-test" class="mini" style="padding:10px;background:#16161a;border-radius:10px"> 自检中…</div>
+  </div>
+
+  <div class="mini" style="text-align:center;margin-top:24px;opacity:.6">UI v2 · 数据契约层驱动 · 所有页面仅消费 /api/live/* · 无生成器机制（改即生效）</div>
+</div>
+
+<script src="/v2/core/api.js"></script>
+<script src="/v2/core/render.js"></script>
+<script src="/v2/components/sidebar.js"></script>
+<script>
+// 5 页入口（V2-V6 建设中，占位）
+var PAGES = [
+  { u: '/v2/pages/portal.html', i: '', n: '门户', s: 'V2 · 建设中' },
+  { u: '/v2/pages/pitch.html', i: '', n: '决策', s: 'V3 · 建设中' },
+  { u: '/v2/pages/holdings.html', i: '', n: '持仓', s: 'V4 · 建设中' },
+  { u: '/v2/pages/factors.html', i: '', n: '因子池', s: 'V5 · 建设中' },
+  { u: '/v2/pages/help.html', i: '', n: '说明', s: 'V6 · 建设中' }
+];
+var grid = document.getElementById('page-grid');
+grid.innerHTML = PAGES.map(function (p) {
+  return '<a class="v2-tile" href="' + p.u + '"><div class="ico">' + p.i + '</div><div class="nm">' + p.n + '</div><div class="st">' + p.s + '</div></a>';
+}).join('');
+
+// 顶栏状态条
+LW.sidebar.render('sidebar', {active: 'portal'});
+
+// 数据链路自检：统一客户端拉 3 个核心 API
+var testBox = document.getElementById('api-test');
+Promise.all([
+  LW.api.get('/api/live/portal_dash').catch(function () { return { err: 'portal_dash' }; }),
+  LW.api.get('/api/live/strong_hits').catch(function () { return { err: 'strong_hits' }; }),
+  LW.api.get('/api/live/factor_perf').catch(function () { return { err: 'factor_perf' }; })
+]).then(function (rs) {
+  var lines = rs.map(function (d) {
+    if (d.err) return ' ' + d.err;
+    var tag = d.ok !== undefined && !d.ok ? '️ ' : ' ';
+    if (d.strong_hits !== undefined || d.hits !== undefined) return tag + 'strong_hits 正常';
+    if (d.factors !== undefined) return tag + 'factor_perf ' + d.factors.length + ' 因子';
+    return tag + 'portal_dash 正常（' + (d.data_date || d.ts || 'ok') + '）';
+  });
+  testBox.innerHTML = '<div style="line-height:1.9">' + lines.join('<br>') + '</div>';
+}).catch(function (e) { testBox.innerHTML = ' 自检失败: ' + e; });
+</script>
+</body>
+</html>

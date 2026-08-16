@@ -1,0 +1,251 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">
+<title>待处理面板 · Action Center · 20260814</title>
+<style>
+:root { --navy:#0A2540; --green:#0F6E56; --red:#C0392B; --gold:#D4A843; --bg:#F0F3F8; --muted:#8a94a6; --line:#e5e9f0; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,"Microsoft YaHei",sans-serif; background:var(--bg); color:#0A2540; padding:20px; }
+.wrap { max-width:1180px; margin:0 auto; }
+.header { background:linear-gradient(135deg,#0A2540,#185FA5); border-radius:14px; padding:18px 22px; color:#fff; }
+.header h1 { font-size:19px; } .header .sub { font-size:12px; color:rgba(255,255,255,.75); margin-top:5px; }
+.kpi { display:inline-block; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.25); border-radius:10px; padding:8px 16px; margin:10px 8px 0 0; font-size:12px; }
+.kpi b { font-size:17px; display:block; }
+.kpi.red b { color:#FF8A7A; } .kpi.orange b { color:#FFC069; }
+.section { background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 18px; margin-top:14px; }
+.section h2 { font-size:14px; margin-bottom:10px; }
+.section h2 .tag { font-size:11px; color:var(--muted); font-weight:400; }
+table { width:100%; border-collapse:collapse; }
+th { font-size:10px; color:var(--muted); padding:6px 8px; text-align:left; border-bottom:2px solid var(--line); }
+td { padding:7px 8px; border-bottom:1px solid var(--line); font-size:12px; }
+.mini { font-size:11px; color:var(--muted); }
+.b-new { background:var(--red); color:#fff; border-radius:8px; padding:1px 6px; font-size:10px; }
+.btn-link { color:#185FA5; font-size:12px; text-decoration:none; font-weight:600; }
+.section.red { border-left:4px solid var(--red); }
+.section.orange { border-left:4px solid var(--gold); }
+.section.green { border-left:4px solid var(--green); }
+.empty { color:#b8c0cc; text-align:center; padding:14px; font-size:12px; }
+.note { background:#EAF3FF; border:1px solid #B8D4F0; border-radius:8px; padding:8px 12px; font-size:11px; color:#3a6ea5; margin-top:12px; line-height:1.7; }
+<link rel="stylesheet" href="/ui_common.css"><link rel="stylesheet" href="/anim_common.css"></style></head><body>
+<div class="lw-nav" data-page="actions"></div>
+<script src="/nav_common.js"></script>
+<div class="wrap">
+<div class="header">
+  <h1>⚡ 待处理面板 <span style="font-weight:400;font-size:13px;opacity:.8">需要你及时操作的事项</span></h1>
+  <div class="sub">止损触发 → 待审批 Pitch → 新突破科技股，按优先级排列 · 数据自动更新（每 4 小时 + 手动更新）</div>
+  <div id="brief-box" style="margin-top:12px;padding:12px 16px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:10px;font-size:12.5px;line-height:1.9">⏳ 今日简报加载中…</div>
+  <span class="kpi red">止损触发<b id="kpi-stop">1</b></span>
+  <span class="kpi orange">待审批 Pitch<b id="kpi-pending">19</b></span>
+  <span class="kpi">新突破科技股<b id="kpi-new">5</b></span>
+  <span class="kpi">监测中<b>100</b>只</span>
+</div>
+
+<div class="section red">
+  <h2>🔴 止损条件触发 <span class="tag">回撤保护线 / 时间止损 / 逻辑失效 · 监测 100 只 · 2026-08-14 02:09:42</span></h2>
+  <table><thead><tr><th>股票</th><th>类型</th><th>触发条件</th><th>操作</th></tr></thead>
+  <tbody id="stop-tbody"><tr>
+  <td><b>000779.SZ</b><span class="mini"> 甘咨询</span></td>
+  <td>tech_sentiment</td>
+  <td class="mini">回撤保护线（-14%）（现价 10.73，入池 12.73，回撤 -15.7%）</td>
+  <td><a class="btn-link" href="/dashboard_stockcheck.html?code=000779">检测 →</a></td>
+</tr></tbody></table>
+  <div class="note">🟡 另有 4 只接近触发（预警）：万辰集团、云铝股份、建投能源、中岩大地</div>
+</div>
+
+<div class="section orange">
+  <h2>💼 实盘持仓卖出信号 <span class="tag">position_stop_check（持仓执行层）· 2026-08-13 21:19:03</span></h2>
+  <table><thead><tr><th>股票</th><th>类型</th><th>信号</th><th>浮盈</th><th>持有</th><th>操作</th></tr></thead>
+  <tbody><tr>
+  <td><b>000567.SZ</b><span class="mini"> </span></td>
+  <td>价值重估</td>
+  <td class="mini">🔵 逻辑止损：人工复核（TODO：接 finance_ts.db）</td>
+  <td>+0.0%</td>
+  <td class="mini">0 天</td>
+  <td><a class="btn-link" href="/dashboard_stockcheck.html?code=000567">检测 →</a></td>
+</tr><tr>
+  <td><b>300308.SZ</b><span class="mini"> </span></td>
+  <td>价值重估</td>
+  <td class="mini">🔵 逻辑止损：人工复核（TODO：接 finance_ts.db）</td>
+  <td>+0.0%</td>
+  <td class="mini">0 天</td>
+  <td><a class="btn-link" href="/dashboard_stockcheck.html?code=300308">检测 →</a></td>
+</tr><tr>
+  <td><b>000975.SZ</b><span class="mini"> </span></td>
+  <td>价值重估</td>
+  <td class="mini">🔵 逻辑止损：人工复核（TODO：接 finance_ts.db）</td>
+  <td>+0.0%</td>
+  <td class="mini">0 天</td>
+  <td><a class="btn-link" href="/dashboard_stockcheck.html?code=000975">检测 →</a></td>
+</tr><tr>
+  <td><b>300972.SZ</b><span class="mini"> </span></td>
+  <td>价值重估</td>
+  <td class="mini">🔵 逻辑止损：人工复核（TODO：接 finance_ts.db）</td>
+  <td>+0.0%</td>
+  <td class="mini">0 天</td>
+  <td><a class="btn-link" href="/dashboard_stockcheck.html?code=300972">检测 →</a></td>
+</tr></tbody></table>
+</div>
+
+<div class="section orange">
+  <h2>🟠 待审批 Pitch <span class="tag">价值池 5 · 科技池 14 · 未审批</span></h2>
+  <table><thead><tr><th>股票</th><th>类型</th><th>评分</th><th>止损方案</th><th>操作</th></tr></thead>
+  <tbody id="pending-tbody"><tr>
+  <td><b>002582.SZ</b><span class="mini"> 好想你</span></td>
+  <td>价值重估</td>
+  <td><b>95.5</b></td>
+  <td class="mini">业绩证伪触发即离场 · 估值兑现止盈 · 13 周未兑现离场 · 回撤超 1</td>
+  <td><a class="btn-link" href="/pitch.html#pitch">审批 →</a></td>
+</tr><tr>
+  <td><b>603268.SH</b><span class="mini"> 松发股份</span></td>
+  <td>事件驱动</td>
+  <td><b>79.3</b></td>
+  <td class="mini">6% 硬止损（事件短促）+ 资金流逆转止损 + 事件证伪立即离场 + 4 周</td>
+  <td><a class="btn-link" href="/pitch.html#pitch">审批 →</a></td>
+</tr><tr>
+  <td><b>688100.SH</b><span class="mini"> 威胜信息</span></td>
+  <td>质量折价</td>
+  <td><b>75.1</b></td>
+  <td class="mini">质量破位（ROE<10%/现金流恶化）触发即离场 · 26 周未修复离场 ·</td>
+  <td><a class="btn-link" href="/pitch.html#pitch">审批 →</a></td>
+</tr><tr>
+  <td><b>603929.SH</b><span class="mini"> 亚翔集成</span></td>
+  <td>事件驱动</td>
+  <td><b>73.6</b></td>
+  <td class="mini">6% 硬止损（事件短促）+ 资金流逆转止损 + 事件证伪立即离场 + 4 周</td>
+  <td><a class="btn-link" href="/pitch.html#pitch">审批 →</a></td>
+</tr><tr>
+  <td><b>603203.SH</b><span class="mini"> 快克智能</span></td>
+  <td>质量折价</td>
+  <td><b>70.5</b></td>
+  <td class="mini">质量破位（ROE<10%/现金流恶化）触发即离场 · 26 周未修复离场 ·</td>
+  <td><a class="btn-link" href="/pitch.html#pitch">审批 →</a></td>
+</tr><tr>
+  <td><b>603637.SH</b><span class="mini"> 镇海股份</span></td>
+  <td>tech_sentiment <span class="b-new">主板</span></td>
+  <td><b>77.8</b></td>
+  <td class="mini"></td>
+  <td><a class="btn-link" href="/pitch.html#pitch">审批 →</a></td>
+</tr><tr>
+  <td><b>301362.SZ</b><span class="mini"> 民爆光电</span></td>
+  <td>tech_sentiment <span class="b-new">创业板</span></td>
+  <td><b>69.5</b></td>
+  <td class="mini"></td>
+  <td><a class="btn-link" href="/pitch.html#pitch">审批 →</a></td>
+</tr><tr>
+  <td><b>002879.SZ</b><span class="mini"> 长缆科技</span></td>
+  <td>tech_sentiment <span class="b-new">主板</span></td>
+  <td><b>80.6</b></td>
+  <td class="mini"></td>
+  <td><a class="btn-link" href="/pitch.html#pitch">审批 →</a></td>
+</tr><tr>
+  <td><b>000603.SZ</b><span class="mini"> 盛达资源</span></td>
+  <td>tech_sentiment <span class="b-new">主板</span></td>
+  <td><b>80.3</b></td>
+  <td class="mini"></td>
+  <td><a class="btn-link" href="/pitch.html#pitch">审批 →</a></td>
+</tr><tr>
+  <td><b>001258.SZ</b><span class="mini"> 立新能源</span></td>
+  <td>tech_sentiment <span class="b-new">主板</span></td>
+  <td><b>80.3</b></td>
+  <td class="mini"></td>
+  <td><a class="btn-link" href="/pitch.html#pitch">审批 →</a></td>
+</tr><tr>
+  <td><b>002396.SZ</b><span class="mini"> 星网锐捷</span></td>
+  <td>tech_sentiment <span class="b-new">主板</span></td>
+  <td><b>81.3</b></td>
+  <td class="mini"></td>
+  <td><a class="btn-link" href="/pitch.html#pitch">审批 →</a></td>
+</tr><tr>
+  <td><b>603330.SH</b><span class="mini"> 天洋新材</span></td>
+  <td>tech_sentiment <span class="b-new">主板</span></td>
+  <td><b>81.1</b></td>
+  <td class="mini"></td>
+  <td><a class="btn-link" href="/pitch.html#pitch">审批 →</a></td>
+</tr><tr>
+  <td><b>002141.SZ</b><span class="mini"> 贤丰控股</span></td>
+  <td>tech_sentiment <span class="b-new">主板</span></td>
+  <td><b>81.0</b></td>
+  <td class="mini"></td>
+  <td><a class="btn-link" href="/pitch.html#pitch">审批 →</a></td>
+</tr><tr>
+  <td><b>300937.SZ</b><span class="mini"> 药易购</span></td>
+  <td>tech_sentiment <span class="b-new">创业板</span></td>
+  <td><b>81.0</b></td>
+  <td class="mini"></td>
+  <td><a class="btn-link" href="/pitch.html#pitch">审批 →</a></td>
+</tr><tr>
+  <td><b>301171.SZ</b><span class="mini"> 易点天下</span></td>
+  <td>tech_sentiment <span class="b-new">创业板</span></td>
+  <td><b>80.7</b></td>
+  <td class="mini"></td>
+  <td><a class="btn-link" href="/pitch.html#pitch">审批 →</a></td>
+</tr><tr>
+  <td><b>002580.SZ</b><span class="mini"> 圣阳股份</span></td>
+  <td>tech_sentiment <span class="b-new">主板</span></td>
+  <td><b>80.6</b></td>
+  <td class="mini"></td>
+  <td><a class="btn-link" href="/pitch.html#pitch">审批 →</a></td>
+</tr><tr>
+  <td><b>603118.SH</b><span class="mini"> 共进股份</span></td>
+  <td>tech_sentiment <span class="b-new">主板</span></td>
+  <td><b>80.6</b></td>
+  <td class="mini"></td>
+  <td><a class="btn-link" href="/pitch.html#pitch">审批 →</a></td>
+</tr><tr>
+  <td><b>000533.SZ</b><span class="mini"> 顺钠股份</span></td>
+  <td>tech_sentiment <span class="b-new">主板</span></td>
+  <td><b>80.3</b></td>
+  <td class="mini"></td>
+  <td><a class="btn-link" href="/pitch.html#pitch">审批 →</a></td>
+</tr><tr>
+  <td><b>002131.SZ</b><span class="mini"> 利欧股份</span></td>
+  <td>tech_sentiment <span class="b-new">主板</span></td>
+  <td><b>80.3</b></td>
+  <td class="mini"></td>
+  <td><a class="btn-link" href="/pitch.html#pitch">审批 →</a></td>
+</tr></tbody></table>
+</div>
+
+<div class="section green">
+  <h2>🟡 新突破科技股 <span class="tag">实时监控新增 · 符合突破条件立即提示</span></h2>
+  <table><thead><tr><th>股票</th><th>类型</th><th>评分</th><th>板块</th><th>操作</th></tr></thead>
+  <tbody><tr>
+  <td><b>603637.SH</b><span class="mini"> 镇海股份</span></td>
+  <td>tech_sentiment <span class="b-new">主板</span></td>
+  <td><b>77.8</b></td>
+  <td class="mini"></td>
+  <td><a class="btn-link" href="/dashboard_techpitch.html#new">看详情 →</a></td>
+</tr><tr>
+  <td><b>301362.SZ</b><span class="mini"> 民爆光电</span></td>
+  <td>tech_sentiment <span class="b-new">创业板</span></td>
+  <td><b>69.5</b></td>
+  <td class="mini"></td>
+  <td><a class="btn-link" href="/dashboard_techpitch.html#new">看详情 →</a></td>
+</tr><tr>
+  <td><b>000603.SZ</b><span class="mini"> 盛达资源</span></td>
+  <td>tech_sentiment <span class="b-new">主板</span></td>
+  <td><b>80.3</b></td>
+  <td class="mini"></td>
+  <td><a class="btn-link" href="/dashboard_techpitch.html#new">看详情 →</a></td>
+</tr><tr>
+  <td><b>001258.SZ</b><span class="mini"> 立新能源</span></td>
+  <td>tech_sentiment <span class="b-new">主板</span></td>
+  <td><b>80.3</b></td>
+  <td class="mini"></td>
+  <td><a class="btn-link" href="/dashboard_techpitch.html#new">看详情 →</a></td>
+</tr><tr>
+  <td><b>002131.SZ</b><span class="mini"> 利欧股份</span></td>
+  <td>tech_sentiment <span class="b-new">主板</span></td>
+  <td><b>80.3</b></td>
+  <td class="mini"></td>
+  <td><a class="btn-link" href="/dashboard_techpitch.html#new">看详情 →</a></td>
+</tr></tbody></table>
+  
+</div>
+
+<div class="note">ℹ️ <b>怎么用：</b>① 止损触发 = 系统检测到入池股达到定制止损条件（如回撤超保护线/财务证伪/时间到）→ 点"检测"看详情决定是否离场；
+  ② 待审批 Pitch = 价值/科技候选等待你的买入决策（点"审批"进入双池并列页）；
+  ③ 新突破科技股 = 刚满足突破条件的新面孔（追高风险，仓位减半）。全部完成后自动清空对应区块。</div>
+<div class="mini" style="margin-top:12px;text-align:center">数据源 stop_alerts_*.json · pitch_v2_*.json · tech_pitch_*.json · breakout_alerts_*.json · 自动刷新 dev_auto</div>
+</div>
+<!-- ★2026-08-11 百轮#51：待处理面板动态化（/api/live/actions 实时刷新 KPI 与三区块） -->
+<script src="/live_patch.js" data-page="actions"></script>
+</body></html>

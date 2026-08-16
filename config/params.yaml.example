@@ -1,0 +1,269 @@
+# ============================================================
+# DeepSeek HARNESS Quant · 全局参数配置模板（开源版）
+# 复制为 params.yaml 并填写你的配置：
+#   cp params.yaml.example params.yaml
+# 数据目录：默认 data/cache；可用环境变量 LWQUANT_CACHE_DIR 覆盖。
+# Tushare token 请在 https://tushare.pro 注册获取（数据获取脚本见 data/fetch_data.py）。
+# ============================================================
+# ============================================================
+# DeepSeek HARNESS Quant · 全局参数配置（v2.5）
+# 说明：所有阈值/权重集中于此，改参数不改代码。
+# 标注 [P0.5校准] 的参数由因子验证阶段按实测 IC 覆盖。
+# ============================================================
+
+# ---------- 数据源 ----------
+data:
+  cache_dir: "<your-config>" # 本地缓存（SQLite/Parquet），唯一读取接口；已迁移 D 盘（2026-08-06）
+  cache_dir_note: "<your-config>"
+  sources:                           # 多源主备
+    daily_primary: "baostock"        # 行情主源（稳）
+    daily_backup: "akshare"          # 行情备源（全）
+    financial_primary: "tushare"     # 财报主源（含公告日 ann_date → PIT）
+    coverage: "akshare"              # 业绩预告/快报/机构调研
+  tushare_token: "<your-config>" # [升级 2026-08-07 主服务器 15000积分+实时竞价]
+  tushare_api_url: "<your-config>" # 主服务器（109 接口，无逐股限频，按日批量 5533 只 3-16s）
+  tushare_backup:                                  # 备用服务器（HTTP API 封装，见 data/fetcher_tushare_backup.py）
+    url: "<your-config>"
+    api_key: "<your-config>"
+  jqdata_user: "<your-config>" # 聚宽 JQData 账号（2026-08-14 用户申请）
+  jqdata_password: "<your-config>" # 聚宽 JQData 密码
+  jqdata_note: "试用/免费版：数据窗口 2025-05-06~2026-05-13（约1年，含 1m/30m/60m 分钟线+申万行业+valuation；无当前实时数据，分钟线仅可用于回测验证周期因子）"
+
+# ---------- CANSLIM 主引擎（修正版）----------
+factors:
+  c_eps_growth_min: 0.25             # 单季 EPS 同比门槛
+  a_eps_cagr_min: 0.25               # 3 年 EPS 复合门槛
+  a_years_positive: 3                # 逐年为正的年数
+  n_new_high_window: 250             # 52 周新高窗口
+  n_near_high_pct: 0.90              # 接近高点 90% 区间
+  s_mcap_min: 3.0e9                  # 流通市值下限 30 亿
+  s_mcap_max: 2.0e10                 # 流通市值上限 200 亿
+  l_rps_min: 80                      # RPS 门槛（大盘池硬过滤）
+  l_smallcap_mode: "reversal"        # 小盘池 L 因子改用月度反转 [CS-03]
+  i_inst_holding_inc: true           # 机构持股提升
+  i_research_count_min: 1            # 近 60 日机构调研次数 ≥1
+
+  # ---- 技术面因子方向（实证驱动 v1.0，2026-08-06 M3 验证 + 市场回测）----
+  # sign: +1=正用(值越大越好) / -1=反转(值越小越好) / 0=剔除
+  # 依据：A股短/中长期动量全反向（rps-0.064/-0.054、lowvol-0.096/-0.112），
+  #       仅 near_high_250 120日转正(+0.012)；低波=中证最稳因子(CS-02)；
+  #       RPS-Top10 追强回测年化 -26.8%（vs 等权 +13.6%）
+  direction:
+    lowvol_60: -1        # 低波正用（波动越小越好，CS-02 最稳）
+    near_high_250: 1     # 接近高点正用（唯一 120 日转正）
+    mom_20: -1           # 短期反转（A股反转市）
+    mom_120: -1          # 中期反转（小盘池；大盘池可覆盖 +1，CS-03）
+    rps_120: -1          # RPS 反转（大盘池可覆盖 +1）
+    new_high_250: 0      # 52周新高剔除（各口径均负）
+
+# ---------- 防守引擎四因子 [CS-02/16/19] ----------
+defense:
+  lowvol_pct: 0.50                   # 低波 ≥ 50% 分位
+  quality_pct: 0.50                  # 质量 ≥ 50% 分位
+  dividend_yield_min: 0.035          # 红利：股息率 TTM ≥ 3.5% [CS-16]
+  dividend_years_min: 3              # 连续分红 ≥ 3 年
+  value_pct: 0.50                    # 价值 BP/EP ≥ 50% 分位（可选加分）
+
+# ---------- PEAD / 分析师预期 [CS-06/20] ----------
+pead:
+  weight_max: 0.10                   # 权重上限 10%
+  scope: "<your-config>" # 仅限大盘/质量池
+  forecast_upgrade: true             # 业绩预告/快报上修加分
+
+# ---------- 因子权重（初始，[P0.5校准] 动态调权为核心机制 [CS-10/23]）----------
+# 第17课《在线学习与策略进化》：静态权重必然 6-18 个月渐变衰退，
+# 权重从设计第一天起就必须"可在线更新"——每次调权写新版本，可回滚。
+weights:
+  defense: 0.40                      # 防守四因子合计
+  canslim: 0.40                      # CANSLIM 主引擎合计
+  pead: 0.10                         # PEAD/分析师预期
+  bonus: 0.10                        # 加分项（RPS 领涨、调研、快报等）
+  rebalance: "<your-config>" # 动态调权：按季度滚动 IC 校准
+
+# ---------- ★策略分层（v2.8，用户拍板 C 方案）----------
+# 实证发现：欧奈尔止损纪律（7%/移动止损/止盈）为"右侧趋势突破"设计，
+# 反转+低波是"左侧抄底"——任何止损线都让反转更差（无止损+7.7% vs -7%:+0.9%，MA50误杀200次）
+# → 两种纪律各归其位：防守底仓无止损 + 趋势进攻仓欧奈尔止损
+layers:
+  defense:                           # 防守底仓（左侧，反转+低波+质量+红利）
+    weight: 0.60                     # 仓位占比 60%（验证：6:4 回撤-37%→-28%、夏普0.42→0.49）
+    top_n: 6                         # 持仓 6 只
+    factors: ["rps_120", "lowvol_60"]  # 方向见 factors.direction（后续补质量/红利）
+    discipline: "none"               # 纪律 = 无止损 + 季度再平衡（反转需要等待时间）
+    hard_floor: -0.40                # 仅设退市/基本面硬底线（-40%，防死扛）
+  attack:                            # 趋势进攻仓（右侧，接近高点+大盘动量）
+    weight: 0.40                     # 仓位占比 40%
+    top_n: 4                         # 持仓 4 只
+    factors: ["near_high_250", "mom_120"]  # 方向：near_high=+1；mom_120 大盘池 +1（CS-03）
+    discipline: "oneil_style"        # 纪律 = 欧奈尔原版：硬止损 7% + 高点回撤 8%（右侧适用）
+
+
+  # ---- 权重版本元数据（第17课落地 #3：M3 回写权重前必须预留）----
+  weight_version: "<your-config>" # 当前权重版本（调权时递增，可回滚）
+  weight_date: "<your-config>" # 本次权重生效日期
+  decay_mode: "<your-config>" # 在线更新模式：指数遗忘
+  decay_lambda_factor: 0.99          # 财报/基本面因子（低频）遗忘因子 λ≈0.99
+  decay_lambda_price: 0.95           # 量价因子（中频）遗忘因子 λ≈0.95
+
+  # ---- 因子漂移/衰退监控（第17课 17.5：PSI + 决策矩阵）----
+  drift:
+    psi_threshold: 0.20              # PSI ≥ 0.20 视为漂移（课程默认阈值）
+    psi_warn: 0.10                   # PSI 0.10~0.25 关注区间下沿
+    ic_drop_threshold: 0.30          # IC 相对基线下降 > 30% 视为性能下降
+    ic_min: 0.03                     # 因子滚动 IC < 0.03 触发审查（课程综合练习）
+    ic_monitor_window: 60            # 滚动 IC 计算窗口（交易日）
+    data_quality_first: true         # 数据质量差 → 先修数据再决策（否则重训无效）
+
+# ---------- 交易纪律 [不可协商] ----------
+risk:
+  stop_loss_pct: 0.07                # 硬止损 7%
+  stop_loss_below_pivot: 0.08        # 突破点下方 8% 支撑止损
+  time_stop_weeks: 3                 # 时间止损：3 周
+  time_stop_min_gain: 0.03           # 3 周内涨幅 < 3% 触发
+  profit_take_low: 0.20              # 止盈区间下沿 20%
+  profit_take_high: 0.25             # 止盈区间上沿 25%
+  trailing_stop_ma: 50               # 移动止损 50 日均线
+  high_drawdown_exit: 0.08           # 阶段高点回撤 8% 卖出
+  risk_budget_pct: 0.02              # 单票风险预算 账户 2% [CS-08]
+  max_position_pct: 0.10             # 单票硬上限 10%
+  max_industry_pct: 0.30             # 行业上限 30%
+  vol_target_annual: 0.18            # 组合目标波动 18%（[P0.5校准] 按 A 股实际波动）
+
+  # ---- 三层风控（第15课，M4 落地）----
+  # 头寸风险：单笔 ≤ 10% + ATR 止损（止损价 = 入场价 - 2×ATR，第04/15课）
+  atr_stop_mult: 2.0                 # ATR 止损倍数（1.5-3 区间，取 2.0）
+  # 组合风险：等风险贡献 + Ledoit-Wolf 收缩协方差（第16课，M7 组合层）
+  # 系统风险：组合回撤三级控制（第15课核心）
+  drawdown_levels:
+    warning: 0.05                    # 警戒 5%：降低新开仓规模
+    control: 0.10                    # 控制 10%：停止新开仓、开始减仓
+    circuit_breaker: 0.15            # 熔断 15%：全面减仓至 30% + 冷静期
+  circuit_breaker_position: 0.30     # 熔断后保留仓位上限
+  circuit_breaker_cooldown_days: 5   # 熔断冷静期（天）
+
+  # ---- 仓位模型（第10/15课 Half-Kelly + Van Tharp，M4 落地）----
+  position_model: "<your-config>"
+  half_kelly:
+    enabled: true                    # 进攻上限（最大化长期复利）
+    sample_discount: 0.25            # 样本 <100 次时 Kelly ×0.25（第15课）
+  van_tharp:
+    enabled: true                    # 防守下限（保证生存）
+    risk_pct: 0.01                   # 单笔风险占账户 1%（R-Multiple）
+  # 贝叶斯 Kelly（第15课）：胜率估计不确定时用置信下限再打五折（二期）
+
+  # ---- 12 种死亡方式周检（附录B，M8 看板/dev_auto 落地）----
+  weekly_health_check:              # 每周 12 项打勾
+    data_quality: true               # #1 数据污染：多源校验通过
+    regime_normal: true              # #3 Regime 漂移：状态未剧烈变化
+    slippage_expected: true          # #4 执行失真：滑点在预期内
+    risk_not_triggered: true         # #5 风控失效：熔断未被绕过
+    liquidity_normal: true           # #6 流动性枯竭：成交正常
+    correlation_ok: true             # #7 相关性飙升：相关矩阵无异常
+    leverage_ok: true                # #8 杠杆：无融资加杠杆
+    no_manual_override: true         # #9 人为干预：无异常人工覆盖
+    system_healthy: true             # #10 系统故障：健康度 100%
+    no_regulatory_change: true       # #11 监管变化：无新规影响
+    alpha_decay_expected: true       # #12 对手盘适应：Alpha 衰减在预期内
+    oos_consistent: true             # 样本外与预期一致
+
+# ---------- Regime 五档 → 现金比例 [CS-04/05] ----------
+regime:
+  ma_fast: 50
+  ma_slow: 200
+  atr_window: 20
+  confirm_days: 5                  # 切换确认天数（★2026-08-07 参数扫描定稿：confirm=5 无冷却为最优。
+                                   #   扫描（正式回测）：5/0→1.07 · 5/冷却5→1.05 · 15/10→0.59 · 20/20→0.56
+                                   #   ——季度评估框架下任何确认/冷却延迟都滞后防守损失收益。
+                                   #   ★降频靠"评估节流"（evaluate_on_rebalance）：实盘只在季度调仓日评估，
+                                   #   实测每日评估年切换 7.8 次 → 节流后 ≤4 次/年，与回测同口径）
+  cooldown_days: 0                 # 切换冷却期（默认关闭；如需防极端抖动可调 5-10，代价夏普 -0.07）
+  uncertain_transition_days: 5     # 刚切换后 N 天内 = 不确定态，降仓 50% 等待
+  evaluate_on_rebalance: true      # ★只在调仓日评估 Regime（对齐回测口径：调仓日 regime_cash_at）
+  cash_map:
+    strong_uptrend: 0.00             # 强势上升：0% 现金
+    uptrend_volatile: 0.20           # 上升波动加剧：20%
+    choppy: 0.50                     # 震荡压缩：50%（只减不加）
+    downtrend: 0.80                  # 下跌趋势：80%
+    panic: 1.00                      # 恐慌放量崩跌：100%
+
+# ---------- 三池管理 ----------
+pools:
+  candidate_top_n: 15                # 排名 Top N 入候选池
+  watch_max_weeks: 8                 # 观察池超 8 周无买点降级
+  target_positions: 10               # 目标持仓 8-12 只
+  buy_above_pivot_limit: 0.05        # 突破点 5% 以上不追买 [CS-14]
+  rebalance_interval: 3              # ★调仓周期（月）：季度=3。敏感性测试 2026-08-06：
+                                     # 月(+1.9%夏普0.19) / 双月(+9.0%夏普0.52) / 季度(+11.2%夏普0.60) /
+                                     # 半年(+6.5%) / 年度(+4.1%) —— 季度最优（成本7.7% vs 月度22.9%）
+
+# ---------- 回测 ----------
+backtest:
+  start: "<your-config>" # ★2026-08-07 数据审计修正：缓存数据 2019-01-01 起（bulk_loader START_DATE），原 2010 配置致前 9 年空转
+  end: null                          # null = 至今
+  include_delisted: true             # 尽力含退市股（数据覆盖不足如实披露；★2026-08-07 审计：148 只退市股缺失待补拉）
+  commission_bps: 2.6                # 双边佣金万 2.6
+  stamp_tax: 0.0005                  # 卖出印花税 0.05%
+  slippage: 0.001                    # 滑点 0.1%
+  out_of_sample_start: "<your-config>" # 样本外起点
+
+# ---------- 个股状态分类（v2.9，用户新方向）----------
+# 先分类再配策略：right 突破（欧奈尔止损）/ left 超跌反转（无止损）/ neutral 低波防守
+stock_state:
+  right_min_dd252: -0.10     # 右侧：距 52 周高点回撤不超过 10%（强势区）
+  left_max_dd252: -0.25      # 左侧：距 52 周高点回撤超过 25%（深度超跌）
+  left_near_ma20: 0.95       # 左侧：价格 ≥ MA20×0.95（企稳，不追暴跌）
+  macd_fast: 12              # MACD 快线
+  macd_slow: 26              # MACD 慢线
+  macd_signal: 9             # MACD 信号线
+  min_pool_weight: 0.10      # 单池资金下限（三池按数量比例分配）
+
+# ---------- 日历效应（S4，2026-08-06 验证：弱月年化-31.4% vs 强月+28.5%，差59.9pp）----------
+# 验证：validation/test_calendar_effect.py（800只/2020-2025）
+calendar:
+  enabled: true               # 启用：弱月降仓
+  weak_months: [1, 4, 12]     # 弱月（1月年报雷/4月财报+关税事件/12月年末资金面）
+  strong_months: [2, 3, 5, 8] # 强月（政策市/年报行情/中报预期）
+  weak_cut: 0.25              # 弱月总仓位 × (1-0.25) = 降仓 25%
+
+# ---------- 主策略 v3（2026-08-07 用户拍板 A 方向：等权+Regime+硬过滤）----------
+# M7 全量裁决：择时是唯一有效 alpha，选股引擎负贡献（0.36）→ 降级过滤层
+# ★2026-08-07 PIT 正式验收（test_ewt_pt_backtest.py，历史真实市值）：市值≥50亿过滤为负贡献
+#   （夏普 1.07→0.91；快照口径的 0.95/1.01 是 look-ahead 幻觉——快照市值=幸存者市值）
+#   → min_mv_yi 归 0（仅保留退市/ST/流动性硬过滤），v3 正式形态 = 等权+Regime，夏普 1.07
+strategy_v3:
+  mode: "<your-config>" # 主策略模式
+  min_mv_yi: 0.0                # ★PIT 验收后归 0（市值过滤 look-ahead 幻觉，负贡献）
+  min_turnover_yi: 0.1          # 日均成交额下限 0.1 亿（流动性，保留）
+  filter_delisted: true         # 剔除退市股（delisted_list.csv）
+  filter_st: true               # 剔除 ST（2026-08-07 F-1 已修复）
+  rebalance_months: 3           # 季度调仓
+  lookahead_note: "<your-config>"
+
+# ---------- 数据审计（risk/data_audit.py 风控前置闸门，2026-08-07 新建）----------
+data_audit:
+  enabled: true                 # 策略/回测前置调用 DataAuditor.gate()；FAIL 阻断
+  strict: true                  # 任一 FAIL → 阻断（当前 C5 ST 标记 FAIL 中 → 数据修复前策略不可信）
+  warn_block: false             # 可选：WARN 数过多也阻断
+  warn_block_count: 6
+  report_dir: "report"          # 输出 report/data_audit_report.{md,json}
+  thresholds:
+    min_rows_per_stock: 100        # A4 短数据阈值
+    max_pct_deviation: 0.5         # C2 pct_chg 允许偏差(pp)
+    price_limit_over: 21.0         # C4 涨跌幅超限阈值（上市/复牌初期豁免）
+    st_ratio_min: 0.01             # C5 ST 占比下限（is_st 全 0 视为失效）
+    amount_ratio_range: [0.9, 1.5] # D1 量价比合理区间
+    finance_null_pct_max: 1.0      # E3 财报缺失率上限(%)
+    sq_calc_coverage_min: 90.0     # E4 单季自算覆盖率下限(%)
+    delisted_coverage_min: 95.0    # A3 退市股覆盖率下限(%)
+  data_start_note: "<your-config>"
+
+# ---------- 因子池（factors/pool/ 动态因子池，2026-08-07 落地）----------
+# 定位：挖→抓→测→决→报 闭环；时序因子（EPU 等）走 eval_ts，横截面因子走 factor_evaluator
+factor_pool:
+  enabled: true
+  thresholds:                     # 与 factors/pool/eval_ts.py THRESHOLDS 一致（改此优先）
+    active: 65                    # ≥65 分 → active（可接入策略）
+    candidate: 40                 # 40-65 分 → candidate（观察）
+  evaluate_on_sched: true         # dev_auto 每轮评估候选+巡检 active
+  fetch_on_sched: true            # 每轮刷新政策数据（EPU FRED 全量重下，量小）
+  ts_eval_start: "<your-config>" # 时序因子评估起点（覆盖 2020-2025 回测 + 前段滚动窗口）

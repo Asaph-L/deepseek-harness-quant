@@ -1,0 +1,87 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">
+<title>观察池 · 2026-08-10</title>
+<style>
+:root { --navy:#0A2540; --green:#0F6E56; --red:#C0392B; --bg:#F0F3F8; --muted:#8a94a6; --line:#e5e9f0; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,"Microsoft YaHei",sans-serif; background:var(--bg); color:#0A2540; padding:20px; }
+.wrap { max-width:1400px; margin:0 auto; }
+.header { background:linear-gradient(135deg,#0A2540,#185FA5); border-radius:14px; padding:18px 22px; color:#fff; }
+.header h1 { font-size:18px; } .header .sub { font-size:12px; color:rgba(255,255,255,.7); margin-top:4px; }
+.kpi { display:inline-block; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.25); border-radius:10px; padding:8px 16px; margin:10px 8px 0 0; font-size:12px; cursor:pointer; }
+.kpi b { font-size:16px; display:block; }
+.kpi-on { background:rgba(255,255,255,.25); }
+table { width:100%; border-collapse:collapse; background:#fff; border-radius:10px; overflow:hidden; }
+th { font-size:10px; color:var(--muted); padding:7px 8px; text-align:left; border-bottom:2px solid var(--line); }
+td { padding:7px 8px; border-bottom:1px solid var(--line); font-size:12px; }
+.w-row { cursor:pointer; } .w-row:hover { background:#F6F9FF; }
+.w-detail td { background:#F8FAFD; } .d-box { font-size:12px; color:#37445c; }
+.mini { font-size:11px; color:var(--muted); }
+.t-green { color:var(--green); } .t-yellow { color:#D4A843; } .t-blue { color:#2F6FED; } .t-gray { color:#8a94a6; }
+.neg { color:var(--red); }
+.f-box { display:inline-block; background:#F0F3F8; border-radius:8px; padding:4px 10px; margin-right:8px; }
+.f-box i { font-style:normal; font-size:10px; color:var(--muted); display:block; } .f-box b { font-size:13px; }
+.section { background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 18px; margin-top:14px; }
+.section h2 { font-size:14px; margin-bottom:10px; }
+/* ★2026-08-10 小白图例 */
+.legend-box { background:#fff; border:1px solid var(--line); border-radius:12px; padding:10px 16px; margin-top:12px; display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:8px 16px; }
+.lg { font-size:11px; color:#37445c; }
+.lg b { font-size:11px; margin-right:6px; }
+.lg span { color:var(--muted); }
+<link rel="stylesheet" href="/ui_common.css"></style></head><body>
+<div class="lw-nav" data-page="watch"></div>
+<script src="/nav_common.js"></script>
+<div class="wrap">
+<div class="header">
+  <h1>👁 观察池 <span style="font-weight:400;font-size:13px;opacity:.8">三层池 · 技术确认 · 四因子</span></h1>
+  <div class="sub">数据 2026-08-10 ｜ 仓位 1000000.0 ｜ 防守现金 0.0</div>
+  <span class="kpi kpi-on" onclick="showLayer('watch')">观察<b>100</b></span>
+  <span class="kpi" onclick="showLayer('candidate')">候选<b>36</b></span>
+  <span class="kpi" onclick="showLayer('decision')">决策<b>20</b></span>
+</div>
+<div class="chain-bar" style="margin:8px 0 10px;padding:6px 12px;background:#F0F6FF;border:1px solid #D6E4FF;border-radius:6px;font-size:12px;color:#1c4d8f">
+  📍 <b>决策链定位</b>：L3 观察池（本页）→ L4 择时 → L5 底座 → L7 机会引擎 → <a href="/pitch.html#pitch">Pitch 审批</a> → <a href="/dashboard_holdings.html">持仓</a>/<a href="/dashboard_pitchtrack.html">远期池</a>
+  ｜ 上游：<a href="/dashboard_factors.html">因子监控</a> ｜ 买入后进 <a href="/dashboard_holdings.html">持有池</a>
+</div>
+<div class="legend-box">
+  <div class="lg"><b>🟢 双均线上</b><span>股价站上 50 日和 200 日均线（趋势健康，最强的技术形态）</span></div>
+  <div class="lg"><b>🟡 仅MA50上</b><span>短期趋势向上，长期均线还没跟上（趋势初期）</span></div>
+  <div class="lg"><b>🔵 仅MA200上</b><span>长期趋势还在，短期走弱（观察是否企稳）</span></div>
+  <div class="lg"><b>⚪ 均线下</b><span>短长期均线都跌破（弱势，等反转信号）</span></div>
+  <div class="lg"><b>📉 距52周高</b><span>离一年最高价的差距（负数越大=跌得越深）</span></div>
+  <div class="lg"><b>📊 因子四格</b><span>低波/反转/质量/成长在同类型股票中的排名（分位 0-1，越接近 1 越靠前）</span></div>
+</div>
+<div id="layer-watch" class="layer">
+  <table><thead><tr><th>#</th><th>股票</th><th>行业</th><th>价</th><th>市值(亿)</th><th>评分</th><th>技术判定</th><th>距52周高</th><th>距52周低</th><th>量比</th><th>检测</th></tr></thead>
+  <!-- ★U1-6 瘦身：行由 live_patch.js renderWatch 从 /api/live/watch 渲染（60s 轮询），静态不内嵌 100 行 -->
+  <tbody></tbody></table>
+</div>
+<div id="layer-candidate" class="layer" style="display:none">
+  <table><thead><tr><th>#</th><th>股票</th><th>行业</th><th>价</th><th>市值(亿)</th><th>评分</th><th>技术判定</th><th>距52周高</th><th>距52周低</th><th>量比</th><th>检测</th></tr></thead>
+  <tbody></tbody></table>
+</div>
+<div id="layer-decision" class="layer" style="display:none">
+  <table><thead><tr><th>#</th><th>股票</th><th>行业</th><th>价</th><th>市值(亿)</th><th>评分</th><th>技术判定</th><th>距52周高</th><th>距52周低</th><th>量比</th><th>检测</th></tr></thead>
+  <tbody></tbody></table>
+</div>
+<div class="section">
+  <h2>📋 入池规则</h2>
+  <table><thead><tr><th>层</th><th>规则</th></tr></thead><tbody><tr><td><b>watch</b></td><td class='mini'>四因子排名 Top N：ROE≥5% + 净利同比>0 + 非ST + 行业上限5</td></tr><tr><td><b>candidate</b></td><td class='mini'>技术确认：价>MA50 且 距52周高点回撤≤20% 且 量比≥0.8</td></tr><tr><td><b>decision</b></td><td class='mini'>score 排序 + 每行业≤3 + 资金分档；防守档(现金≥50%)清空；不足宁缺毋滥不补抽</td></tr><tr><td><b>evidence</b></td><td class='mini'>2020-2025 逐季实证（23 季）：决策池 vs 观察池次季收益 -2.0pp/季、胜率30%——严格筛选不提升选股收益，价值=可执行性+防守（下跌市抗跌：2024Q1 +1.8% vs -7.2%）+低频纪律；收益 alpha 仍来自动态择时</td></tr><tr><td><b>generated_at</b></td><td class='mini'>2026-08-10 22:09:51</td></tr></tbody></table>
+  <div class="mini" style="margin-top:8px">低频纪律：观察池大、决策池小、指令严格；防守档决策池清空，宁缺毋滥不补抽。实证披露：决策池相对观察池 -2.0pp/季（2020-2025 23 季）——价值=可执行性+防守，alpha 来自动态择时</div>
+</div>
+<div class="mini" style="margin-top:12px;text-align:center">数据源 output/pool_layers.json · 点击行展开因子四格 · 点击计数卡切换层</div>
+</div>
+<script>
+function showLayer(l) {
+  document.querySelectorAll('.layer').forEach(x => x.style.display = 'none');
+  document.querySelectorAll('.kpi').forEach(x => x.classList.remove('kpi-on'));
+  document.getElementById('layer-' + l).style.display = '';
+  document.querySelectorAll('.kpi')[['watch','candidate','decision'].indexOf(l)].classList.add('kpi-on');
+}
+function toggle(tr) {
+  var dd = tr.nextElementSibling;
+  dd.style.display = dd.style.display === 'none' ? '' : 'none';
+}
+</script>
+<!-- ★F5 页面 API 化：JS 拉 /api/live/watch 实时刷新（60s 轮询），数据变化无需重新生成 HTML -->
+<script src="/live_patch.js" data-page="watch"></script>
+</body></html>

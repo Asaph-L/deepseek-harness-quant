@@ -1,0 +1,54 @@
+﻿# ---- 环境 ----
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# ---- 本地配置（含真实密钥，勿提交） ----
+config/params.yaml
+harness/home/.credentials.yaml
+
+# ---- HARNESS 运行时与用户数据 ----
+harness/node_modules/
+harness/home/sessions/
+harness/home/storages/
+harness/home/profiles/web/node_modules/
+harness/home/.anonymous-user-id
+harness/home/.credentials.yaml
+
+# ---- 数据（Tushare 协议：不得再分发；请自行获取） ----
+data/cache/
+data/factorpool/
+data/trash/
+*.db
+*.sqlite
+*.parquet
+*.xlsx
+
+# ---- 运行产物 ----
+logs/
+output/
+report/
+deck/dashboard_*_20*.html
+deck/*.json
+
+# ---- 系统 / IDE ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+
+# ---- 打包产物 ----
+build/
+dist/
+*.spec
+
+# ---- 更新机制产物 ----
+updates/
+backups/
+
+# ---- 顶层单文件 EXE（>100MB，走 Release 附件） ----
+/QuantDeck.exe
+harness/home/profiles/node_modules/

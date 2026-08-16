@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>个股交叉评级检测</title>
+<style>
+:root{--bg:#f4f6fa;--card:#ffffff;--ink:#1c2733;--sub:#5b6b7c;--line:#e3e9f2;--blue:#185FA5;
+      --green:#0F6E56;--red:#C0392B;--gold:#D4A843;--radius:14px}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);padding:20px}
+.wrap{max-width:1100px;margin:0 auto}
+.header{background:linear-gradient(135deg,#0A2540,#185FA5);border-radius:var(--radius);padding:18px 22px;color:#fff}
+.header h1{font-size:19px}.header .sub{font-size:12px;color:rgba(255,255,255,.75);margin-top:5px;line-height:1.7}
+.search{display:flex;gap:10px;margin:16px 0}
+.search input{flex:1;padding:12px 16px;font-size:15px;border:1px solid var(--line);border-radius:10px;outline:none}
+.search input:focus{border-color:var(--blue)}
+.search button{padding:12px 26px;font-size:14px;background:var(--blue);color:#fff;border:none;border-radius:10px;cursor:pointer}
+.search button:disabled{background:#a8b8cc;cursor:not-allowed}
+/* 评级主卡 */
+.rating-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px 24px;display:flex;gap:22px;align-items:center;flex-wrap:wrap}
+.grade-circle{width:110px;height:110px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;flex-shrink:0}
+.grade-circle .g{font-size:34px;font-weight:800}
+.grade-circle .s{font-size:13px;opacity:.9}
+.grade-A{background:linear-gradient(135deg,#C0392B,#E05B48)}
+.grade-B{background:linear-gradient(135deg,#D46A1A,#E88B3A)}
+.grade-C{background:linear-gradient(135deg,#8a94a6,#aab4c2)}
+.grade-D{background:linear-gradient(135deg,#3E7B4E,#5C9A6C)}
+.grade-E{background:linear-gradient(135deg,#2b3a4d,#3d5168)}
+.rating-info h2{font-size:20px}
+.rating-info .sub{font-size:12px;color:var(--sub);margin:4px 0 8px}
+.badges{display:flex;gap:6px;flex-wrap:wrap}
+.badge{font-size:10.5px;padding:2px 10px;border-radius:12px;background:#eef1f5;color:#66788a}
+.badge.on{background:#e6f4f0;color:var(--green)}
+.badge.tech{background:#1c2733;color:#fff}
+.badge.warn{background:#fdeaea;color:var(--red)}
+/* 维度网格 */
+.dims{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+@media(max-width:800px){.dims{grid-template-columns:1fr}}
+.dim{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.dim h3{font-size:13px;margin-bottom:8px;display:flex;justify-content:space-between}
+.dim h3 .sc{font-size:12px;color:var(--blue)}
+.dim .row{font-size:12px;color:#37445c;line-height:1.9}
+.dim .row b{color:var(--ink)}
+.dim .kpi{font-size:11px;color:var(--sub)}
+/* 结论 */
+.conclusion{background:#F0F6FF;border:1px solid #B8D4F0;border-radius:12px;padding:14px 18px;margin-top:14px;font-size:13px;color:#1c3a5c;line-height:1.9}
+.stop-box{background:#FFF8E6;border:1px solid #F0D9A8;border-radius:12px;padding:12px 16px;margin-top:12px;font-size:12px;color:#8a6d1a}
+.stop-box b{color:#7a5d14}
+.loading{text-align:center;color:var(--sub);padding:40px;font-size:14px}
+.err{background:#fdeaea;border:1px solid #e8b4b0;border-radius:12px;padding:16px;color:var(--red);margin-top:14px;font-size:13px}
+.examples{margin-top:10px;font-size:11px;color:var(--sub)}
+.examples a{color:var(--blue);cursor:pointer;margin-right:12px}
+.foot{text-align:center;color:var(--sub);font-size:11px;margin-top:16px}
+</style>
+<link rel="stylesheet" href="/ui_common.css"></head>
+<body><div class="lw-nav" data-page="stockcheck"></div><script src="/nav_common.js"></script>
+<div class="wrap">
+<div class="header">
+  <h1>🔍 个股交叉评级检测</h1>
+  <div class="sub">输入股票代码 → 系统全维度交叉验证（机会引擎 + 风控 + 技术 + 估值）→ 输出评级（A 重点关注 ~ E 回避）· 数据截至最近交易日</div>
+</div>
+
+<div class="search">
+  <input id="code" placeholder="输入 6 位代码，如 000650（仁和药业）/ 300869（康泰医学）/ 601398（工商银行）" maxlength="6" onkeydown="if(event.key==='Enter')go()">
+  <button id="btn" onclick="go()">开始检测</button>
+</div>
+<div class="examples">试试：<a onclick="demo('000650')">000650 仁和药业</a><a onclick="demo('300869')">300869 康泰医学</a><a onclick="demo('002415')">002415 海康威视</a><a onclick="demo('601398')">601398 工商银行</a></div>
+
+<div id="result"></div>
+<div class="foot">数据源：机会池/风控/Beneish/假信号/估值快照 + bars.db 单股行情 · 秒级响应</div>
+</div>
+
+<script>
+async function go(){
+  const code = document.getElementById('code').value.trim();
+  if(!/^\d{6}$/.test(code)){ alert('请输入 6 位数字股票代码'); return; }
+  const btn = document.getElementById('btn');
+  btn.disabled = true; btn.textContent = '检测中…';
+  document.getElementById('result').innerHTML = '<div class="loading">🔍 系统正在交叉验证（机会引擎 / 风控 / 技术 / 估值）…</div>';
+  try{
+    const r = await fetch('/api/stock_check?code=' + code);
+    const d = await r.json();
+    if(!d.ok){ document.getElementById('result').innerHTML = '<div class="err">❌ ' + (d.error||'检测失败') + '</div>'; return; }
+    document.getElementById('result').innerHTML = render(d);
+  }catch(e){
+    document.getElementById('result').innerHTML = '<div class="err">❌ 请求失败：' + e.message + '</div>';
+  }
+  btn.disabled = false; btn.textContent = '开始检测';
+}
+function demo(c){ document.getElementById('code').value = c; go(); }
+
+// ★U3-2 预填（2026-08-10 AI-2）：URL ?code= 参数优先（可分享/书签直达），
+//   其次 sessionStorage 'sc'（旧 actions 页跳转兼容）；自动触发检测
+(function autoPrefill(){
+  var c = new URLSearchParams(location.search).get('code') || sessionStorage.getItem('sc') || '';
+  if(c){
+    sessionStorage.removeItem('sc');
+    document.getElementById('code').value = c;
+    go();
+  }
+})();
+
+function render(d){
+  const rt = d.rating;
+  const op = d.dimensions.opportunity;
+  const rk = d.dimensions.risk;
+  const te = d.dimensions.tech;
+  const va = d.dimensions.valuation;
+  const ps = d.pool_status;
+  // 徽章
+  const badges = [];
+  if(op.hit) badges.push('<span class="badge on">🎯 ' + op.otype_cn + ' ' + op.score + '分' + (op.rank_in_type ? '（#'+op.rank_in_type+'）' : '') + '</span>');
+  if(ps.in_pitch) badges.push('<span class="badge tech">✅ Pitch 池</span>');
+  if(ps.in_tech_pitch) badges.push('<span class="badge tech">🚀 科技池</span>');
+  if(ps.in_forward_track) badges.push('<span class="badge on">📈 远期池</span>');
+  if(rk.beneish && rk.beneish.level==='HIGH') badges.push('<span class="badge warn">⚠️ Beneish 高造假</span>');
+  else if(rk.beneish) badges.push('<span class="badge on">Beneish ' + rk.beneish.level + (rk.beneish.m_score!=null ? ' '+rk.beneish.m_score : '') + '</span>');
+  if(rk.level==='BLOCK') badges.push('<span class="badge warn">⛔ 风控否决</span>');
+  else if(rk.level) badges.push('<span class="badge">风控 ' + rk.level + '</span>');
+  if(rk.fake && rk.fake.length) badges.push('<span class="badge warn">假信号 ' + rk.fake.length + ' 项</span>');
+  // 技术行
+  const techRows = (te && te.state) ? te.state : '—';
+  const stopHtml = d.stop_plan ? '<div class="stop-box">🛑 <b>止损方案（' + (d.stop_plan.otype||'') + '类定制）：</b>' + (d.stop_plan.desc||'') + '</div>' : '';
+  return `
+  <div class="rating-card">
+    <div class="grade-circle grade-${rt.grade}"><div class="g">${rt.grade}</div><div class="s">${rt.score} 分</div></div>
+    <div class="rating-info">
+      <h2>${d.name} <span style="color:var(--sub);font-size:14px">${d.code} · ${d.industry||'—'}</span></h2>
+      <div class="sub">${rt.label} ｜ 数据日 ${d.date} ｜ 耗时 ${d.elapsed_s}s</div>
+      <div class="badges">${badges.join('') || '<span class="badge">无特殊状态</span>'}</div>
+    </div>
+  </div>
+  <div class="dims">
+    <div class="dim"><h3>🎯 机会引擎 <span class="sc">${d.dim_scores.opportunity}/40</span></h3>
+      <div class="row">${op.hit ? '<b>命中「'+op.otype_cn+'」</b> 评分 '+op.score+'，同类第 '+op.rank_in_type+' 名<br><span class="kpi">触发：'+op.trigger+'</span>' : '<b>未命中</b> 当前 7 类机会池均未覆盖'}</div>
+    </div>
+    <div class="dim"><h3>🛡 风控 <span class="sc">${d.dim_scores.risk}/30</span></h3>
+      <div class="row">${rk.level||'—'} ${rk.beneish? '· Beneish '+rk.beneish.level+(rk.beneish.m_score!=null?' ('+rk.beneish.m_score+')':''):''}
+      ${rk.fake && rk.fake.length ? '<br><span class="kpi">假信号：'+rk.fake.join('、')+'</span>' : ''}</div>
+    </div>
+    <div class="dim"><h3>📈 技术形态 <span class="sc">${d.dim_scores.tech}/15</span></h3>
+      <div class="row">${techRows}
+        ${te && te.ma50 ? '<br><span class="kpi">MA50 '+te.ma50+' · MA200 '+(te.ma200||'—')+' · 20日动量 '+(te.mom20!=null?te.mom20+'%':'—')+' · 量比 '+(te.vol_ratio||'—')+' · 距52周高 '+(te.near_high!=null?te.near_high+'%':'—')+'</span>' : ''}</div>
+    </div>
+    <div class="dim"><h3>💰 估值 <span class="sc">${d.dim_scores.valuation}/15</span></h3>
+      <div class="row">PB <b>${va.pb!=null?va.pb:'—'}</b> · PE <b>${va.pe!=null?va.pe:'—'}</b> · ROE <b>${va.roe!=null?va.roe+'%':'—'}</b>
+      <br><span class="kpi">${va.mode||''}</span></div>
+    </div>
+  </div>
+  <div class="conclusion">📊 <b>交叉结论：</b>${d.conclusion}</div>
+  ${stopHtml}
+  <!-- ★2026-08-11 百轮#44：信号联动 / 远期表现 / 持仓状态 -->
+  <!-- ★2026-08-12 百轮#73：强因子直通 / FRC 因子风控 -->
+  ${sigHtml(d)}${shHtml(d)}${frcHtml(d)}${fwdHtml(d)}${posHtml(d)}
+  `;
+}
+// ★2026-08-12 百轮#73：强因子直通（跨家族独立证据——#67-68 落地后个股页补充）
+function shHtml(d){
+  const s = d.strong_hit;
+  if(!s) return '';
+  const famC = s.n_family >= 6 ? 'color:#B54708;font-weight:700' : 'color:#8a6d1d;font-weight:700';
+  return '<div class="conclusion" style="background:#FFFDF5;border-color:#EFE3C8">💪 <b>强因子直通：</b>' +
+    '跨家族 <b style="' + famC + '">' + s.n_family + '</b> 个（' + (s.families||[]).join('、') + '）' +
+    '<div class="mini" style="margin-top:4px;color:#8a6d1d">命中因子 rank：' +
+    Object.keys(s.factors||{}).map(function(f){ return f + ' ' + s.factors[f].toFixed(2); }).join(' ｜ ') +
+    '</div></div>';
+}
+// ★2026-08-12 百轮#73：FRC 因子风控（触发因子 eff——#65 落地）
+function frcHtml(d){
+  const f = d.frc;
+  if(!f) return '';
+  const warn = (f.n_disabled||0) > 0;
+  return '<div class="conclusion" style="background:#FDF7F0;border-color:#E8D5B8">🛡 <b>FRC 因子风控：</b>' +
+    (f.n_disabled ? '<b style="color:#C0392B">' + f.n_disabled + ' 个禁用</b>' : '') +
+    (f.n_down ? '<b style="color:#8a6d1d">' + f.n_down + ' 个降权</b>' : '') +
+    '<div class="mini" style="margin-top:4px;color:#8a6d1d">' +
+    (f.factors||[]).map(function(e){ return e.factor + ' ×' + e.eff + (e.status!=='正常'?'('+e.status+')':''); }).join(' ｜ ') +
+    '</div></div>';
+}
+// ★2026-08-11 百轮#44：信号联动（信号族/信号分/无效因子）
+function sigHtml(d){
+  const s = d.signal;
+  if(!s) return '';
+  const sc = s.signal_score;
+  const cls = sc == null ? '' : (sc >= 60 ? 'color:var(--red);font-weight:700' : (sc >= 35 ? 'color:#D4A843;font-weight:700' : 'color:var(--green);font-weight:700'));
+  return '<div class="conclusion" style="background:#F8FAFD;border-color:#E5E9F0">📡 <b>信号联动：</b>' +
+    '信号族 <b>' + (s.signal_family||'—') + '</b> ｜ 信号分 <b style="'+cls+'">' + (sc!=null?sc:'—') + '</b>' +
+    '（ΣICIR120×个股rank/ΣICIR120×100）' +
+    (s.n_invalid ? ' ｜ <b style="color:#C0392B">⚠️ '+s.n_invalid+' 个无效因子不计权</b>' : '') +
+    ' ｜ 有效因子 ' + (s.factor_eff_n||0) + ' 个</div>';
+}
+// ★2026-08-11 百轮#44：远期表现（入池后实际收益）
+function fwdHtml(d){
+  const f = d.forward;
+  if(!f) return '';
+  const hm = {'t1':'T+1','t5':'T+5','t20':'T+20','t60':'T+60','latest':'最新'};
+  let cells = '';
+  const r = f.rets || {};
+  for(const k of ['t1','t5','t20','t60','latest']){
+    const v = r[k];
+    cells += '<span style="margin-right:12px"><b>' + hm[k] + '</b> ' +
+      (v!=null ? '<span style="color:' + (v>=0?'var(--red)':'var(--green)') + ';font-weight:700">' + (v>=0?'+':'') + (v*100).toFixed(2) + '%</span>' : '—') + '</span>';
+  }
+  return '<div class="conclusion" style="background:#F8FAFD;border-color:#E5E9F0">📈 <b>远期表现：</b>' +
+    '入池日 ' + (f.entry_date||'—') + (f.decided ? ' ｜ 审批状态 ' + f.decided : '') +
+    '<div style="margin-top:6px">' + cells + '</div></div>';
+}
+// ★2026-08-11 百轮#44：持仓状态
+function posHtml(d){
+  const p = d.position;
+  if(!p) return '';
+  return '<div class="conclusion" style="background:#F0FFF8;border-color:#0F6E5644">💼 <b>持仓状态：</b>' +
+    '当前持仓 <b>[' + (p.status==='holding'?'持有':'超限') + ']</b> ｜ 买入日 ' + (p.entry_date||'—') +
+    ' ｜ 成本 <b>' + (p.entry_price!=null?p.entry_price:'—') + '</b>' +
+    (p.target ? ' ｜ 目标 ' + p.target : '') + (p.stop ? ' ｜ 止损 ' + p.stop : '') +
+    '</div>';
+}
+</script>
+</body>
+</html>

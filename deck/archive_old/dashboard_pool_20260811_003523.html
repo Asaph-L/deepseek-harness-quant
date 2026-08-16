@@ -1,0 +1,141 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">
+<title>📊 池子总览 · 2026-08-10</title>
+<style>
+:root { --navy:#0A2540; --green:#0F6E56; --red:#C0392B; --bg:#F0F3F8; --muted:#8a94a6; --line:#e5e9f0; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,"Microsoft YaHei",sans-serif; background:var(--bg); color:#0A2540; padding:20px; }
+.wrap { max-width:1440px; margin:0 auto; }
+.tabs { display:flex; gap:8px; margin:14px 0; flex-wrap:wrap; }
+.tab-btn { padding:9px 18px; border-radius:10px; background:#fff; border:1px solid var(--line); cursor:pointer; font-size:13px; color:#37445c; }
+.tab-btn b { font-size:15px; display:block; color:var(--navy); }
+.tab-btn:hover { border-color:#2F6FED; }
+.tab-btn.on { background:var(--navy); color:#fff; border-color:var(--navy); }
+.tab-btn.on b { color:#fff; }
+.tabpane { display:none; }
+.tabpane.on { display:block; }
+.sec-note { font-size:11px; color:var(--muted); margin:8px 0 4px; }
+/* 复用子页样式（header/kpi/表格）——从各生成器内嵌样式复制关键类 */
+.header { background:linear-gradient(135deg,#0A2540,#185FA5); border-radius:14px; padding:16px 20px; color:#fff; }
+.header h1 { font-size:17px; } .header .sub { font-size:12px; color:rgba(255,255,255,.7); margin-top:4px; }
+.kpi { display:inline-block; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.25); border-radius:10px; padding:7px 14px; margin:8px 8px 0 0; font-size:12px; cursor:pointer; }
+.kpi b { font-size:15px; display:block; }
+.kpi-on { background:rgba(255,255,255,.25); }
+table { width:100%; border-collapse:collapse; background:#fff; border-radius:10px; overflow:hidden; margin-top:8px; }
+th { font-size:10px; color:var(--muted); padding:6px 8px; text-align:left; border-bottom:2px solid var(--line); }
+td { padding:6px 8px; border-bottom:1px solid var(--line); font-size:12px; }
+.mini { font-size:11px; color:var(--muted); }
+.w-row { cursor:pointer; } .w-row:hover { background:#F6F9FF; }
+.w-detail td { background:#F8FAFD; } .d-box { font-size:12px; color:#37445c; }
+.f-box { display:inline-block; background:#F0F3F8; border-radius:8px; padding:3px 9px; margin-right:8px; }
+.f-box i { font-style:normal; font-size:10px; color:var(--muted); display:block; } .f-box b { font-size:12px; }
+.btn-link { color:#2F6FED; text-decoration:none; font-size:11px; }
+.empty, .layer .mini, .section .mini { text-align:center; color:var(--muted); }
+.section { background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin-top:10px; }
+.pitch-line { font-size:12px; margin-top:8px; color:rgba(255,255,255,.85); }
+.pitch-badge { display:inline-block; background:rgba(255,255,255,.15); border-radius:8px; padding:3px 10px; margin:2px 6px 2px 0; }
+.tab { display:inline-block; padding:5px 12px; border-radius:8px; background:#F0F3F8; margin:6px 6px 0 0; cursor:pointer; font-size:12px; }
+.tab.on { background:var(--navy); color:#fff; }
+.tab .cnt { font-weight:700; color:var(--green); }
+.tab.on .cnt { color:#7FDBB5; }
+.layer { margin-top:8px; }
+.t-green { color:var(--green); } .neg { color:var(--red); }
+.new { color:#C0392B; font-weight:700; }
+.alert { background:#FFF3E0; border:1px solid #FFD54F; border-radius:8px; padding:8px 12px; font-size:12px; margin-top:10px; color:#8a6d00; }
+<link rel="stylesheet" href="/ui_common.css"></style></head><body>
+<div class="lw-nav" data-page="pool"></div>
+<script src="/nav_common.js"></script>
+<div class="wrap">
+
+<div class="header">
+  <h1>📊 池子总览 <span style="font-weight:400;font-size:13px;opacity:.8">观察池 · 机会池 · 科技池（合并页）</span></h1>
+  <div class="sub">数据 2026-08-10 ｜ 三池一页 tab 切换 ｜ 60 秒实时刷新 ｜ 原页面：观察池 / 机会池 / 科技池</div>
+</div>
+
+<div class="tabs">
+  <div class="tab-btn on" data-t="watch" onclick="switchTab('watch')">👁 观察池<b>100 只</b></div>
+  <div class="tab-btn" data-t="opp" onclick="switchTab('opp')">🎯 机会池<b>495 条</b></div>
+  <div class="tab-btn" data-t="tech" onclick="switchTab('tech')">🧬 科技池<b>6 只</b></div>
+</div>
+
+<!-- ========== 观察池 tab（root: pool-watch） ========== -->
+<div class="tabpane on" id="tabpane-watch">
+  <div id="pool-watch">
+    <div class="header">
+      <h1>👁 观察池</h1>
+      <div class="sub">数据 — ｜ 仓位 — ｜ 防守现金 —</div>
+      <span class="kpi kpi-on" onclick="showWatchLayer('watch', this)">观察<b>—</b></span>
+      <span class="kpi" onclick="showWatchLayer('candidate', this)">候选<b>—</b></span>
+      <span class="kpi" onclick="showWatchLayer('decision', this)">决策<b>—</b></span>
+    </div>
+    <div class="layer" id="layer-watch"><table><thead><tr><th>#</th><th>股票</th><th>行业</th><th>价</th><th>市值(亿)</th><th>评分</th><th>技术判定</th><th>距52周高</th><th>距52周低</th><th>量比</th><th>检测</th></tr></thead><tbody></tbody></table></div>
+    <div class="layer" id="layer-candidate" style="display:none"><table><thead><tr><th>#</th><th>股票</th><th>行业</th><th>价</th><th>市值(亿)</th><th>评分</th><th>技术判定</th><th>距52周高</th><th>距52周低</th><th>量比</th><th>检测</th></tr></thead><tbody></tbody></table></div>
+    <div class="layer" id="layer-decision" style="display:none"><table><thead><tr><th>#</th><th>股票</th><th>行业</th><th>价</th><th>市值(亿)</th><th>评分</th><th>技术判定</th><th>距52周高</th><th>距52周低</th><th>量比</th><th>检测</th></tr></thead><tbody></tbody></table></div>
+  </div>
+</div>
+
+<!-- ========== 机会池 tab（root: pool-opp） ========== -->
+<div class="tabpane" id="tabpane-opp">
+  <div id="pool-opp">
+    <div class="header">
+      <h1>🎯 机会池</h1>
+      <div class="sub">数据日期 —</div>
+      <span class="kpi kpi-on">大池子<b>—</b></span>
+      <span class="kpi">Pitch门槛<b>—</b></span>
+      <span class="kpi">极强门槛<b>—</b></span>
+      <span class="kpi">Pitch候选<b>—</b></span>
+      <div class="pitch-line">Pitch：<span class="mini">—</span></div>
+    </div>
+    <div class="tab-bar">
+      <span class="tab on" data-t="all" onclick="switchOppTab(this)">全部 <span class="cnt">—</span></span>
+      <span class="tab" data-t="value" onclick="switchOppTab(this)">价值 <span class="cnt">—</span></span>
+      <span class="tab" data-t="revalue" onclick="switchOppTab(this)">重估 <span class="cnt">—</span></span>
+      <span class="tab" data-t="quality_gap" onclick="switchOppTab(this)">质折 <span class="cnt">—</span></span>
+      <span class="tab" data-t="pv_consensus" onclick="switchOppTab(this)">共识 <span class="cnt">—</span></span>
+      <span class="tab" data-t="event" onclick="switchOppTab(this)">事件 <span class="cnt">—</span></span>
+      <span class="tab" data-t="reversal" onclick="switchOppTab(this)">反转 <span class="cnt">—</span></span>
+      <span class="tab" data-t="breakout" onclick="switchOppTab(this)">突破 <span class="cnt">—</span></span>
+    </div>
+    <div id="pane-all" class="pane"><table><thead><tr><th>#</th><th>股票</th><th>行业</th><th>类型</th><th>评分</th><th>预期空间</th><th>胜率</th><th>触发条件</th></tr></thead><tbody></tbody></table></div>
+    <div id="pane-value" class="pane" style="display:none"><table><thead><tr><th>#</th><th>股票</th><th>行业</th><th>评分</th><th>预期空间</th><th>触发条件</th></tr></thead><tbody></tbody></table></div>
+    <div id="pane-revalue" class="pane" style="display:none"><table><thead><tr><th>#</th><th>股票</th><th>行业</th><th>评分</th><th>预期空间</th><th>触发条件</th></tr></thead><tbody></tbody></table></div>
+    <div id="pane-quality_gap" class="pane" style="display:none"><table><thead><tr><th>#</th><th>股票</th><th>行业</th><th>评分</th><th>预期空间</th><th>触发条件</th></tr></thead><tbody></tbody></table></div>
+    <div id="pane-pv_consensus" class="pane" style="display:none"><table><thead><tr><th>#</th><th>股票</th><th>行业</th><th>评分</th><th>预期空间</th><th>触发条件</th></tr></thead><tbody></tbody></table></div>
+    <div id="pane-event" class="pane" style="display:none"><table><thead><tr><th>#</th><th>股票</th><th>行业</th><th>评分</th><th>预期空间</th><th>触发条件</th></tr></thead><tbody></tbody></table></div>
+    <div id="pane-reversal" class="pane" style="display:none"><table><thead><tr><th>#</th><th>股票</th><th>行业</th><th>评分</th><th>预期空间</th><th>触发条件</th></tr></thead><tbody></tbody></table></div>
+    <div id="pane-breakout" class="pane" style="display:none"><table><thead><tr><th>#</th><th>股票</th><th>行业</th><th>评分</th><th>预期空间</th><th>触发条件</th></tr></thead><tbody></tbody></table></div>
+  </div>
+</div>
+
+<!-- ========== 科技池 tab（root: pool-tech） ========== -->
+<div class="tabpane" id="tabpane-tech">
+  <div id="pool-tech">
+    <div class="header">
+      <h1>🧬 科技池</h1>
+      <div class="sub">收录 breakout 突破 + pv_consensus 量价共识</div>
+      <span class="kpi kpi-on">入池<b>—</b></span>
+      <span class="kpi">NEW<b>—</b></span>
+    </div>
+    <div class="section">
+      <table><thead><tr><th>股票</th><th>行业</th><th>类型</th><th>评分</th><th>触发</th><th>检测</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+</div>
+
+<script>
+var page = 'pool';
+function switchTab(t) {
+  document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.toggle('on', b.dataset.t === t); });
+  document.querySelectorAll('.tabpane').forEach(function (p) { p.classList.toggle('on', p.id === 'tabpane-' + t); });
+}
+function switchOppTab(el) {
+  document.querySelectorAll('#pool-opp .tab').forEach(function (t) { t.classList.toggle('on', t === el); });
+  document.querySelectorAll('#pool-opp .pane').forEach(function (p) { p.style.display = (p.id === 'pane-' + el.dataset.t) ? '' : 'none'; });
+}
+function showWatchLayer(l, el) {
+  document.querySelectorAll('#pool-watch .layer').forEach(function (x) { x.style.display = (x.id === 'layer-' + l) ? '' : 'none'; });
+  document.querySelectorAll('#pool-watch .kpi').forEach(function (k) { k.classList.toggle('kpi-on', k === el); });
+}
+</script>
+<script src="/live_patch.js" data-page="pool"></script>
+</div>
+</body></html>

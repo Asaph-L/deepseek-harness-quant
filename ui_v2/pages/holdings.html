@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Deepseek HARNESS Quant · 持仓</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="/v2/assets/ui_common.css">
+<link rel="stylesheet" href="/v2/assets/anim_common.css">
+<link rel="stylesheet" href="/v2/assets/app.css">
+<style>
+  .pos-card { background:#131316; border:1px solid #2a2a30; border-radius:var(--r-md); padding:14px 16px; margin-top:10px;
+    box-shadow:var(--shadow-card); transition:box-shadow 200ms var(--ease-hover), transform 200ms var(--ease-hover); }
+  .pos-card:hover { box-shadow:var(--shadow-hover); transform:translateY(-2px); }
+  .pos-top { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+  .pos-code { font-weight:700; font-size:14px; color:#f4f4f5; }
+  .pos-sub { font-size:12px; color:#a1a1aa; margin-top:2px; }
+  .pos-chip { font-size:12px; padding:2px 8px; border-radius:6px; font-weight:600; white-space:nowrap; }
+  .chip-deck { background:rgba(94,106,210,.14); color:#5e6ad2; }
+  .chip-manual { background:rgba(242,201,76,.12); color:#f2c94c; }
+  .pos-kv { display:flex; justify-content:space-between; padding:4px 0; font-size:12px; border-bottom:1px dashed rgba(255,255,255,.08); }
+  .pos-kv span { color:#a1a1aa; }
+  .pos-kv b { color:#d4d4d8; font-weight:600; font-variant-numeric:tabular-nums; }
+  .pos-kv b.warn { color:#eb5757; }
+  .pos-kv b.ok { color:#27ae60; }
+  .pos-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:12px; }
+  .empty-hero { text-align:center; padding:30px 20px; }
+  .empty-hero .ico { display:flex; justify-content:center; color:#a1a1aa; }
+  .empty-hero .ico svg { width:40px; height:40px; }
+  .empty-hero .tx { font-size:14px; font-weight:600; margin-top:8px; }
+  .empty-hero .sub { font-size:12px; color:#a1a1aa; margin-top:4px; }
+  .nav-wrap { margin-top:6px; }
+  /* ★#318 四池筛选条（上面 tab 选池，下面单池明细） */
+  /* ★#335 止损预警条目 */
+  .stop-item { padding:6px 0; border-bottom:1px dashed rgba(255,255,255,.08); }
+  .stop-item:last-child { border-bottom:none; }
+  .stop-item .pos-kv { border-bottom:none; }
+</style>
+</head>
+<body style="background:var(--bg);margin:0">
+<div id="sidebar"></div>
+<div class="v2-wrap">
+  <div class="v2-h"><span class="bar"></span><h1>持仓</h1><span class="sub">绩效 · 状态机分组（持有→预警→触发/止盈→卖出）· 信号详情内嵌 </span></div>
+
+  <!-- KPI 区 -->
+  <div class="v2-kpi anim-stagger" id="kpi-box"></div>
+
+  <!-- regime + 净值 -->
+  <div class="v2-card anim-fade-in-up" style="margin-top:14px">
+    <h2> 组合净值 <span class="tag">perf.nav vs 基准 · 60s 自动刷新</span></h2>
+    <div id="regime-box" class="mini" style="color:var(--muted);margin-bottom:6px"> 加载市场环境…</div>
+    <div class="nav-wrap" id="nav-wrap"><span class="mini" style="opacity:.5">净值数据积累中（T+1 起逐日填充）</span></div>
+    <div class="mini" id="perf-sub" style="color:var(--muted);margin-top:4px"></div>
+  </div>
+
+  <!-- 持仓分组（★2026-08-15 大改：止盈·止损指令卡已合并进持仓卡——同一批信息不重复出现；
+       每只持仓卡内直接显示触发的规则详情 + 状态机摘要条） -->
+  <div class="v2-card anim-fade-in-up d1" style="margin-top:14px">
+    <h2> 持仓明细 <span class="tag">状态机：持有 → 预警 → 触发/止盈 → 卖出 · 上限 5 只 · 信号详情内嵌卡片</span></h2>
+    <div id="pos-box"> 加载中…</div>
+  </div>
+
+  <!-- 风控 · 行业敞口 -->
+  <div class="v2-card anim-fade-in-up d3" style="margin-top:14px">
+    <h2> 风控 <span class="tag">行业敞口</span></h2>
+    <div class="mini" id="industry-box" style="color:var(--muted)"></div>
+  </div>
+
+  <div class="mini" style="text-align:center;margin-top:18px;opacity:.7"><span class="dsq-brand">Deepseek HARNESS Quant</span><span style="color:var(--muted)"> · 作者：LW </span><span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:#2a2a30;border:1px solid #3a3a44;box-shadow:0 2px 6px rgba(0,0,0,.5)"><svg class="cat-stroll" width="22" height="22" viewBox="0 0 24 24" fill="none"><path class="cat-tail" d="M14.5 17.5c3.2.6 5.2-1.2 5.6-3.8" stroke="#111" stroke-width="2.4" stroke-linecap="round" fill="none"/><path d="M7.4 6.8L6 2.8l3.6 2.6M16.6 6.8L18 2.8l-3.6 2.6" fill="#111" stroke="#111" stroke-width="1"/><circle cx="10.5" cy="9.5" r="4.4" fill="#111"/><ellipse cx="11" cy="16" rx="6" ry="4.4" fill="#111"/><circle cx="8.8" cy="9.2" r="0.9" fill="#4ade80"/><circle cx="12.2" cy="9.2" r="0.9" fill="#4ade80"/><path d="M5.8 10.2h-2.6M6.4 11.6L4 12.8M18.2 10.2h-2.6M17.6 11.6l2.4 1.2" stroke="#555" stroke-width="0.7" stroke-linecap="round"/></svg></span><span style="opacity:.5"> · 持股≤5 · 宁缺毋滥</span></div>
+</div>
+
+<script src="/v2/core/api.js"></script>
+<script src="/v2/core/render.js"></script>
+<script src="/v2/components/icons.js"></script>
+<script src="/v2/components/search.js"></script>
+<script src="/v2/components/sidebar.js"></script>
+<script src="/v2/components/decide.js"></script>
+<script>
+(function () {
+  LW.sidebar.render('sidebar', {active: 'holdings'});
+  var R = LW.render;
+  var IC = LW.icons;
+  var otypeCN = {};
+
+  function pct(v, d) { return (v != null && !isNaN(v)) ? (v * 100).toFixed(d || 0) + '%' : '—'; }
+  function stripEmoji(s) { return String(s == null ? '' : s).replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE00}-\u{FE0F}\u{2190}-\u{21FF}\u{2300}-\u{23FF}]/gu, '').replace(/\s+/g, ' ').trim(); }
+  // ★#335 止损方案格式化（stop_plan 是对象，直接 R._f 会变成 [object Object]）
+  function stopPlanTxt(sp) {
+    if (!sp || typeof sp !== 'object') return R._f(sp || '—');
+    var parts = [];
+    if (sp.stop_loss_pct != null) parts.push('硬止损 ' + (sp.stop_loss_pct * 100).toFixed(0) + '%');
+    if (sp.time_stop_weeks != null) parts.push('时间 ' + sp.time_stop_weeks + ' 周');
+    if (sp.max_drawdown_pct != null) parts.push('回撤 ' + (sp.max_drawdown_pct * 100).toFixed(0) + '%');
+    if (sp.trailing_ma != null) parts.push('MA' + sp.trailing_ma);
+    return parts.length ? parts.join(' · ') : '—';
+  }
+
+  // ★#410 净值折线图（组合净值 vs 基准，SVG 双线，替换原简陋竖条）
+  function navLineSvg(nav, bench) {
+    var W = 680, H = 180, P = { t: 16, r: 16, b: 30, l: 54 };
+    var all = nav.concat(bench).filter(function (v) { return v != null; });
+    if (!all.length) return '';
+    var mx = Math.max.apply(null, all), mn = Math.min.apply(null, all);
+    var rng = (mx - mn) || (Math.abs(mx) * 0.02) || 1;
+    var top = mx + rng * 0.15, bot = mn - rng * 0.15, span = (top - bot) || 1;
+    var n = Math.max(nav.length, bench.length, 2);
+    function px(i) { return P.l + (W - P.l - P.r) * (i / (n - 1)); }
+    function py(v) { return P.t + (H - P.t - P.b) * (1 - (v - bot) / span); }
+    function polyline(arr, color, dash, w) {
+      var pts = [];
+      for (var i = 0; i < arr.length; i++) { if (arr[i] == null) continue; pts.push(px(i).toFixed(1) + ',' + py(arr[i]).toFixed(1)); }
+      if (pts.length < 2) return '';
+      return '<polyline points="' + pts.join(' ') + '" fill="none" stroke="' + color + '" stroke-width="' + (w || 2) + '"' + (dash ? ' stroke-dasharray="5,4"' : '') + ' stroke-linejoin="round" stroke-linecap="round"/>';
+    }
+    var g = '';
+    for (var gi = 0; gi <= 4; gi++) {
+      var gy = P.t + (H - P.t - P.b) * gi / 4, gv = top - span * gi / 4;
+      g += '<line x1="' + P.l + '" y1="' + gy.toFixed(1) + '" x2="' + (W - P.r) + '" y2="' + gy.toFixed(1) + '" stroke="#d4d4d8" stroke-width="1"/>';
+      g += '<text x="' + (P.l - 6) + '" y="' + (gy + 3).toFixed(1) + '" text-anchor="end" font-size="10" fill="#a1a1aa">' + gv.toFixed(3) + '</text>';
+    }
+    function dots(arr, color) {
+      var out = '';
+      for (var i = 0; i < arr.length; i++) { if (arr[i] == null) continue; out += '<circle cx="' + px(i).toFixed(1) + '" cy="' + py(arr[i]).toFixed(1) + '" r="3" fill="' + color + '"/>'; }
+      return out;
+    }
+    var last = nav[nav.length - 1];
+    var lbl = '';
+    if (last != null) {
+      lbl = '<text x="' + (px(nav.length - 1) + 6) + '" y="' + (py(last) - 6) + '" text-anchor="start" font-size="11" font-weight="700" fill="#5e6ad2">' + last.toFixed(3) + '</text>';
+    }
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;display:block" role="img" aria-label="组合净值曲线">' +
+      g + polyline(bench, '#a1a1aa', true, 1.5) + polyline(nav, '#5e6ad2', false, 2.5) + dots(nav, '#5e6ad2') + lbl + '</svg>';
+  }
+
+  function loadAll() {
+    LW.api.get('/api/live/holdings').then(function (d) {
+      var pf = d.portfolio || {};
+      var pnl = d.pnl || {};
+      var pr = d.position_risk || {};
+      var perf = d.perf || {};
+      var stats = perf.stats || {};
+      var tp = d.take_profit || {};
+      var sa = d.stop_alerts || {};
+      var sig = d.daily_signal || {};
+      var positions = pf.positions || [];
+      // ★2026-08-14 超限透明：后端已分离 _held/_over；前端 KPI 只数真实持仓（holding），
+      //   over_limit（超 5 只纪律拒绝）单独提示条——原混在一起显示 6/5 且无标注
+      var heldPos = pf._held && pf._held.length ? pf._held
+                   : positions.filter(function (p) { return p.status === 'holding'; });
+      var overPos = pf._over && pf._over.length ? pf._over
+                   : positions.filter(function (p) { return p.status === 'over_limit'; });
+      if (pf._held == null) { heldPos = positions; overPos = []; }   // 旧后端兼容
+      var n = heldPos.length;
+
+      /* KPI 4 卡 */
+      var tv = pnl.total_value != null && !isNaN(pnl.total_value) ? pnl.total_value : null;
+      var tr = pnl.total_ret != null && !isNaN(pnl.total_ret) ? pnl.total_ret : null;
+      var sret = stats.total_ret != null && !isNaN(stats.total_ret) ? stats.total_ret : null;
+      // ★2026-08-14 收益口径统一：持仓市值与组合收益都用 pnl 实时口径（盘中实时价），
+      //   日线 stats.total_ret 仅作净值曲线/超额展示（样本积累期二者相近，盘中实时优先）
+      var sretReal = tr;   // 实时组合收益（pnl 已实时化）
+      var sretNote = sretReal != null && stats.days > 0 && sret != null && Math.abs(sretReal - sret) > 0.005
+        ? '（盘中实时）' : '';
+      var ex = stats.excess != null && !isNaN(stats.excess) ? stats.excess : null;
+      var riskList = pr.per_stock || pr.positions || [];
+      var nWatch = riskList.filter(function (r) { return (r.risk_level || r.status) === 'WATCH'; }).length;
+      function delta(v) { return v == null ? '<span class="d-flat">—</span>' : (v > 0 ? '<span class="d-up">' + Math.abs(v).toFixed(2) + '%</span>' : v < 0 ? '<span class="d-down">' + Math.abs(v).toFixed(2) + '%</span>' : '<span class="d-flat">0%</span>'); }
+      var kpis = [
+        { lb: '持仓数', vl: n + ' / ' + (pf.max_positions || 5), dt: '剩余 ' + Math.max(0, (pf.max_positions || 5) - n) + ' 名额', num: null },
+        { lb: '持仓市值', vl: tv != null ? (tv / 10000).toFixed(2) + ' 万' : '—', dt: tr != null ? '收益 ' + delta(tr) : '成本 ' + (pnl.total_cost != null && !isNaN(pnl.total_cost) ? pnl.total_cost.toFixed(0) : '—'), num: tv != null ? (tv / 10000).toFixed(2) + ' 万' : null },
+        { lb: '组合收益', vl: sretReal != null ? (sretReal >= 0 ? '+' : '') + sretReal.toFixed(2) + '%' : '—', dt: (sretNote ? sretNote + ' · ' : '') + (ex != null ? '超额 ' + delta(ex) : '样本积累中'), num: sretReal != null ? (sretReal >= 0 ? '+' : '') + sretReal.toFixed(2) + '%' : null },
+        { lb: '风控', vl: (riskList.length ? (riskList.length - nWatch) + '/' + riskList.length : '—'), dt: nWatch > 0 ? nWatch + ' 只 WATCH' : '全部 PASS', num: null }
+      ];
+      document.getElementById('kpi-box').innerHTML = kpis.map(function (k, i) {
+        var vlHtml = k.num != null
+          ? '<span class="cnt" data-val="' + k.num + '">' + k.vl + '</span>'
+          : k.vl;
+        return '<div class="kp anim-fade-in-up d' + (i + 1) + '"><div class="lb">' + k.lb + '</div><div class="vl">' + vlHtml + '</div><div class="dt">' + k.dt + '</div></div>';
+      }).join('');
+      // ★#405 KPI 数字 count-up（持仓市值/组合收益滚动，持仓数/风控分数式静态）
+      var cnts = document.querySelectorAll('#kpi-box .cnt');
+      for (var ci = 0; ci < cnts.length; ci++) {
+        R.countUp(cnts[ci], cnts[ci].getAttribute('data-val'));
+      }
+
+      /* regime + 净值 */
+      document.getElementById('regime-box').innerHTML =
+        R._f(sig.regime_label, '—') + ' · ' + (sig.regime_level === 'full' ? '满仓信号' : sig.regime_level === 'half' ? '半仓信号' : '防守信号') +
+        ' · 现金 ' + pct(sig.regime_cash_ratio, 0);
+      var nav = perf.nav || [];
+      var bench = perf.bench_nav || [];
+      var navBox = document.getElementById('nav-wrap');
+      if (nav.length) {
+        navBox.innerHTML = navLineSvg(nav, bench) +
+          '<div class="mini" style="display:flex;gap:16px;margin-top:8px">' +
+          '<span style="display:inline-flex;align-items:center;gap:5px"><span style="display:inline-block;width:14px;height:3px;background:#5e6ad2;border-radius:2px"></span>组合净值</span>' +
+          '<span style="display:inline-flex;align-items:center;gap:5px"><span style="display:inline-block;width:14px;height:3px;background:#3f3f46;border-radius:2px"></span>基准</span></div>';
+        document.getElementById('perf-sub').innerHTML = (stats.days || 0) + ' 交易日 · 最大回撤 ' + pct(stats.max_dd, 1) + ' · 基准 ' + (stats.bench_ret != null ? stats.bench_ret.toFixed(2) + '%' : '—');
+      }
+
+      /* 持仓卡片（人工/程序分组）★2026-08-14 超限透明 + 实时价标注 */
+      var posBox = document.getElementById('pos-box');
+      if (!heldPos.length) {
+        posBox.innerHTML = '<div class="empty-hero"><div class="ico">' + (IC.bar || '') + '</div><div class="tx">当前空仓</div>' +
+          '<div class="sub">' + R._f(pf.cleared_note, '无持仓记录') + ' — 宁缺毋滥，等待高质量 Pitch</div></div>';
+      } else {
+        function posCard(p, state) {
+          var src = p.source === 'deck' ? '程序' : '人工';
+          var srcCls = p.source === 'deck' ? 'chip-deck' : 'chip-manual';
+          var tps = p.take_profit || {};
+          var tpTxt = tps.target_pct != null ? '+' + (tps.target_pct * 100).toFixed(0) + '%' : '—';
+          var stopTxt = stopPlanTxt(p.stop_plan || p.stop);
+          var rl = p.risk_level || p.status || '—';
+          var rlCls = (rl === 'WATCH' || rl === 'watch') ? 'warn' : 'ok';
+          // ★#408 收益焦点区：收益率大数字突出（红涨绿跌），现价/入池价并列
+          var retCls = p.ret != null ? (p.ret >= 0 ? '#eb5757' : '#27ae60') : '#a1a1aa';
+          var retTxt = p.ret != null ? (p.ret >= 0 ? '+' : '') + (p.ret * 100).toFixed(1) + '%' : '—';
+          // ★2026-08-14 实时价来源标注（盘中=新浪实时；盘后=日线收盘）
+          var pxTag = p.price_src === 'realtime' ? '<span class="mini" style="color:var(--green);font-weight:600;font-size:11px">实时</span>'
+                     : '<span class="mini" style="color:var(--muted);font-size:11px">收盘</span>';
+          // ★2026-08-15 信号详情内嵌（合并原"止盈·止损指令"卡——同一批信息不重复出现）
+          var sigHtml = '';
+          if (state === 'triggered' || state === 'near') {
+            var al = null;
+            (sa.entries || []).forEach(function (a) { if (a.code === p.code) al = a; });
+            if (al && (al.alerts || []).length) {
+              var rules = al.alerts.map(function (x) {
+                return stripEmoji((x.rule || '') + (x.detail ? '：' + x.detail : '') + (x.action ? ' → ' + x.action : ''));
+              }).join('；');
+              var m = al.metrics || {};
+              var meta = (m.last != null ? '现价 ' + m.last : '') + (m.dd_from_entry != null ? ' · 入池后 ' + (m.dd_from_entry >= 0 ? '+' : '') + (m.dd_from_entry * 100).toFixed(1) + '%' : '');
+              var trig = state === 'triggered';
+              sigHtml = '<div style="margin-top:8px;padding:8px 11px;background:' + (trig ? 'rgba(235,87,87,.16)' : 'rgba(242,201,76,.16)') +
+                ';border:1px solid ' + (trig ? 'rgba(235,87,87,.45)' : 'rgba(242,201,76,.45)') + ';border-left:3px solid ' +
+                (trig ? '#f87171' : '#f2c94c') + ';border-radius:8px;font-size:11px;line-height:1.8;color:' +
+                (trig ? '#fca5a5' : '#fde68a') + '"><b>' + (trig ? '🔴 触发止损' : '🟡 临近止损') + '</b> ' + R._f(rules) +
+                (meta ? ' · ' + meta : '') + '</div>';
+            }
+          } else if (state === 'tp') {
+            var t = null;
+            (tp.positions || []).forEach(function (x) { if (x.code === p.code) t = x; });
+            if (t) {
+              var t2 = t.tp || {};
+              var s0 = (t.signals && t.signals[0]) || {};
+              sigHtml = '<div style="margin-top:8px;padding:7px 10px;background:rgba(39,174,96,.12);border:1px solid rgba(39,174,96,.25);border-radius:8px;font-size:11px;line-height:1.7;color:#4ade80">' +
+                '<b>🟢 止盈信号</b> 止盈位 ' + (t2.target_pct != null ? '+' + (t2.target_pct * 100).toFixed(0) + '%' : '—') +
+                (t2.pullback_pct != null ? ' · 移动回撤 ' + (t2.pullback_pct * 100).toFixed(0) + '%' : '') +
+                (s0.msg ? ' · ' + stripEmoji(s0.msg) : '') + '</div>';
+            }
+          }
+          return '<div class="pos-card">' +
+            '<div class="pos-top"><div><div class="pos-code">' + R._f(p.name || p.code) + '</div>' +
+            '<div class="pos-sub">' + R._f(p.code) + (p.industry ? ' · ' + R._f(p.industry) : '') + '</div></div>' +
+            '<div style="display:flex;gap:6px;align-items:center">' +
+            '<span class="pos-chip ' + srcCls + '">' + src + '</span>' +
+            '<span class="pos-chip" style="background:#16161a;color:#a1a1aa">' + R._f(otypeCN[p.otype] || p.otype) + '</span>' +
+            (state !== 'hold' ? '<span class="pos-chip" style="background:' + (state === 'triggered' ? 'rgba(235,87,87,.15);color:#f87171' : state === 'near' ? 'rgba(242,201,76,.12);color:#f2c94c' : 'rgba(39,174,96,.12);color:#4ade80') + '">' +
+              (state === 'triggered' ? '触发止损' : state === 'near' ? '临近止损' : '止盈信号') + '</span>' : '') +
+            '</div></div>' +
+            '<div style="display:flex;align-items:flex-end;justify-content:space-between;margin:12px 0 4px;padding:10px 12px;background:#16161a;border-radius:8px">' +
+              '<div><div style="font-size:12px;color:#a1a1aa;margin-bottom:2px">当前收益</div>' +
+                '<div style="font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;color:' + retCls + ';line-height:1">' + retTxt + '</div></div>' +
+              '<div style="text-align:right"><div style="font-size:12px;color:#a1a1aa;margin-bottom:2px">现价 / 入池 ' + pxTag + '</div>' +
+                '<div style="font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:#d4d4d8">' + (p.last_price != null ? p.last_price : '—') + ' <span style="color:#a1a1aa;font-weight:400">/</span> ' + (p.entry_price != null ? p.entry_price : '—') + '</div></div>' +
+            '</div>' +
+            sigHtml +
+            '<div class="pos-kv"><span>入池日</span><b>' + R._f(p.entry_date) + '</b></div>' +
+            '<div class="pos-kv"><span>止盈</span><b>' + tpTxt + (tps.pullback_pct != null ? ' ｜ 回撤 ' + (tps.pullback_pct * 100).toFixed(0) + '%' : '') + '</b></div>' +
+            '<div class="pos-kv"><span style="color:#f87171;font-weight:600">止损</span><b class="warn" style="color:#f87171;font-weight:700">' + R._f(stopTxt) + '</b></div>' +
+            '<div class="pos-kv"><span>风控</span><b class="' + rlCls + '">' + R._f(rl) + '</b></div>' +
+            '<div class="pos-kv" style="border-bottom:none"><span>备注</span><b style="font-weight:400">' + R._f((p.note || '').slice(0, 40)) + '</b></div>' +
+            '<div style="margin-top:8px;display:flex;justify-content:flex-end;align-items:center;gap:8px">' +
+            '<span class="mini" style="color:#a1a1aa">卖出 = 次日开盘执行（T+1 · 当日买入不可卖）</span>' +
+            '<button class="v2-btn neg v2-btn-sell" data-code="' + R._f(p.code) + '" data-name="' + String(p.name || '').replace(/'/g, '') + '" title="T+1：卖出指令次日开盘执行">卖出</button></div>' +
+            '</div>';
+        }
+        // ★P1-2 状态分组（2026-08-15）：止损预警 → 止盈信号 → 持有（替代原"程序/人工"来源分组——
+        //   用户一眼看出每只持仓处于什么状态，避免在止损/止盈/正常间迷失）
+        var stopCodes = {};
+        (sa.entries || []).forEach(function (a) {
+          if (a.code && (a.status === 'NEAR' || a.status === 'TRIGGERED')) stopCodes[a.code] = a.status;
+        });
+        var tpCodes = {};
+        (tp.positions || []).forEach(function (p) { if (p.code) tpCodes[p.code] = 1; });
+        function stateOf(p) {
+          if (stopCodes[p.code] === 'TRIGGERED') return 'triggered';
+          if (stopCodes[p.code] === 'NEAR') return 'near';
+          if (tpCodes[p.code]) return 'tp';
+          return 'hold';
+        }
+        var grpStop = heldPos.filter(function (p) { return stateOf(p) === 'triggered' || stateOf(p) === 'near'; });
+        var grpTp = heldPos.filter(function (p) { return stateOf(p) === 'tp'; });
+        var grpHold = heldPos.filter(function (p) { return stateOf(p) === 'hold'; });
+        function group(t, list, dotCls) {
+          if (!list.length) return '';
+          return '<div class="mini" style="font-weight:600;margin:10px 0 6px;display:flex;align-items:center;gap:6px">' +
+            '<span class="lv-dot ' + dotCls + '"></span>' + t + ' <span style="color:var(--muted)">' + list.length + ' 只</span></div>' +
+            '<div class="pos-grid">' + list.map(function (p) { return posCard(p, stateOf(p)); }).join('') + '</div>';
+        }
+        // ★2026-08-15 超限提示条：over_limit（超 5 只纪律拒绝）单独展示，不占持仓名额
+        var overHtml = '';
+        if (overPos.length) {
+          overHtml = '<div style="margin:10px 0 2px;padding:8px 12px;background:rgba(242,201,76,.12);border:1px solid rgba(242,201,76,.25);border-radius:8px;font-size:12px;color:#f2c94c">' +
+            '<b>超限 ' + overPos.length + ' 只（持股≤5 纪律，已拒绝入持仓）</b>：' +
+            overPos.map(function (p) { return R._f(p.code) + (p.name ? ' ' + R._f(p.name) : '') + (p.entry_date ? '（' + p.entry_date + '）' : ''); }).join('、') +
+            '</div>';
+        }
+        // ★2026-08-15 状态机摘要条：一眼看清当前持仓分布（持有→临近→触发→止盈→卖出）
+        //   ★2026-08-15 可读性修复：底色加深 + 结构文字提亮（#d4d4d8）+ 数字加大加色，白条感消除
+        var nTrig = grpStop.filter(function (p) { return stateOf(p) === 'triggered'; }).length;
+        var nNear = grpStop.filter(function (p) { return stateOf(p) === 'near'; }).length;
+        function stChip(label, n, color, bg) {
+          return '<span style="display:inline-flex;align-items:center;gap:4px;background:' + bg + ';border:1px solid ' + bg + ';border-radius:6px;padding:2px 8px;font-weight:600">' +
+            label + ' <b style="color:' + color + ';font-size:14px">' + n + '</b></span>';
+        }
+        var mach = '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:6px 0 2px;padding:9px 12px;background:#0f0f12;border:1px solid #3a3a44;border-radius:8px;font-size:12px;color:#d4d4d8">' +
+          '<b style="color:#f4f4f5">状态机</b>' +
+          stChip('持有', grpHold.length, '#5e6ad2', 'rgba(94,106,210,.14)') +
+          '<span style="color:#a1a1aa">→</span>' +
+          stChip('临近止损', nNear, '#f2c94c', 'rgba(242,201,76,.12)') +
+          '<span style="color:#a1a1aa">→</span>' +
+          stChip('触发止损', nTrig, '#f87171', 'rgba(235,87,87,.12)') +
+          '<span style="color:#a1a1aa">→</span>' +
+          stChip('止盈信号', grpTp.length, '#4ade80', 'rgba(39,174,96,.12)') +
+          '<span style="color:#a1a1aa">→</span>' +
+          '<span style="color:#a1a1aa">卖出（次日开盘 · T+1）</span>' +
+          (nTrig ? ' <span style="color:#f87171;font-weight:700">⚠ 有触发需处理</span>' : '') +
+          '</div>';
+        posBox.innerHTML = overHtml + mach +
+          group('止损预警（触发/临近）', grpStop, 'lv-high') +
+          group('止盈信号', grpTp, 'lv-mid') +
+          group('持有', grpHold, 'lv-ok');
+        // 全空仓时保留空态
+        if (!heldPos.length) posBox.innerHTML = '<div class="empty-hero"><div class="ico">' + (IC.bar || '') + '</div><div class="tx">当前空仓</div>' +
+          '<div class="sub">' + R._f(pf.cleared_note, '无持仓记录') + ' — 宁缺毋滥，等待高质量 Pitch</div></div>';
+      }
+
+      /* 行业敞口 */
+      var ie = d.industry_exposure || {};
+      var ieTxt = ie.top_industry ? '行业敞口：' + ie.top_industry + (ie.top_industry_pct != null ? ' ' + (ie.top_industry_pct * 100).toFixed(0) + '%' : '') + (ie.flag ? '（' + ie.flag + '）' : '') : '';
+      document.getElementById('industry-box').innerHTML = ieTxt || '';
+    }).catch(function (e) {
+      document.getElementById('pos-box').innerHTML = '<div class="mini" style="color:var(--red)"> ' + e + '</div>';
+    });
+  }
+
+  /* 枚举预加载（otype 中文名）→ 渲染 → 60s 刷新
+     ★#354 竞态修复：原 loadAll 在 enums 异步完成前同步执行 → otypeCN 空 {}，
+     类型名渲染成英文 key（revalue 而非"价值重估"）——enums 先加载完再首次渲染 */
+  function ensureEnums(cb) {
+    if (otypeCN && Object.keys(otypeCN).length) { cb(); return; }
+    LW.api.get('/api/live/enums').then(function (e) { otypeCN = e.otypes || {}; }).catch(function () {}).then(cb);
+  }
+  ensureEnums(function () {
+    loadAll();
+    LW.decide.bind(document.getElementById('pos-box'));
+    LW.decide.on(loadAll);
+  });
+  setInterval(loadAll, 60000);
+})();
+</script>
+</body>
+</html>

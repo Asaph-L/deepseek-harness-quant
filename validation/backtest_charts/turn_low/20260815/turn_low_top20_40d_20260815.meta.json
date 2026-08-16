@@ -1,0 +1,37 @@
+{
+ "chart": "turn_low_top20_40d_20260815.png",
+ "title": "turn_low 40日调仓 top20 净值 vs 等权基准（T+1）",
+ "data": {
+  "source": "因子池面板 (bars.db qfq)",
+  "range": "2019-01~2026-08",
+  "factor_coverage": {
+   "2019-2026": "99%+",
+   "2011-2018": "0%（数据边界，不含）"
+  },
+  "n_codes": 5817
+ },
+ "backtest": {
+  "rebalance_days": 40,
+  "top_n": 20,
+  "weight": "equal",
+  "cost_buy": 0.0,
+  "cost_sell": 0.0,
+  "stamp": 0.0,
+  "slip": 0.0,
+  "t_plus_1": true,
+  "fix_qfq_jump": true,
+  "min_price": null,
+  "stop_loss": null,
+  "lookahead": "none"
+ },
+ "repro": {
+  "script": "validation/gen_backtest_charts.py",
+  "params_hash": "sha256:6aab6ecc356a",
+  "seed": null,
+  "env": "deepseek-harness-quant .venv"
+ },
+ "author": "主系统审计员",
+ "date": "2026-08-15",
+ "status": "定稿",
+ "note": "定稿形态：全市场 40日 top20、T+1、无止损无择时；2019+ 唯一可验证（turn 2019 前缺失）"
+}

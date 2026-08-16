@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LW量化 · 择时面板</title>
+<style>
+/* ═══════════ #155 择时面板深度打磨（2026-08-12）═══════════
+   风格规范（用户提供）：深色侧边栏 #0f172a 256px / nav #94a3b8 /
+   active #3b82f6 左边框 + #1e293b 背景 / 浅色内容 #f8fafc /
+   KPI 卡白底 1px #e2e8f0 24px padding / 24px grid gap /
+   tabular-nums 28px semibold / 正绿 #16a34a 负红 #dc2626 带箭头 */
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --sb-bg:#0f172a; --sb-label:#94a3b8; --sb-active-border:#3b82f6;
+  --sb-active-bg:#1e293b; --content-bg:#f8fafc; --card:#ffffff;
+  --border:#e2e8f0; --zebra:#f1f5f9; --pos:#16a34a; --neg:#dc2626;
+  --ink:#0f172a; --sub:#64748b; --accent:#3b82f6;
+}
+body{display:flex;min-height:100vh;background:var(--content-bg);color:var(--ink);
+  font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+
+/* ── 深色侧边栏 ── */
+.sb{width:256px;background:var(--sb-bg);color:#e2e8f0;display:flex;flex-direction:column;
+  position:fixed;inset:0 auto 0 0;z-index:10}
+.sb-brand{padding:22px 20px 18px;font-size:17px;font-weight:700;letter-spacing:.5px;
+  border-bottom:1px solid #1e293b;display:flex;align-items:center;gap:9px}
+.sb-brand .dot{width:9px;height:9px;border-radius:50%;background:var(--accent);
+  box-shadow:0 0 8px rgba(59,130,246,.8)}
+.sb-nav{flex:1;padding:14px 0;overflow-y:auto}
+.sb-nav a{display:flex;align-items:center;gap:11px;padding:11px 20px;font-size:13.5px;
+  color:var(--sb-label);text-decoration:none;border-left:3px solid transparent;
+  transition:background .15s,color .15s}
+.sb-nav a:hover{background:#16213a;color:#e2e8f0}
+.sb-nav a.on{background:var(--sb-active-bg);color:#f1f5f9;border-left-color:var(--sb-active-border);
+  font-weight:600}
+.sb-nav .ico{width:18px;text-align:center;font-size:14px;opacity:.9}
+.sb-foot{padding:14px 20px;font-size:11px;color:#475569;border-top:1px solid #1e293b;line-height:1.7}
+
+/* ── 浅色内容区 ── */
+.main{flex:1;margin-left:256px;padding:26px 30px;min-width:0}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
+.topbar h1{font-size:19px;font-weight:700}
+.topbar .ts{font-size:12px;color:var(--sub)}
+.badge-level{display:inline-flex;align-items:center;gap:6px;padding:5px 14px;border-radius:999px;
+  font-size:12.5px;font-weight:600}
+.badge-level.g{background:#ecfdf5;color:#059669;border:1px solid #a7f3d0}
+.badge-level.y{background:#fffbeb;color:#b45309;border:1px solid #fde68a}
+.badge-level.r{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+
+/* ── KPI 卡（4 张）── */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;margin-bottom:26px}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:14px;
+  padding:24px;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+.kpi .k-label{font-size:12.5px;color:var(--sub);display:flex;justify-content:space-between;align-items:center}
+.kpi .k-label .tag{font-size:10.5px;padding:2px 8px;border-radius:999px;background:#eff6ff;color:#2563eb}
+.kpi .k-value{font-variant-numeric:tabular-nums;font-size:28px;font-weight:600;
+  margin:10px 0 4px;letter-spacing:-.5px}
+.kpi .k-delta{font-size:12px;display:flex;align-items:center;gap:4px;font-weight:500}
+.kpi .k-delta.up{color:var(--pos)}
+.kpi .k-delta.down{color:var(--neg)}
+.kpi .k-delta.flat{color:var(--sub)}
+.kpi .k-note{font-size:11px;color:var(--sub);margin-top:8px;line-height:1.6}
+.spark{width:100%;height:34px;margin-top:12px}
+
+/* ── 双栏（四维分解 + 类型适配）── */
+.cols{display:grid;grid-template-columns:1.15fr 1fr;gap:24px;margin-bottom:26px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;
+  box-shadow:0 1px 2px rgba(15,23,42,.04)}
+.card h2{font-size:14.5px;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.card .sub{font-size:11.5px;color:var(--sub);margin-bottom:16px}
+.dim-row{margin-bottom:14px}
+.dim-top{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:5px}
+.dim-top b{font-weight:600}
+.dim-bar{height:7px;border-radius:99px;background:#eef2f7;overflow:hidden}
+.dim-fill{height:100%;border-radius:99px;transition:width .6s ease}
+.dim-note{font-size:10.8px;color:var(--sub);margin-top:4px;line-height:1.55}
+
+/* 类型适配徽章 */
+.fit-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}
+.fit{display:flex;justify-content:space-between;align-items:center;padding:9px 13px;
+  border:1px solid var(--border);border-radius:10px;font-size:12.5px}
+.fit b{font-weight:600}
+.fit .s{font-variant-numeric:tabular-nums;font-weight:700;font-size:13px}
+.fit.s2 .s{color:var(--pos)} .fit.s1 .s{color:#2f855a}
+.fit.s0 .s{color:var(--sub)} .fit.s-1 .s{color:#dd6b20} .fit.s-2 .s{color:var(--neg)}
+
+/* ── 日历窗口 + 风格 + 新鲜度 ── */
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-bottom:26px}
+.cal-list{list-style:none}
+.cal-list li{display:flex;justify-content:space-between;align-items:center;
+  padding:9px 0;border-bottom:1px dashed var(--border);font-size:12.5px}
+.cal-list li:last-child{border-bottom:none}
+.cal-list .b{font-variant-numeric:tabular-nums;font-weight:700;font-size:12.5px}
+.cal-list .b.up{color:var(--pos)} .cal-list .b.down{color:var(--neg)} .cal-list .b.flat{color:var(--sub)}
+.cal-now{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:10px;
+  background:#fffbeb;border:1px solid #fde68a;font-size:12.5px;margin-bottom:10px}
+.cal-now.none{background:#f8fafc;border:1px solid var(--border)}
+.kv{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed var(--border);
+  font-size:12.5px}
+.kv:last-child{border-bottom:none}
+.kv b{font-weight:600}
+.kv .ok{color:var(--pos)} .kv .warn{color:#b45309}
+
+/* ── 温度组件表（zebra）── */
+table.z{width:100%;border-collapse:collapse;font-size:12.5px}
+table.z th{text-align:left;padding:9px 12px;color:var(--sub);font-weight:600;font-size:11px;
+  border-bottom:1px solid var(--border)}
+table.z td{padding:9px 12px;border-bottom:1px solid var(--border)}
+table.z tr:nth-child(even){background:var(--zebra)}
+table.z td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+table.z td.num.up{color:var(--pos)} table.z td.num.down{color:var(--neg)}
+
+@media(max-width:1200px){.kpi-grid{grid-template-columns:repeat(2,1fr)}.cols,.grid3{grid-template-columns:1fr}}
+@media(max-width:760px){.sb{position:static;width:100%;flex-direction:row;align-items:center}
+  .sb-nav{display:flex;overflow-x:auto;padding:0}.sb-nav a{border-left:none;border-bottom:3px solid transparent;padding:12px 14px;white-space:nowrap}
+  .sb-nav a.on{border-bottom-color:var(--sb-active-border)}
+  .sb-foot{display:none}.main{margin-left:0;padding:18px}.kpi-grid{grid-template-columns:1fr}}
+
+/* ═══════════ #156 StyleKit 动画融合（2026-08-12）═══════════
+   来源：stylekit.top/animations（用户提供素材站，直接抄代码）
+   一致性：统一缓动 cubic-bezier(0.16,1,0.3,1) · 统一时长节奏（微 200ms/入 500ms/数 2s）·
+   prefers-reduced-motion 全部降级 · 动画只增强不干扰数据读取 */
+
+/* 1) 数字滚动（counter-roll：0-9 垂直滚动至目标值）——KPI 数值 */
+@keyframes counter-roll {
+  from { transform: translateY(0); }
+  to   { transform: translateY(calc(var(--counter-target, -9) * -1em)); }
+}
+.counter-roll-container{display:inline-flex;overflow:hidden;height:1em;line-height:1;
+  font-variant-numeric:tabular-nums}
+.counter-roll-column{display:flex;flex-direction:column}
+.counter-roll-column span{height:1em;display:flex;align-items:center;justify-content:center}
+.counter-roll-digit{will-change:transform;
+  animation:counter-roll 2s cubic-bezier(0.16,1,0.3,1) both;
+  animation-delay:calc(var(--digit-index,0)*150ms)}
+
+/* 2) 子元素错开入场（stagger-children：卡片网格依次上滑淡入） */
+@keyframes stagger-fade-in{
+  from{opacity:0;transform:translateY(15px)}
+  to{opacity:1;transform:translateY(0)}
+}
+.stagger-children>*{will-change:transform,opacity;opacity:0;
+  animation:stagger-fade-in 500ms cubic-bezier(0.16,1,0.3,1) both;
+  animation-delay:calc(var(--stagger-index,0)*var(--stagger-delay,75ms))}
+
+/* 3) 悬浮抬升（hover-lift：卡片 hover 上移+阴影加深） */
+.hover-lift{will-change:transform,box-shadow;
+  transition:transform 200ms cubic-bezier(0.33,1,0.68,1),
+             box-shadow 200ms cubic-bezier(0.33,1,0.68,1)}
+.hover-lift:hover{transform:translateY(-4px);
+  box-shadow:0 12px 20px -8px rgba(15,23,42,.15),0 4px 6px -4px rgba(15,23,42,.1)}
+
+/* 4) 微光扫过（shimmer：Apple 风格加载占位） */
+@keyframes shimmer{from{background-position:-200% 0}to{background-position:200% 0}}
+.shimmer{background:linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 37%,#f1f5f9 63%);
+  background-size:200% 100%;animation:shimmer 2s linear infinite;border-radius:.375rem}
+
+/* 5) 脉冲光环（pulse-ring：状态指示呼吸灯） */
+@keyframes pulse-ring{
+  0%{box-shadow:0 0 0 0 rgba(22,163,74,.45)}
+  70%{box-shadow:0 0 0 9px rgba(22,163,74,0)}
+  100%{box-shadow:0 0 0 0 rgba(22,163,74,0)}
+}
+.pulse-ring{width:9px;height:9px;border-radius:50%;background:#16a34a;
+  animation:pulse-ring 2s ease-out infinite;display:inline-block}
+.pulse-ring.amber{background:#d97706}
+@keyframes pulse-ring-amber{
+  0%{box-shadow:0 0 0 0 rgba(217,119,6,.45)}
+  70%{box-shadow:0 0 0 9px rgba(217,119,6,0)}
+  100%{box-shadow:0 0 0 0 rgba(217,119,6,0)}
+}
+.pulse-ring.amber{animation:pulse-ring-amber 2s ease-out infinite}
+
+/* 6) 区块淡入上滑（fade-in-up：主区块入场） */
+@keyframes fade-in-up{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+.fade-in-up{animation:fade-in-up 600ms cubic-bezier(0.16,1,0.3,1) both}
+.fade-in-up.d1{animation-delay:80ms}.fade-in-up.d2{animation-delay:160ms}.fade-in-up.d3{animation-delay:240ms}
+
+/* 动画降级（用户偏好减少动效时全部禁用） */
+@media (prefers-reduced-motion: reduce){
+  .counter-roll-digit,.stagger-children>*,.shimmer,.pulse-ring,.fade-in-up{
+    animation:none!important;opacity:1!important;transform:none!important}
+  .hover-lift{transition:none!important}
+}
+
+/* ★#166 动态行情条（live_ticker） */
+.lt-bar{overflow:hidden;white-space:nowrap;background:#050a18;border-radius:6px;
+  padding:9px 0;margin-bottom:14px;position:relative}
+.lt-track{display:inline-block;white-space:nowrap;animation:lt-scroll 14s linear infinite}
+.lt-bar:hover .lt-track{animation-play-state:paused}
+@keyframes lt-scroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.lt-item{display:inline-flex;align-items:center;gap:5px;margin:0 18px;font-size:11.5px;color:#94a3b8}
+.lt-item b{color:#e2e8f0;font-weight:600}
+.lt-val{font-variant-numeric:tabular-nums;font-weight:700}
+.lt-dot{width:6px;height:6px;border-radius:50%;display:inline-block}
+.lt-msg .lt-val{color:#7dd3fc!important;font-weight:500}
+.lt-rotator{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;
+  padding:10px 16px;font-size:12px;color:#334155;margin-bottom:14px;min-height:38px;
+  display:flex;align-items:center;gap:8px;overflow:hidden}
+.lt-rot-cat{font-weight:700;flex-shrink:0}
+.lt-rot-msg{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;animation:lt-fade .6s ease}
+@keyframes lt-fade{from{opacity:0;transform:translateX(8px)}to{opacity:1;transform:translateX(0)}}
+@media (prefers-reduced-motion: reduce){.lt-track{animation:none}.lt-rot-msg{animation:none}}
+
+.lt-sep{color:#1e3a5f;font-size:10px;margin:0 2px;animation:lt-blink 1s steps(2) infinite}
+@keyframes lt-blink{0%,100%{opacity:1}50%{opacity:.15}}
+</style>
+</head>
+<body>
+
+<!-- 深色侧边栏（256px） -->
+<aside class="sb">
+  <div class="sb-brand"><span class="dot"></span>LW量化</div>
+  <nav class="sb-nav">
+    <a href="/"><span class="ico">🏠</span>门户</a>
+    <a href="/pitch"><span class="ico">🎯</span>决策</a>
+    <a href="/holdings"><span class="ico">💼</span>持仓</a>
+    <a href="/factors"><span class="ico">🧬</span>因子池</a>
+    <a href="/timing_dash.html" class="on"><span class="ico">📊</span>择时面板</a>
+    <a href="/help"><span class="ico">📖</span>说明</a>
+  </nav>
+  <div class="sb-foot">数据：timing_system / regime / calendar_hook / 外包快照<br>刷新：60s 自动 · 版本缓存自动失效</div>
+</aside>
+
+<!-- 浅色内容区 -->
+<main class="main">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:12px">
+      <h1>择时面板</h1>
+      <span id="lvl-badge" class="badge-level">…</span>
+    </div>
+    <span class="ts" id="ts">加载中…</span>
+  </div>
+
+  <!-- ★#166 动态行情条（文字一直在动——金融系统感） -->
+  <div class="lt-bar"></div>
+  <div class="lt-rotator">⏳ 正在加载实时信息…</div>
+  <script src="/live_ticker.js"></script>
+
+  <!-- 4 KPI 卡（stagger 错开入场 + hover-lift 悬停抬升） -->
+  <div class="kpi-grid stagger-children" style="--stagger-delay:90ms">
+    <div class="kpi hover-lift" style="--stagger-index:0">
+      <div class="k-label">择时总分 <span class="tag">0-100</span></div>
+      <div class="k-value" id="k-score">—</div>
+      <div class="k-delta" id="k-score-d">…</div>
+      <svg class="spark" id="sp-score" preserveAspectRatio="none"></svg>
+      <div class="k-note" id="k-score-note">政策40% + 宏观25% + 情绪20% + 宽度15%</div>
+    </div>
+    <div class="kpi hover-lift" style="--stagger-index:1">
+      <div class="k-label">市场温度 <span class="tag">越低越恐慌=买入区</span></div>
+      <div class="k-value" id="k-temp">—</div>
+      <div class="k-delta" id="k-temp-d">…</div>
+      <svg class="spark" id="sp-temp" preserveAspectRatio="none"></svg>
+      <div class="k-note" id="k-temp-note">外包五指标温度计（H5/H23/H30）</div>
+    </div>
+    <div class="kpi hover-lift" style="--stagger-index:2">
+      <div class="k-label">行业宽度 <span class="tag">&lt;20% 恐慌底部</span></div>
+      <div class="k-value" id="k-width">—</div>
+      <div class="k-delta" id="k-width-d">…</div>
+      <svg class="spark" id="sp-width" preserveAspectRatio="none"></svg>
+      <div class="k-note" id="k-width-note">60 日动量 &gt;0 行业占比（H30）</div>
+    </div>
+    <div class="kpi hover-lift" style="--stagger-index:3">
+      <div class="k-label">市场拥挤度 <span class="tag">&gt;0.8 过热</span></div>
+      <div class="k-value" id="k-crowd">—</div>
+      <div class="k-delta" id="k-crowd-d">…</div>
+      <svg class="spark" id="sp-crowd" preserveAspectRatio="none"></svg>
+      <div class="k-note" id="k-crowd-note">拥挤度 252 日分位（C-10 反向温度计）</div>
+    </div>
+  </div>
+
+  <!-- ★2026-08-13 跨日评分走势（"择时动起来"：每日 18:30 管道更新 + 8.69 归档积累） -->
+  <div class="card fade-in-up d1" style="margin-top:14px">
+    <h2>📈 跨日评分走势 <span style="font-size:11px;color:var(--sub);font-weight:400">每日自动积累 · 择时趋势</span></h2>
+    <div class="sub">score 走势（0-100）——长期择时趋势，见底回升=加仓窗口信号</div>
+    <svg id="score-trend" width="100%" height="90" preserveAspectRatio="none" style="display:block;margin-top:8px"></svg>
+    <div class="k-note" id="trend-note">加载中…</div>
+  </div>
+
+  <!-- 四维分解 + 类型适配（fade-in-up 区块入场） -->
+  <div class="cols">
+    <div class="card hover-lift fade-in-up">
+      <h2>四维分解</h2>
+      <div class="sub">政策 / 宏观 / 情绪 / 宽度 —— 每维 0-100，越低越防守、越高越进攻（情绪/宽度为反向读数）</div>
+      <div id="dims"></div>
+    </div>
+    <div class="card hover-lift fade-in-up d1">
+      <h2>类型适配 <span style="font-size:11px;color:var(--sub);font-weight:400">Pitch 审批参考</span></h2>
+      <div class="sub" id="fit-note">…</div>
+      <div class="fit-grid" id="fit-grid"></div>
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+        <h2 style="font-size:13px">风格状态</h2>
+        <div id="style-box" style="margin-top:10px;font-size:12.5px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 日历窗口 + 温度构成 + 新鲜度（fade-in-up 区块入场） -->
+  <div class="grid3">
+    <div class="card hover-lift fade-in-up d2">
+      <h2>日历窗口 <span style="font-size:11px;color:var(--sub);font-weight:400">H16 节日 + H17 政策 + CAL 月收益</span></h2>
+      <div class="sub" style="margin-bottom:10px">市场级效应，全池统一加减分（#154 CAL 已补落地）</div>
+      <div id="cal-box"></div>
+      <div class="sub" style="margin:10px 0 6px">未来 90 天窗口</div>
+      <ul class="cal-list" id="cal-up"></ul>
+    </div>
+    <div class="card hover-lift fade-in-up d2">
+      <h2>温度构成 <span style="font-size:11px;color:var(--sub);font-weight:400">五指标加权</span></h2>
+      <div class="sub" id="temp-zone">…</div>
+      <table class="z" id="temp-table">
+        <thead><tr><th>指标</th><th style="text-align:right">贡献</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="card hover-lift fade-in-up d3">
+      <h2>数据新鲜度 <span style="font-size:11px;color:var(--sub);font-weight:400">防消费旧数据</span></h2>
+      <div class="sub" style="margin-bottom:10px">#135 快照新鲜度语义：滞后 &gt;3 交易日 → 降档</div>
+      <div id="fresh-box"></div>
+    </div>
+  </div>
+
+  <!-- 详细原因（fade-in-up 区块入场） -->
+  <div class="card hover-lift fade-in-up d3">
+    <h2>当前判断依据</h2>
+    <div class="sub" id="reason" style="margin:8px 0 0;font-size:12.5px;line-height:1.9">…</div>
+    <div class="sub" id="formula" style="margin-top:12px">…</div>
+  </div>
+</main>
+
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+/* ── #156 StyleKit 数字滚动组件（counter-roll：0-9 垂直滚动至目标值）──
+   用法：counterRoll(el, 80.0, {decimals:1, suffix:'分'}) —— 仅首次加载滚动 */
+function counterRoll(el, val, opt){
+  opt=opt||{};
+  const decimals=opt.decimals!=null?opt.decimals:0;
+  const suffix=opt.suffix||'';
+  if(val==null){el.textContent='—';return}
+  const num=Number(val).toFixed(decimals);
+  const intPart=Math.floor(Math.abs(Number(val))).toString();
+  const decPart=decimals>0?num.split('.')[1]:'';
+  const sign=Number(val)<0?'-':'';
+  let html=sign;
+  for(let i=0;i<intPart.length;i++){
+    const d=parseInt(intPart[i],10);
+    html+='<span class="counter-roll-container" style="height:1.05em"><span class="counter-roll-column counter-roll-digit" style="--counter-target:-'+d+';--digit-index:'+i+'">'+
+      [0,1,2,3,4,5,6,7,8,9].map(x=>'<span>'+x+'</span>').join('')+'</span></span>';
+  }
+  if(decPart) html+='.<span class="counter-roll-container" style="height:1.05em"><span class="counter-roll-column counter-roll-digit" style="--counter-target:-'+parseInt(decPart[0],10)+';--digit-index:'+intPart.length+'">'+
+    [0,1,2,3,4,5,6,7,8,9].map(x=>'<span>'+x+'</span>').join('')+'</span></span>';
+  el.innerHTML=html+(suffix?'<span style="font-size:14px;color:var(--sub);margin-left:3px">'+suffix+'</span>':'');
+}
+/* ── sparkline 绘制（SVG polyline，12 点归一）── */
+function spark(svgId, arr, color){
+  const svg=$(svgId); if(!svg||!arr||arr.length<2){if(svg)svg.innerHTML='';return}
+  const w=svg.clientWidth||260, h=34, pad=2;
+  const min=Math.min(...arr), max=Math.max(...arr), rng=(max-min)||1;
+  const pts=arr.map((v,i)=>[(w-2*pad)*i/(arr.length-1)+pad, h-pad-(v-min)/rng*(h-2*pad)]);
+  svg.innerHTML='<polyline fill="none" stroke="'+color+'" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" points="'+pts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')+'"/>'+
+    '<circle cx="'+pts[pts.length-1][0].toFixed(1)+'" cy="'+pts[pts.length-1][1].toFixed(1)+'" r="2.4" fill="'+color+'"/>';
+}
+/* ── delta 徽章（正绿负红带箭头，颜色非唯一信号）── */
+function delta(cur, prev, unit, inv){
+  if(prev==null||cur==null) return '<span class="k-delta flat">— 无历史</span>';
+  const d=cur-prev;
+  const arrow=d>0?'▲':d<0?'▼':'▬';
+  const cls=d>0?'up':d<0?'down':'flat';
+  const val=unit==='pct'?Math.abs(d).toFixed(1)+'pp':Math.abs(d).toFixed(1)+' 点';
+  const txt=inv?(d>0?'升高(偏热)':d<0?'回落(偏冷)':''):(d>0?'较上次 +':'较上次 ');
+  return '<span class="k-delta '+cls+'">'+arrow+' '+txt+(inv?(''):'')+val+(d===0?'':(''))+'</span>';
+}
+/* ── 主渲染 ── */
+function load(){
+  fetch('/api/live/timing_dash').then(r=>r.json()).then(d=>{
+    if(!d||!d.ok){$('#ts').textContent='API 异常：'+(d&&d.error||'');return}
+    if(d.schema_version!=='1.0'){$('#ts').textContent='⚠️ 数据格式升级中（schema v'+d.schema_version+'）——稍后刷新';return}
+    const t=d.timing||{};
+    const st=t.style_state||{};
+    $('#ts').textContent='数据日 '+esc(t.date||'—')+' ｜ 评估 '+esc(t.ts||'')+' ｜ 每 60s 自动刷新';
+    /* 等级徽章 */
+    const lv=t.level||'';
+    const lvCls=lv.includes('适合')?'g':(lv.includes('谨慎')?'y':'r');
+    $('#lvl-badge').textContent=(t.emoji||'')+' '+lv;
+    $('#lvl-badge').className='badge-level '+lvCls;
+    /* KPI1 择时总分（#156 数字滚动） */
+    if(t.score!=null) counterRoll($('#k-score'), t.score, {decimals:1, suffix:'分'});
+    else $('#k-score').textContent='—';
+    const sh=d.score_hist||[];
+    if(sh.length>=2) $('#k-score-d').innerHTML=delta(sh[sh.length-1],sh[sh.length-2]);
+    else $('#k-score-d').innerHTML='<span class="k-delta flat">当日 '+sh.length+' 次评估</span>';
+    spark('#sp-score', sh, '#3b82f6');
+    /* ★2026-08-13 跨日评分走势（score_series——每日归档积累） */
+    try{
+      const ser=d.score_series||[], days=d.score_days||[];
+      const svg=$('#score-trend'), note=$('#trend-note');
+      if(svg&&ser.length>=2){
+        const w=svg.clientWidth||300, h=90, pad=18;
+        const min=Math.min(...ser), max=Math.max(...ser), rng=(max-min)||1;
+        const pts=ser.map((v,i)=>[(w-2*pad)*i/(ser.length-1)+pad, h-pad-(v-min)/rng*(h-2*pad-14)]);
+        let html='<polyline fill="none" stroke="#3b82f6" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" points="'+pts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')+'"/>';
+        // 面积渐变 + 端点
+        html+='<polygon fill="rgba(59,130,246,.08)" points="'+pts[0][0].toFixed(1)+','+(h-pad)+' '+pts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')+' '+(pts[pts.length-1][0]).toFixed(1)+','+(h-pad)+'"/>';
+        html+='<circle cx="'+pts[pts.length-1][0].toFixed(1)+'" cy="'+pts[pts.length-1][1].toFixed(1)+'" r="3.2" fill="#3b82f6"/>';
+        // 数值标签
+        ser.forEach(function(v,i){
+          html+='<text x="'+pts[i][0].toFixed(1)+'" y="'+(pts[i][1]-9).toFixed(1)+'" font-size="10" fill="#64748B" text-anchor="'+(i===0?'start':i===ser.length-1?'end':'middle')+'">'+v.toFixed(1)+'</text>';
+        });
+        svg.innerHTML=html;
+        if(note) note.textContent=days[0]+' → '+days[days.length-1]+'：'+ser[0].toFixed(1)+' → '+ser[ser.length-1].toFixed(1)+'（'+(ser[ser.length-1]-ser[0]>=0?'+':'')+(ser[ser.length-1]-ser[0]).toFixed(1)+' 分）· 每日 18:30 更新';
+      } else if(svg&&ser.length===1){
+        if(note) note.textContent='仅 1 个交易日样本（'+days[0]+'：'+ser[0].toFixed(1)+' 分）——每日自动积累中';
+      }
+    }catch(e){}
+    /* KPI2 市场温度（#156 数字滚动） */
+    const temp=(st&&st.temp!=null)?st.temp:null;
+    const th=d.temp_hist||[];
+    const curTemp=th.length?th[th.length-1]:null;
+    if(curTemp!=null) counterRoll($('#k-temp'), curTemp, {decimals:0, suffix:'/100'});
+    else $('#k-temp').textContent='—';
+    if(th.length>=2){
+      const dd=th[th.length-1]-th[th.length-2];
+      $('#k-temp-d').innerHTML='<span class="k-delta '+(dd>0?'up':dd<0?'down':'flat')+'">'+(dd>0?'▲':'▼')+' 恐慌'+(dd>0?'缓解':'加深')+'</span>';
+    } else $('#k-temp-d').innerHTML='<span class="k-delta flat">'+esc(d.temp_zone||'')+'</span>';
+    spark('#sp-temp', th, '#8b5cf6');
+    $('#k-temp-note').textContent=d.temp_zone||'外包五指标温度计';
+    /* KPI3 行业宽度（#156 数字滚动） */
+    const wh=d.width_hist||[];
+    const curW=wh.length?wh[wh.length-1]:null;
+    if(curW!=null) counterRoll($('#k-width'), curW*100, {decimals:0, suffix:'%'});
+    else $('#k-width').textContent='—';
+    if(wh.length>=2){
+      const dd=wh[wh.length-1]-wh[wh.length-2];
+      $('#k-width-d').innerHTML='<span class="k-delta '+(dd>0?'up':dd<0?'down':'flat')+'">'+(dd>0?'▲':'▼')+' 宽度'+(dd>0?'回升':'收窄')+'</span>';
+    } else $('#k-width-d').innerHTML='<span class="k-delta flat">'+(curW!=null&&curW<0.2?'🔥 恐慌底部':'正常')+'</span>';
+    spark('#sp-width', wh, '#0ea5e9');
+    /* KPI4 拥挤度（#156 数字滚动） */
+    const cd=d.crowding||{};
+    const ch=d.crowd_hist||[];
+    const curC=ch.length?ch[ch.length-1]:null;
+    if(curC!=null) counterRoll($('#k-crowd'), curC*100, {decimals:1, suffix:'%'});
+    else $('#k-crowd').textContent='—';
+    if(ch.length>=2){
+      const dd=ch[ch.length-1]-ch[ch.length-2];
+      $('#k-crowd-d').innerHTML='<span class="k-delta '+(dd>0?'up':dd<0?'down':'flat')+'">'+(dd>0?'▲':'▼')+' 拥挤度'+(dd>0?'上升':'回落')+'</span>';
+    } else $('#k-crowd-d').innerHTML='<span class="k-delta flat">'+(curC!=null&&curC>0.8?'⚠️ 过热':'✅ 正常')+'</span>';
+    spark('#sp-crowd', ch, '#f59e0b');
+    $('#k-crowd-note').textContent=(cd.zone||'')+' ｜ 拥挤股 '+((cd.n_crowded!=null)?cd.n_crowded+' 只':'—')+'（'+esc(cd.date||'')+'）';
+    /* 四维分解 */
+    const dims=t.dims||{};
+    const dimDefs=[['政策','#3b82f6'],['宏观','#8b5cf6'],['情绪','#0ea5e9'],['宽度','#f59e0b']];
+    $('#dims').innerHTML=dimDefs.map(([k,c])=>{
+      const v=dims[k]; if(!v) return '';
+      const s=v.score!=null?v.score:0;
+      const fill='<div class="dim-fill" style="width:'+Math.max(4,Math.min(100,s))+'%;background:'+c+'"></div>';
+      return '<div class="dim-row"><div class="dim-top"><b>'+k+'</b><span style="font-variant-numeric:tabular-nums">'+
+        (v.score!=null?Math.round(v.score):'—')+' 分</span></div><div class="dim-bar">'+fill+'</div>'+
+        '<div class="dim-note">'+esc(v.note||'')+'</div></div>';
+    }).join('');
+    /* 类型适配（#165 枚举动态下发：新类型自动出现） */
+    const rf=t.regime_fit||{};
+    const map=rf.map||{};
+    const nameMap=window.__ENUMS_OTYPES||{};
+    const fitCls={'++':'s2','+':'s1','0':'s0','-':'s-1','--':'s-2'};
+    $('#fit-grid').innerHTML=Object.keys(map).map(k=>{
+      const v=map[k];
+      return '<div class="fit '+fitCls[v]+'"><b>'+(nameMap[k]||k)+'</b><span class="s">'+v+'</span></div>';
+    }).join('')||'<div style="font-size:12px;color:var(--sub)">无适配数据</div>';
+    $('#fit-note').textContent=esc(rf.note||'');
+    /* 风格状态 */
+    const sbHtml='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><b style="font-size:13px">'+
+      esc(st.style||'—')+'</b>'+(st.fresh?'<span style="font-size:10.5px;padding:2px 8px;border-radius:999px;background:#ecfdf5;color:#059669"><span class="pulse-ring" style="vertical-align:-1px;margin-right:4px"></span>快照新鲜</span>':'<span style="font-size:10.5px;padding:2px 8px;border-radius:999px;background:#fef2f2;color:#b91c1c"><span class="pulse-ring amber" style="vertical-align:-1px;margin-right:4px"></span>快照滞后</span>')+'</div>'+
+      '<div style="color:var(--sub);line-height:1.7">'+esc(st.note||'')+'</div>'+
+      '<div style="margin-top:6px;font-size:11px;color:var(--sub)">分化度 '+(st.divergence_60!=null?(st.divergence_60*100).toFixed(1)+'%':'—')+
+      ' ｜ 行业宽度 '+(st.ind_breadth_60!=null?(st.ind_breadth_60*100).toFixed(1)+'%':'—')+
+      ' ｜ 拥挤分位 '+(st.crowding_pctile!=null?(st.crowding_pctile*100).toFixed(1)+'%':'—')+'</div>';
+    $('#style-box').innerHTML=sbHtml;
+    /* 日历窗口 */
+    const cw=d.cal_win;
+    $('#cal-box').innerHTML=cw
+      ?'<div class="cal-now"><span>📅</span><div><b>'+esc(cw.label)+'</b>（'+esc(cw.start)+'~'+esc(cw.end)+'）<br><span style="color:var(--sub)">'+
+        (cw.bonus>=0?'+' :'')+cw.bonus+' 分 · '+esc(cw.evidence||'')+' · 剩 '+cw.days_left+' 天</span></div></div>'
+      :'<div class="cal-now none"><span>📅</span><div>当前无日历窗口（正常市场）</div></div>';
+    const cm=d.cal_month||{};
+    $('#cal-up').innerHTML=
+      '<li><span>CAL 本月</span><span class="b '+(cm.bonus>0?'up':cm.bonus<0?'down':'flat')+'">'+
+      (cm.bonus?((cm.bonus>0?'+':'')+cm.bonus+' 分'):'中性')+'</span></li>'+
+      (d.cal_upcoming||[]).map(u=>'<li><span>'+esc(u.label)+'（'+u.days_to+' 天后）</span><span class="b '+(u.bonus>=0?'up':'down')+'">'+(u.bonus>=0?'+':'')+u.bonus+'</span></li>').join('')||'<li><span>90 天内无窗口</span><span class="b flat">—</span></li>';
+    /* 温度构成表 */
+    const tc=d.temp_components||{};
+    $('#temp-zone').textContent=d.temp_zone||'';
+    $('#temp-table tbody').innerHTML=Object.keys(tc).map(k=>{
+      const v=tc[k];
+      return '<tr><td>'+esc(k)+'</td><td class="num '+(v>=0?'up':'down')+'">'+(v>=0?'+':'')+Number(v).toFixed(1)+'</td></tr>';
+    }).join('');
+    /* 新鲜度 */
+    $('#fresh-box').innerHTML=
+      '<div class="kv"><span>择时数据日</span><b>'+(t.date!=null?'✅ '+esc(t.date):'—')+'</b></div>'+
+      '<div class="kv"><span>快照文件</span><b class="'+(st.fresh?'ok':'warn')+'">'+esc(st.snap_file||'—')+'</b></div>'+
+      '<div class="kv"><span>拥挤度日期</span><b>'+(cd.date?'✅ '+esc(cd.date):'—')+'</b></div>'+
+      '<div class="kv"><span>风格状态</span><b>'+(st.fresh?'🟢 新鲜':'🟡 滞后降档')+'</b></div>';
+    /* 原因 + 公式 */
+    $('#reason').innerHTML=esc(t.reason||'');
+    $('#formula').innerHTML='<b style="color:var(--sub)">公式：</b>'+esc(t.formula||'');
+  }).catch(e=>{$('#ts').textContent='加载失败：'+e.message});
+}
+/* #165 枚举预加载（类型中文名动态下发） */
+fetch('/api/live/enums').then(r=>r.json()).then(e=>{
+  window.__ENUMS_OTYPES=e.otypes||{};
+  load();
+}).catch(()=>load());
+load();
+setInterval(load, 60000);
+</script>
+</body>
+</html>

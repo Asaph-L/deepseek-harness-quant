@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Deepseek HARNESS Quant · 说明</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="/v2/assets/ui_common.css">
+<link rel="stylesheet" href="/v2/assets/anim_common.css">
+<link rel="stylesheet" href="/v2/assets/app.css">
+<style>
+  .funnel-row { display:flex; align-items:center; gap:12px; padding:9px 12px; margin-bottom:6px;
+    background:#16161a; border:1px solid #2a2a30; border-radius:10px; }
+  .funnel-row .f-name { width:90px; font-size:13px; font-weight:700; color:#d4d4d8; flex-shrink:0; }
+  .funnel-row .f-n { width:110px; font-size:18px; font-weight:700; font-variant-numeric:tabular-nums; text-align:right; flex-shrink:0; }
+  .funnel-row .f-bar-wrap { flex:1; height:14px; background:#1c1c22; border-radius:7px; overflow:hidden; }
+  .funnel-row .f-bar { height:100%; border-radius:7px; transition:width .6s ease; }
+  .funnel-row .f-desc { width:210px; font-size:11px; color:#a1a1aa; line-height:1.5; flex-shrink:0; }
+  .funnel-row .f-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .arch { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-top:10px; }
+  .arch .layer { background:#16161a; border:1px solid #2a2a30; border-radius:10px; padding:12px 14px; }
+  .arch .layer h3 { margin:0 0 6px; font-size:14px; display:flex; align-items:center; gap:8px; }
+  .arch .layer .ln { font-size:11px; padding:1px 7px; border-radius:8px; font-weight:700; }
+  .term { padding:6px 0; border-bottom:1px solid rgba(255,255,255,.08); font-size:12px; line-height:1.7; }
+  .term b { color:var(--navy); min-width:130px; display:inline-block; }
+  @media (max-width: 900px) {
+    .arch { grid-template-columns:1fr; }
+    .funnel-row { flex-wrap:wrap; }
+    .funnel-row .f-desc { width:100%; }
+  }
+</style>
+</head>
+<body style="background:var(--bg);margin:0">
+<div id="sidebar"></div>
+<div class="v2-wrap">
+  <div class="v2-h"><span class="bar"></span><h1>说明</h1><span class="sub">全决策流程 · 动态漏斗 · 各层原理 · 协作</span></div>
+  <div class="mini" style="opacity:.7">UI v2 · 说明页 2026-08-15 重建 —— 展示系统真实决策链（源头数据 → 各层过滤 → Pitch → 持仓 → 验证）</div>
+
+  <!-- ★2026-08-15 动态决策流程漏斗（核心） -->
+  <div class="v2-card anim-fade-in-up" style="margin-top:12px">
+    <h2> 动态决策流程漏斗 <span class="tag">/api/live/funnel · 60s 自动刷新 · 每层实时数量</span></h2>
+    <div class="mini" style="margin-bottom:10px;line-height:1.8;color:#a1a1aa">
+      从 <b style="color:#d4d4d8">源头数据</b> 到 <b style="color:#d4d4d8">Pitch 层</b> 的每一层过滤都在真实发生——数字实时拉取，
+      宽度 = 该层数量占比（漏斗效果）。<b style="color:var(--gold)">为什么只剩 17 只？</b>看淘汰原因统计。
+    </div>
+    <div id="funnel-box" class="mini" style="line-height:2"> 加载中…</div>
+    <div id="funnel-extra" class="mini" style="margin-top:10px;color:var(--muted)"></div>
+  </div>
+
+  <!-- 系统架构（L0/L1/L2） -->
+  <div class="v2-card anim-fade-in-up d1" style="margin-top:14px">
+    <h2> 系统架构 <span class="tag">三层决策 · 2026-08-15 低频主观量化 CTA 化</span></h2>
+    <div class="mini" style="line-height:1.9;color:#a1a1aa">
+      核心转变：<b>从"因子高分自动选股"→"L0 择时管仓位（参考）+ L2 主观精选管个股 + L1 因子参考管候选"</b>。
+      买入指令 = L2 决策卡片聚合（同一套数据源，绝无两套推荐逻辑）。
+    </div>
+    <div class="arch">
+      <div class="layer">
+        <h3><span class="ln" style="background:rgba(94,106,210,.16);color:#5e6ad2">L0</span> 择时层 · 仓位总闸</h3>
+        <div class="mini" style="color:var(--muted);line-height:1.8">四维评分（政策40%/宏观25%/情绪20%/宽度15%）= 适合买入/谨慎/不适合。<br>
+          ⚠️ 实证（08-15）：<b style="color:var(--gold)">择时对低换手组合是净损耗</b>（12 参数组合 + 因子池 MA 重验双重确认），
+          故 L0 仅作<b>满仓主义大波段参考</b>（红绿灯=参考，不接线），不做月度择向。<br>
+          防御期（评分&lt;40）revalue/短线情绪审批从严（后端硬门控）。</div>
+      </div>
+      <div class="layer">
+        <h3><span class="ln" style="background:rgba(242,201,76,.14);color:#f2c94c">L2</span> 主观精选层 · 唯一产生买入指令</h3>
+        <div class="mini" style="color:var(--muted);line-height:1.8"><b>Pitch 长线</b>（价值/质量缺口/重估，1/2/3 年证据+止损）+
+          <b>Pitch 短线</b>（情绪/事件，ATR 双倍止损"见光死"）。<br>
+          决策页「今日买入指令」= 长+短待审批卡聚合（同源）。<br>
+          持仓 ≤5 纪律：审批买入满仓自动进超限，须先卖后买。<br>
+          ⚠️ 实证：<b style="color:var(--gold)">pitch 高分集中持仓 = -41~-60% 回撤</b>——pitch 是雷达+卫星仓，主力走 turn_low 分散。</div>
+      </div>
+      <div class="layer">
+        <h3><span class="ln" style="background:rgba(39,174,96,.14);color:#4ade80">L1</span> 因子参考层 · 不产生指令</h3>
+        <div class="mini" style="color:var(--muted);line-height:1.8">因子净化 A/B/C 分类（稳定 47 / 反转 21 / 噪声 55）+ 机会池 + 机器池 + 竞价排雷。<br>
+          参考数据：daily_scores（因子池）/ 机会池 / 远期池验证（T+1/5/20/60 实盘归因）。<br>
+          turn_low 防守因子：40日 top20、T+1、无止损无择时（+15.9%/-8.7%/1.11，2019+）。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 风控层 -->
+  <div class="v2-card anim-fade-in-up d1" style="margin-top:14px">
+    <h2> 风控层 <span class="tag">数据审计 · 因子健康 · FRC · Beneish · 竞价排雷 · 单因子依赖</span></h2>
+    <div class="mini" style="line-height:2;color:var(--muted)">
+      <b style="color:var(--navy)">数据审计闸门</b>：每日链开头 gate（FAIL → 信号标记"不可执行"）。<br>
+      <b style="color:var(--navy)">因子健康分层</b>：有效 / 弱有效 / 反向漂移 / 衰减 / 失效——反向/失效/衰减因子不得选股（FRC 排雷）。<br>
+      <b style="color:var(--navy)">Beneish M-Score</b>：财务操纵检测（HIGH 260/WATCH 350/LOW 4891，R6 一票否决）。<br>
+      <b style="color:var(--navy)">竞价反信号</b>：strength≥6 高开过热 → 机会池减分回避（T-3 实证 1 日短效/5-20 日反转）。<br>
+      <b style="color:var(--navy)">单因子依赖</b>：仅 1 因子/单类型命中 → 橙徽章需主观复核。<br>
+      <b style="color:var(--navy)">实盘归因门控</b>：revalue 下跌日放大亏损（-1.25pp 实证）→ 防御期审批从严。
+    </div>
+  </div>
+
+  <!-- 协作体系 -->
+  <div class="v2-card anim-fade-in-up d1" style="margin-top:14px">
+    <h2> 协作体系 <span class="tag">因子池 · AlphaGPT 科研 · 留言区</span></h2>
+    <div class="mini" style="line-height:2;color:var(--muted)">
+      <b style="color:var(--navy)">因子池（研究员）</b>：挖掘/验证/交付（122 份报告 + daily_scores/health/manifest/ui_data），主系统只读+留言裁决。<br>
+      <b style="color:var(--navy)">★新员工：AlphaGPT 自动因子挖掘（科研阶段）</b>：`_trial_alphagpt/` 独立目录，正在做 Alpha158/公式生成研究；
+      已按验证链走通 69 因子对表→去重闸门→组合层 T+1→终审（结论：外部因子库≠增量，价值=校准基线）。
+      科研产出经入池流程规范化（9 步 + 回测图归档）后进入因子池。<br>
+      <b style="color:var(--navy)">沟通文件夹</b>：量化代码库思路库/AI协作、因子池/AI协作、DeepSeek HARNESS Quant/AI协作、deepseek-harness-quant/AI协作（留言-回执制）。
+    </div>
+  </div>
+
+  <!-- 系统运行状态 -->
+  <div class="v2-card anim-fade-in-up d1" style="margin-top:14px">
+    <h2> 系统运行状态 <span class="tag">/api/system_live · 30s 自动刷新</span></h2>
+    <div class="mini" id="sys-meta" style="color:var(--muted);margin-bottom:8px"> 加载中…</div>
+    <div id="sys-db" class="mini" style="line-height:2"></div>
+    <div class="mini" style="font-weight:600;margin:10px 0 4px;color:#d4d4d8">计划任务</div>
+    <div id="sys-sched" class="mini" style="line-height:1.9"></div>
+    <div class="mini" style="font-weight:600;margin:10px 0 4px;color:#d4d4d8">API 健康（各数据源自定义滞后阈值）</div>
+    <div id="sys-api" class="mini" style="line-height:2"></div>
+  </div>
+
+  <!-- 手动更新 -->
+  <div class="v2-card anim-fade-in-up d1" style="margin-top:14px">
+    <h2> 手动更新全域数据 <span class="tag">数据及时性补救 · 自动程序运行中自动拒绝</span></h2>
+    <div class="mini" style="color:var(--muted);margin-bottom:10px;line-height:1.7">系统不 24h 在线，自动链失效或关机后会缺数据——点此一键触发完整数据管道。自动程序运行中会自动拒绝。</div>
+    <div id="mu-status" class="mini" style="line-height:1.9;margin-bottom:10px"> 加载状态…</div>
+    <button id="mu-btn" class="v2-btn">手动更新全域数据</button>
+    <div id="mu-log" class="mini" style="margin-top:10px;color:var(--muted);font-family:monospace;font-size:12px;line-height:1.6;white-space:pre-wrap"></div>
+  </div>
+
+  <!-- 择时公式 -->
+  <div class="v2-card anim-fade-in-up d1" style="margin-top:14px">
+    <h2> 择时逻辑（公式 + 原因）</h2>
+    <div class="term"><b>评分公式</b> 政策 40% + 宏观 25% + 情绪 20% + 宽度 15%</div>
+    <div class="term"><b>政策（40%）</b> EPU + 社融 + 利差（防守区→择时降档联动）</div>
+    <div class="term"><b>宏观（25%）</b> Regime 状态 + 社融近 3 月 vs 近 6 月 + 利率（y10 下行=宽松加分）</div>
+    <div class="term"><b>情绪（20%）</b> 市场温度 0–100（越低越恐慌=买入区）</div>
+    <div class="term"><b>宽度（15%）</b> 行业宽度（60 日动量>0 行业占比，&lt;20% 恐慌底部）+ 宽度修正</div>
+    <div class="term" style="border-bottom:none"><b>定位（08-15 修正）</b> 满仓主义大波段参考：平时满仓、择时=大波段减仓/加仓参考、极端熊市才收闸；<b>不接线、不做月度择向</b>（实证：择时对低换手组合纯损害）</div>
+  </div>
+
+  <!-- 术语表 -->
+  <details class="v2-card anim-fade-in-up d2" style="margin-top:14px">
+    <summary style="cursor:pointer;font-weight:600;font-size:14px"> 术语表</summary>
+    <div style="padding-top:10px">
+      <div class="term"><b>L0/L1/L2</b> 三层决策：择时总闸（参考）/ 因子参考 / 主观精选（唯一产生买入指令）</div>
+      <div class="term"><b>Pitch</b> 可审批买入候选（长线=价值/质量缺口/重估；短线=情绪/事件），带止损止盈+因子归因+三问证据</div>
+      <div class="term"><b>买入指令=同源</b> 今日买入指令卡 = L2 决策卡片聚合（同一套数据源，绝无两套推荐逻辑）</div>
+      <div class="term"><b>远期池</b> 入池后追踪 T+1/5/20/60 实盘收益（125 条，批次自动复核）</div>
+      <div class="term"><b>四池</b> A 自动 / B 机器强因子（ext_hits top0.1%）/ C 人工 / D 自动精选（AI 选股）——各带止损止盈</div>
+      <div class="term"><b>turn_low</b> 低换手防守因子（散户关注度反人性）：40日 top20、T+1、无止损无择时、+15.9%/-8.7%/1.11（2019+ 唯一可验证）</div>
+      <div class="term"><b>IC Memo 三问</b> Pitch 卡必答：①价值创造杠杆 ②情景赔率（持有期回测）③致命风险与对冲</div>
+      <div class="term"><b>风控层</b> 因子健康分层（有效/弱/反向/衰减/失效）+ FRC 排雷 + Beneish + 竞价反信号 + 单因子依赖徽章</div>
+      <div class="term"><b>ICIR</b> 信息比率（IC 均值/标准差），|ICIR120|≥0.5 强因子；⚠️ 截面 ICIR 强 ≠ 组合层可交易（转化率 ~8%）</div>
+      <div class="term"><b>数据边界</b> turn 换手率 2019 前缺失（覆盖率 0%）→ 长历史回测为 NaN 噪声，有效范围=2019+（覆盖率分年核查铁律）</div>
+      <div class="term"><b>宁缺毋滥</b> 持股≤5、Pitch 极严格、决策池不足留现金——空仓是正常状态</div>
+    </div>
+  </details>
+
+  <!-- 页面入口 -->
+  <details class="v2-card anim-fade-in-up d3" style="margin-top:14px">
+    <summary style="cursor:pointer;font-weight:600;font-size:14px"> 页面入口</summary>
+    <div style="padding-top:10px" class="mini">
+      <div class="term"><a href="/" style="color:var(--navy2)"> 门户</a> 今日要点 + 择时 + 市场环境 + 系统状态</div>
+      <div class="term"><a href="/pitch" style="color:var(--navy2)"> 决策</a> 择时·L0 ｜ Pitch 长线 ｜ Pitch 短线 ｜ 参考·L1 ｜ 历史 + 今日买入指令 + 当前持仓条</div>
+      <div class="term"><a href="/holdings" style="color:var(--navy2)"> 持仓</a> 状态机分组（持有→预警→触发/止盈→卖出）+ 信号详情内嵌 + 远期验证（折叠）</div>
+      <div class="term"><a href="/factors" style="color:var(--navy2)"> 因子</a> 净化（A/B/C）｜ 当前因子 ｜ 风控层 ｜ 生命周期 ｜ 相关性 ｜ 推荐质量 ｜ 综合排名</div>
+      <div class="term"><a href="/report" style="color:var(--navy2)"> 日报</a> 每日市场环境 + 自动选股</div>
+      <div class="term"><a href="/data" style="color:var(--navy2)"> 数据</a> 因子实战库 + 加权结果 + 资产链路</div>
+      <div class="term"><a href="/subj_quant" style="color:var(--navy2)"> 板块研究台</a> 人圈方向 → 机器算（L2 主观量化入口）</div>
+      <div class="term"><a href="/help" style="color:var(--navy2)"> 说明</a> 本页</div>
+    </div>
+  </details>
+
+  <div class="mini" style="text-align:center;margin-top:18px;opacity:.7"><span class="dsq-brand">Deepseek HARNESS Quant</span><span style="color:var(--muted)"> · 作者：LW </span><span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:#2a2a30;border:1px solid #3a3a44;box-shadow:0 2px 6px rgba(0,0,0,.5)"><svg class="cat-stroll" width="22" height="22" viewBox="0 0 24 24" fill="none"><path class="cat-tail" d="M14.5 17.5c3.2.6 5.2-1.2 5.6-3.8" stroke="#111" stroke-width="2.4" stroke-linecap="round" fill="none"/><path d="M7.4 6.8L6 2.8l3.6 2.6M16.6 6.8L18 2.8l-3.6 2.6" fill="#111" stroke="#111" stroke-width="1"/><circle cx="10.5" cy="9.5" r="4.4" fill="#111"/><ellipse cx="11" cy="16" rx="6" ry="4.4" fill="#111"/><circle cx="8.8" cy="9.2" r="0.9" fill="#4ade80"/><circle cx="12.2" cy="9.2" r="0.9" fill="#4ade80"/><path d="M5.8 10.2h-2.6M6.4 11.6L4 12.8M18.2 10.2h-2.6M17.6 11.6l2.4 1.2" stroke="#555" stroke-width="0.7" stroke-linecap="round"/></svg></span><span style="opacity:.5"> · 低频主观量化 CTA 化 · 宁缺毋滥</span></div>
+</div>
+
+<script src="/v2/core/api.js"></script>
+<script src="/v2/core/render.js"></script>
+<script src="/v2/components/icons.js"></script>
+<script src="/v2/components/search.js"></script>
+<script src="/v2/components/sidebar.js"></script>
+<script>
+(function () {
+  LW.sidebar.render('sidebar', {active: 'help'});
+  var R = LW.render;
+
+  function dot(ok, warn) {
+    var c = ok ? 'var(--green)' : (warn ? 'var(--gold)' : 'var(--red)');
+    return '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + c + ';margin-right:5px;vertical-align:middle"></span>';
+  }
+
+  /* ── ★2026-08-15 动态决策流程漏斗（/api/live/funnel）── */
+  var FCOLOR = { '源头数据': '#5e6ad2', '因子库': '#5e6ad2', '硬过滤通过': '#8b5cf6',
+                 '机会池': '#2d9cdb', 'Pitch 候选': '#f2c94c', '待审批': '#f2c94c',
+                 '持仓': '#27ae60', '远期池': '#27ae60' };
+  function loadFunnel() {
+    LW.api.get('/api/live/funnel', { bypass: true }).then(function (d) {
+      var stages = d.funnel || [];
+      var maxN = 1;
+      stages.forEach(function (s) { if (s.n != null && s.n > maxN) maxN = s.n; });
+      var rows = stages.map(function (s) {
+        var n = s.n;
+        var w = n != null ? Math.max(2, Math.round(n / maxN * 100)) : 0;
+        var c = FCOLOR[s.name] || '#a1a1aa';
+        var txt = n != null ? (n >= 10000 ? (n / 10000).toFixed(1) + '万' : n.toLocaleString()) : '—';
+        return '<div class="funnel-row">' +
+          '<span class="f-name">' + R._f(s.name) + '</span>' +
+          '<span class="f-n" style="color:' + c + '">' + txt + '</span>' +
+          '<div class="f-bar-wrap"><div class="f-bar" style="width:' + w + '%;background:' + c + '"></div></div>' +
+          '<span class="f-desc">' + R._f(s.desc) + '</span></div>';
+      }).join('');
+      var extra = '';
+      if (d.elimination) {
+        extra += '<b style="color:var(--gold)">淘汰原因（机会池 → Pitch）</b>：分数未达门槛 ' + d.elimination.n_gate +
+          ' 只 + 达标但同类型名额满 ' + d.elimination.n_quota + ' 只 —— 机会池 ' + (d.funnel && d.funnel[3] ? d.funnel[3].n : '?') +
+          ' 只中仅 ' + (d.funnel && d.funnel[4] ? d.funnel[4].n : '?') + ' 只通过（' +
+          (d.ratio_pitch != null ? (d.ratio_pitch * 100).toFixed(1) + '%' : '—') + '）';
+      }
+      if (d.pitch_types && d.pitch_types.length) {
+        extra += '<br><b style="color:var(--navy)">Pitch 类型分布</b>：' +
+          d.pitch_types.map(function (t) { return t.name + ' ' + t.n; }).join(' · ');
+      }
+      document.getElementById('funnel-box').innerHTML = rows;
+      document.getElementById('funnel-extra').innerHTML = extra;
+    }).catch(function (e) {
+      document.getElementById('funnel-box').innerHTML = '<span style="color:var(--red)">漏斗加载失败：' + e + '</span>';
+    });
+  }
+
+  /* ── 系统运行状态（/api/system_live）── */
+  function loadSys() {
+    LW.api.get('/api/system_live', { bypass: true }).then(function (d) {
+      if (d.error) { document.getElementById('sys-meta').innerHTML = '状态获取失败：' + R._f(d.error); return; }
+      document.getElementById('sys-meta').innerHTML = '采集 ' + R._f(d.ts) + ' · deck 进程 PID ' + R._f(d.deck_pid);
+      var dbs = d.databases || {};
+      document.getElementById('sys-db').innerHTML = Object.keys(dbs).map(function (k) {
+        var v = dbs[k];
+        return dot(v.online, false) + '<b>' + k + '</b> ' +
+          (v.online ? ((v.rows != null ? (v.rows / 10000).toFixed(0) + ' 万行' : '') + (v.ms != null ? ' · ' + v.ms + 'ms' : '')) : '离线');
+      }).join('　');
+      var sc = d.scheduled || {};
+      document.getElementById('sys-sched').innerHTML = Object.keys(sc).map(function (k) {
+        var v = sc[k];
+        return '<b>' + k.replace('LWQuant-', '') + '</b> ' + R._f(v.desc) + ' · 下次 ' + R._f(v.next);
+      }).join('<br>') || '无计划任务';
+      var ah = d.api_health || {};
+      document.getElementById('sys-api').innerHTML = Object.keys(ah).map(function (k) {
+        var v = ah[k];
+        var stale = !!v.stale;
+        return dot(v.online, stale) + '<b>' + k + '</b> ' +
+          (v.online ? (v.age_h != null ? v.age_h.toFixed(1) : '—') + 'h' : '离线') +
+          (stale ? ' <span style="color:var(--gold)">滞后</span>' : '');
+      }).join('　');
+    }).catch(function (e) {
+      document.getElementById('sys-meta').innerHTML = '状态获取失败：' + e;
+    });
+  }
+
+  /* ── 手动更新 ── */
+  function loadMu() {
+    LW.api.get('/api/update_status', { bypass: true }).then(function (d) {
+      var st = document.getElementById('mu-status');
+      var btn = document.getElementById('mu-btn');
+      if (d.busy) {
+        st.innerHTML = dot(false, true) + '<b>忙碌</b> ' + R._f(d.reason);
+        btn.disabled = true;
+      } else {
+        var last = d.last || {};
+        st.innerHTML = dot(true, false) + '<b>空闲</b>，可手动更新' +
+          (last.ts ? ' · 上次 ' + R._f(last.ts) + ' [' + R._f(last.status || '') + ']' : ' · 尚无更新记录');
+        btn.disabled = false;
+      }
+      var log = d.log_tail || [];
+      document.getElementById('mu-log').innerHTML = log.length ? log.join('\n') : '';
+    }).catch(function (e) {
+      document.getElementById('mu-status').innerHTML = '状态获取失败：' + e;
+    });
+  }
+
+  document.getElementById('mu-btn').onclick = function () {
+    var btn = document.getElementById('mu-btn');
+    btn.disabled = true; btn.textContent = '正在触发…';
+    LW.api.post('/api/manual_update', {}).then(function (d) {
+      btn.textContent = '手动更新全域数据';
+      if (d.ok) { loadMu(); }
+      else { alert('触发失败：' + (d.reason || d.error || '未知原因')); loadMu(); }
+    }).catch(function (e) {
+      btn.textContent = '手动更新全域数据';
+      alert('触发失败：' + e);
+      loadMu();
+    });
+  };
+
+  loadFunnel();
+  loadSys();
+  loadMu();
+  setInterval(loadFunnel, 60000);
+  setInterval(loadSys, 30000);
+  setInterval(loadMu, 10000);
+})();
+</script>
+</body>
+</html>

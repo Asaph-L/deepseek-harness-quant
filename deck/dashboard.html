@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepSeek HARNESS Quant · 系统看板</title>
+<style>
+  :root{
+    --bg:#f4f6fa; --card:#ffffff; --ink:#1c2733; --sub:#5b6b7c;
+    --line:#e3e9f0; --blue:#1f5eff; --blue-bg:#eaf0ff;
+    --red:#e33e3e; --red-bg:#fdecec; --green:#1fa971; --green-bg:#e7f7f0;
+    --amber:#d97706; --amber-bg:#fdf3e0; --gray-bg:#eef1f5;
+    --radius:14px; --shadow:0 1px 3px rgba(20,40,80,.06),0 6px 24px rgba(20,40,80,.05);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font:14px/1.6 "PingFang SC","Microsoft YaHei",system-ui,sans-serif;padding-bottom:60px}
+  header{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:12px 28px;display:flex;align-items:center;gap:14px}
+  .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#1f5eff,#6a5cff);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px}
+  header h1{font-size:17px;font-weight:700}
+  header .sub{color:var(--sub);font-size:12px}
+  .spacer{flex:1}
+  .pill{font-size:12px;padding:4px 12px;border-radius:99px;font-weight:600}
+  .pill.p2{background:#eef1f5;color:#5b6b7c}
+  main{max-width:1240px;margin:0 auto;padding:24px 28px;display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px 18px;grid-column:span 4}
+  .card.w6{grid-column:span 6}.card.w8{grid-column:span 8}.card.w12{grid-column:span 12}
+  .card h3{font-size:14px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .card h3 .tag{font-size:11px;background:var(--gray-bg);color:var(--sub);padding:2px 8px;border-radius:99px;font-weight:600}
+  .kpis{display:flex;gap:10px;flex-wrap:wrap}
+  .kpi{flex:1;min-width:110px;background:var(--gray-bg);border-radius:12px;padding:12px 14px}
+  .kpi .v{font-size:22px;font-weight:800;font-family:Consolas,monospace}
+  .kpi .k{font-size:11px;color:var(--sub);font-weight:600;margin-top:2px}
+  .kpi .v.g{color:var(--green)}.kpi .v.y{color:var(--amber)}.kpi .v.r{color:var(--red)}.kpi .v.b{color:var(--blue)}
+  .hbar{display:flex;align-items:center;gap:10px;margin:6px 0}
+  .hbar .lbl{width:76px;font-size:12px;color:var(--sub);text-align:right;flex-shrink:0}
+  .hbar .track{flex:1;height:18px;background:var(--gray-bg);border-radius:99px;overflow:hidden}
+  .hbar .fill{height:100%;border-radius:99px;background:linear-gradient(90deg,#1f5eff,#6a5cff);display:flex;align-items:center;justify-content:flex-end;padding-right:8px;font-size:11px;color:#fff;font-weight:700;min-width:0;transition:width .6s}
+  .hbar .fill.red{background:linear-gradient(90deg,#e33e3e,#ff7a5c)}
+  .hbar .fill.green{background:linear-gradient(90deg,#1fa971,#59c896)}
+  .hbar .fill.amber{background:linear-gradient(90deg,#d97706,#f5b04c)}
+  .hbar .n{width:34px;font-size:12px;font-weight:700;color:var(--ink)}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th{color:var(--sub);font-weight:600;text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);font-size:11.5px}
+  td{padding:6px 8px;border-bottom:1px solid #eef2f7}
+  tr:hover td{background:#f8fafd}
+  .badge{font-size:11px;padding:1px 8px;border-radius:99px;font-weight:700;white-space:nowrap}
+  .b-pass{background:var(--green-bg);color:var(--green)}
+  .b-watch{background:var(--amber-bg);color:var(--amber)}
+  .b-block{background:var(--red-bg);color:var(--red)}
+  .b-nodata{background:var(--gray-bg);color:var(--sub)}
+  .b-ok{background:var(--green-bg);color:var(--green)}
+  .b-warn{background:var(--amber-bg);color:var(--amber)}
+  .b-fail{background:var(--red-bg);color:var(--red)}
+  .audit-item{padding:8px 0;border-bottom:1px solid #eef2f7;font-size:12.5px}
+  .audit-item:last-child{border-bottom:none}
+  .audit-item .t{display:flex;gap:8px;align-items:center}
+  .audit-item .name{font-weight:600}
+  .audit-item .detail{color:var(--sub);font-size:12px;margin-top:2px}
+  .regime-big{display:flex;align-items:center;gap:18px}
+  .gauge{width:110px;height:110px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#fff;font-weight:800;flex-shrink:0}
+  .gauge .gv{font-size:26px;font-family:Consolas,monospace}
+  .gauge .gk{font-size:10px;opacity:.85}
+  .pos-chart{display:flex;align-items:flex-end;gap:3px;height:80px;flex:1;margin-top:8px}
+  .pos-chart .bar{flex:1;background:var(--blue-bg);border-radius:3px 3px 0 0;position:relative;min-width:6px}
+  .pos-chart .bar .pct{position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--sub)}
+  .hint{background:#fff8e6;border:1px solid #f0e0b0;color:#8a6d1a;padding:12px 16px;border-radius:12px;margin:20px 28px 0;font-size:13px;display:none}
+  .empty{color:var(--sub);font-size:12.5px;text-align:center;padding:18px 0}
+  .foot{grid-column:span 12;color:var(--sub);font-size:12px;text-align:center}
+  .score-dist{display:flex;align-items:flex-end;gap:4px;height:90px;margin-top:6px}
+  .score-dist .b{flex:1;background:linear-gradient(180deg,#1f5eff,#6a5cff);border-radius:3px 3px 0 0;position:relative;min-width:14px}
+  .score-dist .b .n{position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--sub)}
+  .score-dist .x{display:flex;justify-content:space-between;font-size:9px;color:var(--sub);margin-top:3px}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">LW</div>
+  <div><h1>DeepSeek HARNESS Quant · 系统看板</h1><div class="sub">机会池 / 风控 / 择时 / 数据健康 总览</div></div>
+  <div class="spacer"></div>
+  <span class="pill p2">P2 · 外包 #4</span>
+</header>
+
+<div class="hint" id="hint"></div>
+<main id="main"></main>
+
+<script>
+const $ = s => document.querySelector(s);
+const S = {};
+const TYPENAME = {reversal:'反转',value:'低估值',breakout:'突破',revalue:'重估',event:'事件',quality_gap:'质量折价'};
+
+async function load(key, url){
+  try{
+    const r = await fetch(url);
+    if(!r.ok) throw 0;
+    S[key] = await r.json();
+  }catch(e){ S[key] = null; }
+}
+
+function card(title, tag, bodyHTML, span){
+  return `<div class="card ${span||''}"><h3>${title}<span class="tag">${tag||''}</span></h3>${bodyHTML}</div>`;
+}
+
+function esc(s){ return (s||'').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function hbar(items){
+  const max = Math.max(...items.map(i=>i.v), 1);
+  return items.map(i => `
+    <div class="hbar">
+      <span class="lbl">${i.k}</span>
+      <div class="track"><div class="fill ${i.c||''}" style="width:${(i.v/max*100).toFixed(1)}%">${i.v}</div></div>
+      <span class="n">${i.v}</span>
+    </div>`).join('');
+}
+
+async function init(){
+  try{
+    await Promise.all([
+      load('pool','/api/pool'),
+      load('risk','/api/risk'),
+      load('regime','/api/regime'),
+      load('audit','/api/audit'),
+      load('beneish','/api/beneish'),
+      load('winrates','/api/winrates'),
+      load('sim','/api/sim'),
+      load('decisions','/api/decisions'),
+      load('portfolio','/api/portfolio'),
+    ]);
+  }catch(e){}
+  if(!S.pool && !S.risk){
+    $('#hint').style.display='block';
+    $('#hint').innerHTML='⚠️ 请通过本地服务器打开看板：<code>cd deepseek-harness-quant && ./.venv/Scripts/python.exe deck/deck_server.py</code> → <b>http://127.0.0.1:8787/dashboard.html</b>';
+    return;
+  }
+  render();
+}
+
+function render(){
+  const H = [];
+  const pool = S.pool, risk = S.risk, regime = S.regime, audit = S.audit;
+
+  // ① 择时档位
+  let regimeHTML = '<div class="empty">无 dynamic_regime.json</div>';
+  if(regime){
+    const keys = Object.keys(regime).filter(k => /^\d{4}-\d{2}$/.test(k));
+    const cur = regime[keys[keys.length-1]];
+    const recent = keys.slice(-12).map(k => ({m:k, v:regime[k].pos}));
+    const posPct = Math.round((cur?.pos??0)*100);
+    const levelColor = posPct > 66 ? '#e33e3e' : posPct > 33 ? '#d97706' : '#1fa971';
+    regimeHTML = `
+      <div class="regime-big">
+        <div class="gauge" style="background:${levelColor}">
+          <div class="gv">${posPct}%</div><div class="gk">仓位建议</div>
+        </div>
+        <div style="flex:1">
+          <div style="font-weight:800;font-size:15px">${esc(cur?.top||'—')}</div>
+          <div style="color:var(--sub);font-size:12px;margin-top:2px">档位 level=${esc(cur?.level||'—')} ｜ 最近更新 ${keys[keys.length-1]||'—'}</div>
+          <div class="pos-chart">
+            ${recent.map(b=>`<div class="bar" style="height:${(b.v*100).toFixed(0)}%" title="${b.m} ${(b.v*100).toFixed(0)}%"><span class="pct" style="display:${b.v>0.5?'none':'block'}">${(b.v*100).toFixed(0)}%</span></div>`).join('')}
+          </div>
+          <div style="font-size:9px;color:var(--sub);text-align:right">近12月仓位</div>
+        </div>
+      </div>`;
+  }
+  H.push(card('🎯 择时档位 Regime', 'dynamic_regime.json', regimeHTML, 'w4'));
+
+  // ② 机会池统计
+  let poolHTML = '<div class="empty">无 opportunity_pool.json（跑 scan.py --pitch 生成）</div>';
+  if(pool){
+    const stats = pool.stats||{};
+    const items = Object.entries(stats).map(([k,v])=>({k:TYPENAME[k]||k, v, c:k==='revalue'?'red':''}));
+    poolHTML = `
+      <div class="kpis" style="margin-bottom:10px">
+        <div class="kpi"><div class="v b">${pool.n??'—'}</div><div class="k">机会总数</div></div>
+        <div class="kpi"><div class="v r">${(pool.pitch||[]).length}</div><div class="k">Pitch 候选</div></div>
+        <div class="kpi"><div class="v b">${pool.date||'—'}</div><div class="k">数据日</div></div>
+      </div>
+      ${hbar(items)}`;
+  }
+  H.push(card('📊 机会大池子', '类型分布', poolHTML, 'w8'));
+
+  // ③ 风控统计
+  let riskHTML = '<div class="empty">无 stock_risk_map.json</div>';
+  if(risk){
+    const st = risk.stats||{};
+    riskHTML = `
+      <div class="kpis">
+        <div class="kpi"><div class="v">${st.total??'—'}</div><div class="k">覆盖</div></div>
+        <div class="kpi"><div class="v g">${st.PASS??0}</div><div class="k">PASS</div></div>
+        <div class="kpi"><div class="v y">${st.WATCH??0}</div><div class="k">WATCH</div></div>
+        <div class="kpi"><div class="v r">${st.BLOCK??0}</div><div class="k">BLOCK</div></div>
+        <div class="kpi"><div class="v">${st.NO_DATA??0}</div><div class="k">NO_DATA</div></div>
+      </div>`;
+  }
+  H.push(card('🛡 风控地图', 'stock_risk_map.json', riskHTML, 'w4'));
+
+  // ④ 数据健康度
+  let auditHTML = '<div class="empty">无 data_audit_report.json</div>';
+  if(audit){
+    const h = Math.round(audit.health||0);
+    const hc = h >= 90 ? '#1fa971' : h >= 75 ? '#d97706' : '#e33e3e';
+    auditHTML = `
+      <div class="regime-big" style="margin-bottom:8px">
+        <div class="gauge" style="background:${hc}">
+          <div class="gv">${h}</div><div class="gk">健康度</div>
+        </div>
+        <div style="flex:1">
+          <div class="kpis">
+            <div class="kpi"><div class="v g">${audit.n_pass??0}</div><div class="k">PASS</div></div>
+            <div class="kpi"><div class="v y">${audit.n_warn??0}</div><div class="k">WARN</div></div>
+            <div class="kpi"><div class="v r">${audit.n_fail??0}</div><div class="k">FAIL</div></div>
+          </div>
+        </div>
+      </div>
+      ${(audit.items||[]).filter(i=>i.status!=='PASS').slice(0,5).map(i=>`
+        <div class="audit-item"><div class="t">
+          <span class="badge ${i.status==='WARN'?'b-warn':'b-fail'}">${i.status}</span>
+          <span class="name">${esc(i.id)} ${esc(i.name)}</span></div>
+          <div class="detail">${esc(i.detail)}</div></div>`).join('')
+        || '<div class="empty">全部检查项 PASS</div>'}`;
+  }
+  H.push(card('🩺 数据健康度', 'data_audit', auditHTML, 'w6'));
+
+  // ⑤ 风控 BLOCK 名单
+  let blockHTML = '<div class="empty">无数据</div>';
+  if(risk && risk.results){
+    const blocks = risk.results.filter(r=>r.level==='BLOCK');
+    if(blocks.length){
+      blockHTML = `<table><tr><th>代码</th><th>分</th><th>红旗</th></tr>
+        ${blocks.slice(0,12).map(r=>`<tr>
+          <td style="font-family:Consolas,monospace;font-weight:700">${esc(r.code)}</td>
+          <td><span class="badge b-block">${r.score}</span></td>
+          <td style="color:var(--sub);font-size:11.5px">${r.flags.map(f=>f.id).slice(0,4).join('、')||'—'}</td></tr>`).join('')}
+      </table>
+      ${blocks.length>12?`<div style="text-align:center;color:var(--sub);font-size:11.5px;margin-top:6px">…共 ${blocks.length} 只 BLOCK（禁止进 Pitch）</div>`:''}`;
+    }
+  }
+  H.push(card('⛔ 风控 BLOCK 名单', '禁止进 Pitch', blockHTML, 'w6'));
+
+  // ⑥ Pitch 候选
+  let pitchHTML = '<div class="empty">无 Pitch 候选</div>';
+  if(pool && pool.pitch && pool.pitch.length){
+    pitchHTML = `<table><tr><th>代码</th><th>名称</th><th>类型</th><th>评分</th><th>风控</th></tr>
+      ${pool.pitch.map(o=>`<tr>
+        <td style="font-family:Consolas,monospace;font-weight:700">${esc(o.code)}</td>
+        <td>${esc(o.name)}</td>
+        <td>${esc(o.otype_name||o.otype)}</td>
+        <td style="font-weight:800;color:var(--blue)">${(o.score??0).toFixed(1)}</td>
+        <td><span class="badge ${o.risk_level==='BLOCK'?'b-block':o.risk_level==='WATCH'?'b-watch':'b-pass'}">${esc(o.risk_level||'未挂载')}</span></td>
+      </tr>`).join('')}</table>`;
+  }
+  H.push(card('🎯 Pitch 候选', '每日最多 5 只', pitchHTML, 'w6'));
+
+  // ⑦ Beneish 造假嫌疑（外包 #3 产出）
+  let benHTML = '<div class="empty">未产出（跑 risk/beneish.py --scan）</div>';
+  if(S.beneish && S.beneish.results){
+    const high = S.beneish.results.filter(r=>r.level==='HIGH');
+    benHTML = `
+      <div style="color:var(--sub);font-size:12px;margin-bottom:8px">M-Score 降级版 ｜ HIGH ${S.beneish.stats?.HIGH??0} / WATCH ${S.beneish.stats?.WATCH??0} / LOW ${S.beneish.stats?.LOW??0}</div>
+      ${high.length?`<table><tr><th>代码</th><th>M-Score</th><th>级别</th></tr>
+        ${high.slice(0,8).map(r=>`<tr>
+          <td style="font-family:Consolas,monospace;font-weight:700">${esc(r.code)}</td>
+          <td style="font-family:Consolas,monospace;color:var(--red);font-weight:700">${r.m_score}</td>
+          <td><span class="badge b-block">HIGH</span></td></tr>`).join('')}</table>
+        ${high.length>8?`<div style="text-align:center;color:var(--sub);font-size:11.5px;margin-top:6px">…共 ${high.length} 只 HIGH</div>`:''}`
+      : '<div class="empty">无 HIGH 嫌疑标的</div>'}`;
+  }
+  H.push(card('🔍 Beneish 造假嫌疑', 'R6 红旗 · 外包#3', benHTML, 'w6'));
+
+  // ⑧ 机会胜率回测（外包 #2 产出）
+  let wrHTML = '<div class="empty">未产出（跑 factors/opportunities/backtest_winrate.py）</div>';
+  if(S.winrates && S.winrates.results){
+    const rows = [];
+    for(const [ot, hs] of Object.entries(S.winrates.results)){
+      for(const [h, v] of Object.entries(hs)){
+        if(v.n>0) rows.push({ot, h, ...v});
+      }
+    }
+    if(rows.length){
+      wrHTML = `<table><tr><th>类型</th><th>持有</th><th>样本</th><th>胜率</th><th>均收益</th><th>最大回撤</th><th>盈亏比</th></tr>
+        ${rows.map(r=>`<tr>
+          <td>${TYPENAME[r.ot]||r.ot}</td><td>${r.h}月</td><td>${r.n}</td>
+          <td style="font-weight:700;color:${r.winrate>=0.55?'var(--red)':'var(--ink)'}">${(r.winrate*100).toFixed(1)}%</td>
+          <td style="color:${r.avg_ret>0?'var(--red)':'var(--green)'}">${(r.avg_ret*100).toFixed(1)}%</td>
+          <td style="color:var(--green)">${(r.max_dd*100).toFixed(1)}%</td>
+          <td>${r.pl_ratio?r.pl_ratio.toFixed(2):'—'}</td></tr>`).join('')}</table>`;
+    }
+  }
+  H.push(card('📈 机会胜率回测', '替换硬编码 winrate · 外包#2', wrHTML, 'w6'));
+
+  // ⑨ 模拟盘双轨（外包 #5 产出）
+  let simHTML = '<div class="empty">未产出（跑 strategy/sim_tracks.py）</div>';
+  if(S.sim && S.sim.tracks){
+    const t = S.sim.tracks;
+    const row = (k, name) => {
+      const s = t[k]?.stats;
+      if(!s) return '';
+      return `<tr><td style="font-weight:700">${name}</td>
+        <td>${(s.ann_ret*100).toFixed(1)}%</td>
+        <td style="color:var(--green)">${(s.max_dd*100).toFixed(1)}%</td>
+        <td>${s.sharpe?s.sharpe.toFixed(2):'—'}</td>
+        <td>${(s.winrate*100).toFixed(0)}%</td>
+        <td>${(s.final_nav??1).toFixed(3)}</td></tr>`;
+    };
+    simHTML = `<table><tr><th>轨</th><th>年化</th><th>最大回撤</th><th>夏普</th><th>胜率</th><th>期末净值</th></tr>
+      ${row('config','配置轨')}${row('pitch','优选轨')}</table>
+      <div style="color:var(--sub);font-size:11.5px;margin-top:6px">${esc(S.sim.meta?.note||'')}</div>`;
+  }
+  H.push(card('🛤 模拟盘双轨', '配置 vs 优选 · 外包#5', simHTML, 'w6'));
+
+  // ⑩ 审批记录
+  let decHTML = '<div class="empty">暂无审批记录（Deck 审批台操作后显示）</div>';
+  if(S.decisions && S.decisions.length){
+    const buys = S.decisions.filter(d=>d.action==='buy');
+    decHTML = `
+      <div class="kpis" style="margin-bottom:8px">
+        <div class="kpi"><div class="v b">${S.decisions.length}</div><div class="k">审批总数</div></div>
+        <div class="kpi"><div class="v r">${buys.length}</div><div class="k">已买入</div></div>
+      </div>
+      <table><tr><th>日期</th><th>代码</th><th>动作</th></tr>
+        ${S.decisions.slice(-8).reverse().map(d=>`<tr>
+          <td>${esc(d.date)}</td><td style="font-family:Consolas,monospace">${esc(d.code)}</td>
+          <td><span class="badge ${d.action==='buy'?'b-pass':'b-nodata'}">${d.action==='buy'?'买入':'放弃'}</span></td></tr>`).join('')}
+      </table>`;
+  }
+  H.push(card('🗂 审批记录', 'deck_decisions.json', decHTML, 'w6'));
+
+  // ⑪ 当前持仓（T-2 联动，持股≤5）
+  let pfHTML = '<div class="empty">暂无持仓（Deck 审批台点"买入"后自动入持仓）</div>';
+  if(S.portfolio && S.portfolio.positions){
+    const pos = S.portfolio.positions.filter(p=>p.status==='holding'||p.status==='over_limit');
+    if(pos.length){
+      pfHTML = `
+        <div class="kpis" style="margin-bottom:8px">
+          <div class="kpi"><div class="v b">${pos.filter(p=>p.status==='holding').length}</div><div class="k">持仓数（上限 ${S.portfolio.max_positions||5}）</div></div>
+          <div class="kpi"><div class="v ${pos.some(p=>p.status==='over_limit')?'r':'g'}">${pos.filter(p=>p.status==='over_limit').length}</div><div class="k">超限待处理</div></div>
+        </div>
+        <table><tr><th>代码</th><th>名称</th><th>入场日</th><th>目标/止损</th><th>风控</th><th>状态</th></tr>
+          ${pos.map(p=>`<tr>
+            <td style="font-family:Consolas,monospace;font-weight:700">${esc(p.code)}</td>
+            <td>${esc(p.name||'')}</td>
+            <td>${esc(p.entry_date||'—')}</td>
+            <td>${p.target||'—'}/${p.stop||'—'}</td>
+            <td><span class="badge ${p.risk_level==='WATCH'?'b-watch':p.risk_level==='BLOCK'?'b-block':'b-pass'}">${esc(p.risk_level||'—')}</span></td>
+            <td><span class="badge ${p.status==='over_limit'?'b-block':'b-pass'}">${p.status==='over_limit'?'超限':'持有中'}</span></td>
+          </tr>`).join('')}
+        </table>`;
+    }
+  }
+  H.push(card('💼 当前持仓', 'portfolio.json · T-2', pfHTML, 'w6'));
+
+  $('#main').innerHTML = H.join('');
+}
+
+init();
+</script>
+</body>
+</html>
