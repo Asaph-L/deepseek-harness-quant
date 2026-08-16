@@ -109,7 +109,7 @@
         '<td>' + famBadge + '</td>' +
         '<td><span class="type-chip" style="background:' + otc + '22;color:' + otc + '">' + esc(o.otype_name || o.otype) + '</span>' +
         // ★2026-08-12 百轮#103：降权类型标记（实盘裁决体系落池——浏览即知哪些类型降权）
-        (o.down_type ? '<span style="color:#C0392B;font-weight:700" title="该类型实盘偏弱降权提示中，审批从严（Pitch 卡片带 🔻）"> 🔻降权</span>' : '') +
+        (o.down_type ? '<span style="color:#b0774a" title="该类型实盘偏弱降权提示中，审批从严（Pitch 卡片带 🔻）"> 🔻降权</span>' : '') +
         '</td>' +
         '<td class="mini">' + esc(o.trigger) + '</td>' +
         '<td>' + sigHtml + sigBadge + '</td>' +
@@ -253,7 +253,7 @@
         '<td>' + fmt(it.rank) + '</td>' +
         '<td><b>' + esc(it.code) + '</b><span class="mini"> ' + esc(it.name) + '</span>' +
         // ★2026-08-12 百轮#103：降权类型标记（观察池同标）
-        (it.down_type ? ' <span style="color:#C0392B;font-weight:700" title="该类型实盘偏弱降权提示中，审批从严">🔻' + esc(it.down_type) + '</span>' : '') +
+        (it.down_type ? ' <span style="color:#b0774a" title="该类型实盘偏弱降权提示中，审批从严">🔻' + esc(it.down_type) + '</span>' : '') +
         '</td>' +
         '<td class="mini">' + esc(String(it.industry || '—').slice(0, 18)) + '</td>' +
         '<td>' + fmt(it.price) + '</td><td>' + fmt(it.mv_yi) + '</td>' +
@@ -410,10 +410,10 @@
           var maxN = Math.max.apply(null, keys.map(function (k) { return ie[k]; }));
           var parts = keys.map(function (k) {
             var pct = Math.round(ie[k] / (pnl.n_holdings || 1) * 100);
-            var hi = ie[k] >= 2 ? 'style="color:#C0392B;font-weight:700"' : '';
+            var hi = ie[k] >= 2 ? 'style="color:#b0774a"' : '';
             return '<span ' + hi + '>' + esc(k.replace(/^[A-Z]\d+\s*/, '')) + ' ' + ie[k] + '</span>';
           });
-          var warn = maxN >= 2 ? ' <span style="color:#C0392B;font-weight:700">⚠️ 有行业集中（' + maxN + ' 只同行业）</span>' : ' <span style="color:#0F6E56">分散良好</span>';
+          var warn = maxN >= 2 ? ' <span style="color:#b0774a">⚠️ 有行业集中（' + maxN + ' 只同行业）</span>' : ' <span style="color:#0F6E56">分散良好</span>';
           return '<div class="mini" style="margin-top:6px">🏭 行业敞口：' + parts.join(' ｜ ') + warn + '</div>';
         })();
     }
@@ -464,9 +464,9 @@
         var fired = (t.signals || []).filter(function (s) { return s.type === 'target' || s.type === 'pullback' || s.type === 'time'; });
         var se = stmap[p.code] || {};
         if (fired.length) {
-          acts.push('<span style="color:#C0392B;font-weight:700">🔔 ' + esc(p.code) + ' 建议止盈（' + esc(fired[0].msg || fired[0].type) + '）</span>');
+          acts.push('<span style="color:#b0774a">🔔 ' + esc(p.code) + ' 建议止盈（' + esc(fired[0].msg || fired[0].type) + '）</span>');
         } else if (se.status === 'TRIGGERED') {
-          acts.push('<span style="color:#C0392B;font-weight:700">⛔ ' + esc(p.code) + ' 触发止损，建议卖出</span>');
+          acts.push('<span style="color:#b0774a">⛔ ' + esc(p.code) + ' 触发止损，建议卖出</span>');
         } else if (se.status === 'NEAR') {
           acts.push('<span style="color:#D4A843;font-weight:700">⚠️ ' + esc(p.code) + ' 接近止损（' + esc((se.alerts || [{rule:''}])[0].rule) + '）</span>');
         } else {
@@ -484,7 +484,7 @@
     } catch (e) {}
     // ★2026-08-11 百轮#18 止损预警展示（池级 stop_alerts：near 临近 / triggered 触发）
     var sa = d.stop_alerts || {};
-    var sec2 = document.querySelector('.section');
+    var sec2 = null; // ????????
     if (sec2) {
       var near = (sa.near || 0), trig = (sa.triggered || 0);
       var saEl = document.getElementById('lw-stop-alert');
@@ -711,7 +711,7 @@
       var srows = d.stop.map(function (s) {
         return '<tr><td><b>' + esc(s.code) + '</b><span class="mini"> ' + esc(s.name || '') + '</span></td>' +
           '<td class="mini">止损</td><td class="mini">' + esc(s.msg || s.status || '') + '</td>' +
-          '<td><a class="btn-link" href="/dashboard_holdings.html" style="color:#C0392B;font-weight:700">处理</a></td></tr>';
+          '<td><a class="btn-link" href="/dashboard_holdings.html" style="color:#b0774a">处理</a></td></tr>';
       }).join('');
       sb.innerHTML = srows || '<tr><td colspan=4 class="mini">无触发</td></tr>';
     }

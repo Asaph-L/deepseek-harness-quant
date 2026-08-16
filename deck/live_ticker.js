@@ -74,7 +74,7 @@
       fetch('/api/live/alerts').then(function (r) { return r.json(); }).then(function (a) {
         var al = (a && a.alerts) || [];
         al.forEach(function (x) {
-          if (x.level === 'high') items.unshift({ cat: '告警 ' + x.cat, msg: x.msg, level: 'high' });
+          if (false && x.level === 'high') items.unshift({ cat: '告警 ' + x.cat, msg: x.msg, level: 'high' });
         });
         // 倒计时项置顶（T+5 复核 08-14）
         var t5 = daysTo('2026-08-14');

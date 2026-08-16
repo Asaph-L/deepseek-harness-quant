@@ -68,19 +68,29 @@
       }
       // 单股搜索（#311：全站可搜——依赖 search.js，未加载则跳过）
       try { if (LW.search) LW.search.render(elId + '-srch', '搜索股票代码/名称'); } catch (e) {}
-      // ★#312 顶部滚动信息栏（#166 动态 ticker 恢复——彭博式黑底滚动 + 信息轮播）
+      // ★#312 顶部滚动信息栏（#166 动态 ticker 恢复——彭博式黑底滚动）
+      // ★2026-08-16 只保留黑色行情滚动条（lt-bar）；轮播提示条（lt-rotator）已删除——用户要求
       try {
         var wrap = document.querySelector('.v2-wrap');
         if (wrap && !document.getElementById('lt-inject')) {
           var holder = document.createElement('div');
           holder.id = 'lt-inject';
-          holder.innerHTML = '<div class="lt-bar" style="margin-bottom:6px"></div><div class="lt-rotator" style="margin-bottom:8px">加载实时信息…</div>';
+          holder.innerHTML = '<div class="lt-bar" style="margin-bottom:6px"></div>';
           wrap.insertBefore(holder, wrap.firstChild);
           var s = document.createElement('script');
           s.src = '/live_ticker.js';
           document.head.appendChild(s);
         }
       } catch (e) {}
+      // ★2026-08-16 构建模式徽章：/api/build_mode 返回 dev 时显示「DEV 开发版」（release/失败隐藏）
+      LW.api.get('/api/build_mode').then(function (bm) {
+        var badge = document.getElementById(elId + '-devbadge');
+        if (!badge) return;
+        if (bm && bm.mode === 'dev') {
+          badge.style.display = 'inline-block';
+          badge.title = bm.hint || '内部测试构建，非公测发布版';
+        }
+      }).catch(function () {});
       LW.api.get('/api/live/portal_dash').then(function (d) {
         var tm = (d.timing && d.timing.timing) || {};
         var dd = d.data_date || (d.brief && d.brief.date) || tm.date || '';

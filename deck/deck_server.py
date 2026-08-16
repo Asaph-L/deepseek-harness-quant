@@ -5,7 +5,7 @@
       用 Python 标准库起一个零依赖小服务器，提供页面 + 读写 API。
 
 用法：
-  cd deepseek-harness-quant
+  cd DSHQuant
   NO_PROXY=* ./.venv/Scripts/python.exe deck/deck_server.py [--port 8787]
   浏览器打开 http://127.0.0.1:8787/deck.html      （Deck 审批界面）
                http://127.0.0.1:8787/dashboard.html （看板总览）
@@ -34,6 +34,7 @@ try:
 except Exception:
     pass
 
+import os
 import sys
 import threading
 import time
@@ -271,6 +272,82 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send_json({"harness": {"online": False}, "error": "harness_state.json 未生成"}, 404)
             except Exception as e:
                 return self._send_json({"error": str(e)}, 500)
+        if path == "/api/build_mode":   # ★2026-08-16 构建模式（dev=开发版徽章 / release=公测发布版无徽章；config/ui_build.json 驱动）
+            try:
+                _bm = BASE / "config" / "ui_build.json"
+                if _bm.exists():
+                    _cfg = json.loads(_bm.read_text(encoding="utf-8"))
+                    return self._send_json({
+                        "mode": _cfg.get("mode", "release"),
+                        "label": _cfg.get("label", "DEV 开发版"),
+                        "hint": _cfg.get("hint", "内部测试构建，非公测发布版"),
+                    })
+                return self._send_json({"mode": "release"})
+            except Exception as e:
+                return self._send_json({"mode": "release", "error": str(e)})
+        if path == "/api/assets/list":   # ★2026-08-16 资产导入源列表（skills + agent presets，来自 assets/）
+            try:
+                _sk = BASE / "assets" / "skills"
+                _pr = BASE / "assets" / "presets"
+
+                def _desc(md_path):
+                    try:
+                        for ln in md_path.read_text(encoding="utf-8", errors="replace").splitlines():
+                            if ln.startswith("description:"):
+                                return ln.split(":", 1)[1].strip().strip('"').strip("'")[:120]
+                    except Exception:
+                        pass
+                    return ""
+
+                skills = []
+                if _sk.exists():
+                    for d in sorted(_sk.iterdir()):
+                        if d.is_dir():
+                            md = d / "SKILL.md"
+                            skills.append({"name": d.name, "desc": _desc(md) if md.exists() else ""})
+                presets = []
+                if _pr.exists():
+                    for d in sorted(_pr.iterdir()):
+                        if d.is_dir():
+                            pm = d / "preset.yml"
+                            desc = ""
+                            if pm.exists():
+                                try:
+                                    for ln in pm.read_text(encoding="utf-8", errors="replace").splitlines():
+                                        if ln.startswith("name:"):
+                                            desc = ln.split(":", 1)[1].strip()[:120]
+                                            break
+                                except Exception:
+                                    pass
+                            presets.append({"name": d.name, "desc": desc})
+                return self._send_json({"ok": True, "skills": skills, "presets": presets})
+            except Exception as e:
+                return self._send_json({"ok": False, "error": str(e)}, 500)
+        if path.startswith("/api/proxy/"):   # ★2026-08-16 反向代理 GET → :3080 HARNESS（前端同源访问，零跨源）
+            import urllib.request as _ur
+            import urllib.error as _ue
+            _tgt = "http://127.0.0.1:3080/" + path[len("/api/proxy/"):]
+            if "?" in self.path:
+                _tgt += "?" + self.path.split("?", 1)[1]
+            try:
+                _r = _ur.urlopen(_ur.Request(_tgt), timeout=40)
+                _data = _r.read()
+                try:
+                    return self._send_json(json.loads(_data.decode("utf-8")))
+                except Exception:
+                    self.send_response(_r.status)
+                    self.send_header("Content-Type", _r.headers.get("Content-Type", "application/json"))
+                    self.end_headers()
+                    self.wfile.write(_data)
+                    return
+            except _ue.HTTPError as e:
+                _d = e.read()
+                try:
+                    return self._send_json(json.loads(_d.decode("utf-8")), e.code)
+                except Exception:
+                    return self._send_json({"ok": False, "error": "proxy upstream " + str(e.code)}, e.code)
+            except Exception as e:
+                return self._send_json({"ok": False, "error": "proxy: " + str(e)}, 502)
         if path == "/api/subj_quant":   # ★2026-08-14 主观量化融合系统状态（标签+否决+胜率徽章）
             try:
                 sys.path.insert(0, str(BASE))
@@ -674,6 +751,54 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split("?")[0]
+        if path.startswith("/api/proxy/"):   # ★2026-08-16 反向代理 POST → :3080（删除/批量/清空/发送全走这里）
+            import urllib.request as _ur
+            import urllib.error as _ue
+            _tgt = "http://127.0.0.1:3080/" + path[len("/api/proxy/"):]
+            try:
+                _body = self._read_json()
+                _req = _ur.Request(_tgt, data=json.dumps(_body).encode("utf-8"),
+                                   headers={"Content-Type": "application/json"})
+                _r = _ur.urlopen(_req, timeout=60)
+                _data = _r.read()
+                try:
+                    return self._send_json(json.loads(_data.decode("utf-8")))
+                except Exception:
+                    self.send_response(_r.status)
+                    self.send_header("Content-Type", _r.headers.get("Content-Type", "application/json"))
+                    self.end_headers()
+                    self.wfile.write(_data)
+                    return
+            except _ue.HTTPError as e:
+                _d = e.read()
+                try:
+                    return self._send_json(json.loads(_d.decode("utf-8")), e.code)
+                except Exception:
+                    return self._send_json({"ok": False, "error": "proxy upstream " + str(e.code)}, e.code)
+            except Exception as e:
+                return self._send_json({"ok": False, "error": "proxy: " + str(e)}, 502)
+        if path == "/api/import/install":   # ★2026-08-16 导入 skill / agent 预设（assets → 运行库）
+            try:
+                rec = self._read_json()
+                typ = rec.get("type")
+                name = rec.get("name") or ""
+                import re as _re, shutil as _sh
+                if typ not in ("skill", "preset") or not _re.fullmatch(r"[a-z0-9][a-z0-9-]*", name):
+                    return self._send_json({"ok": False, "error": "type 需为 skill/preset，name 需为小写字母数字连字符"}, 400)
+                src = BASE / "assets" / ("skills" if typ == "skill" else "presets") / name
+                if not src.is_dir():
+                    return self._send_json({"ok": False, "error": "assets 中不存在 " + name}, 404)
+                # 安装目标：DSH_HOME 环境变量 > 随包 harness/home（仅本地开发用，勿硬编码本机路径）
+                _home = Path(os.environ.get("DSH_HOME", str(BASE / "harness" / "home")))
+                dst_root = _home / "skills" if typ == "skill" else _home / ".agent-presets"
+                dst_root.mkdir(parents=True, exist_ok=True)
+                dst = dst_root / name
+                if dst.exists():
+                    _sh.rmtree(dst)
+                _sh.copytree(src, dst)
+                return self._send_json({"ok": True, "type": typ, "name": name, "target": str(dst)})
+            except Exception as e:
+                return self._send_json({"ok": False, "error": str(e)}, 500)
         if path == "/api/subj_quant/tag":   # ★2026-08-14 主观量化：录入标签 {code,name,tag,confidence,note}
             try:
                 rec = self._read_json()
@@ -1054,7 +1179,7 @@ class Handler(BaseHTTPRequestHandler):
                     if len(c) == 6 and c.isdigit():
                         return c + (".SH" if c[0] in "69" else ".SZ")
                     return c
-                picks = [{"code": _norm(d.get("code")), "action": d.get("action", "watch"),
+                picks = [{"code": _norm(d.get("code") or d.get("ticker")), "action": d.get("action", "watch"),
                           "priority": d.get("priority", ""),
                           "reason_short": d.get("reason_short", "")}
                          for d in _decisions if d.get("code")]

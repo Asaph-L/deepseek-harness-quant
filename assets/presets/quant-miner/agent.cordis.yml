@@ -1,0 +1,110 @@
+# quant-miner 预设 — 量化因子挖掘工作区一键装配
+#
+# 本文件是 AGENT-PLANE 组合。会话选中本 preset 后自动挂载:
+# 技能发现 + 文件系统 + 工作区指令 + 常用工具。
+#
+# 下面每一行要么注册进宿主 registry(工具/技能/指令), 要么只消费
+# 宿主服务(文件系统/子代理注册表/后台任务/目标), 都不发布进程级
+# 服务, 因此无需 isolate realm。
+
+# ── 身份与工作区指令 ────────────────────────────────────────────────────────
+
+# 本 preset 自己的 persona, 覆盖部署默认值。
+# `{{model}}` / `{{cwd}}` 由该 agent 自身的路由与工作区解析。
+- id: persona
+  name: '@deepseek-ai/dsh-persona'
+  config:
+    text: >-
+      You are a quantitative factor-mining agent powered by the {{model}} model,
+      running on the DeepSeek Harness. Your working directory is {{cwd}}.
+      You mine, validate, and backtest A-share quantitative factors by following
+      the workspace's factor-mining-workflow and backtest-acceptance skills.
+
+# 加载工作区根目录的 AGENTS.md(LWQuant 规则), 以及任何仓库级指令。
+- id: agent-instructions
+  name: '@deepseek-ai/dsh-agent-instructions'
+  config:
+    maxBytes: 65536
+
+# ── 执行 ─────────────────────────────────────────────────────────────────────
+
+# Windows 工作区用 PowerShell 作为 shell。
+- id: tool-pwsh
+  name: '@deepseek-ai/dsh-tool-pwsh'
+  disabled: !!js process.platform !== 'win32'
+
+# ── 文件系统 ────────────────────────────────────────────────────────────────
+
+# 两者都注册进宿主 `tools` registry, 不发布服务, 无需 realm。
+# `fs` 服务与其策略留在宿主。
+- id: tool-fs
+  name: '@deepseek-ai/dsh-tool-fs'
+
+- id: tool-fs-search
+  name: '@deepseek-ai/dsh-tool-fs-search'
+  config:
+    sampleOverCapGlobResults: false
+
+# ── 后台任务 ────────────────────────────────────────────────────────────────
+
+# 仅模型可见的收集/停止控件; 任务 registry 留在宿主。
+- id: tool-jobs
+  name: '@deepseek-ai/dsh-tool-jobs'
+
+# ── 目标 ─────────────────────────────────────────────────────────────────────
+
+# 仅模型可见的目标工具; 目标 service/会话驱动留在宿主。
+- id: tool-goal
+  name: '@deepseek-ai/dsh-tool-goal'
+
+# ── 技能 ─────────────────────────────────────────────────────────────────────
+
+# 技能 registry 在宿主按 scope 分层: 这两行注册进本 preset 的那一层。
+# `skill-filesystem` 贡献本地根发现(工作区 .dsh/skills 下的因子挖掘/牛散/回测技能),
+# `tool-skill` 提供目录与加载器。
+- id: skill-filesystem
+  name: '@deepseek-ai/dsh-skill-filesystem'
+
+- id: tool-skill
+  name: '@deepseek-ai/dsh-tool-skill'
+
+# ── 委派(子代理) ────────────────────────────────────────────────────────────
+
+# `subagents` registry 与 spawn/fork 后端留在宿主组合; 本 preset 只贡献
+# 委派工具, 它们解析那个宿主 registry, 因此无需 realm。
+- id: tool-subagent-control
+  name: '@deepseek-ai/dsh-tool-subagent-control'
+
+- id: tool-subagent-list-agents
+  name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
+
+- id: tool-subagent
+  name: '@deepseek-ai/dsh-tool-subagent'
+  config:
+    provider: spawn
+    toolName: subagent
+    backgroundMode: continuable
+
+- id: tool-subagent-fork
+  name: '@deepseek-ai/dsh-tool-subagent'
+  config:
+    provider: fork
+    toolName: subagent_fork
+    backgroundMode: continuable
+
+# ── 其余模型可见工具 ────────────────────────────────────────────────────────
+
+- id: tool-ask-user
+  name: '@deepseek-ai/dsh-tool-ask-user'
+
+- id: tool-todo
+  name: '@deepseek-ai/dsh-tool-todo'
+  config:
+    allowParallelInProgress: true
+
+# `web` 服务与其搜索 provider 留在宿主; 只有模型可见工具是 per-session。
+- id: tool-web
+  name: '@deepseek-ai/dsh-tool-web'
+  config:
+    fetch: false
+    searchTimeoutMs: 60000

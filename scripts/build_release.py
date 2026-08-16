@@ -17,6 +17,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 TOP_SKIP = {"build", "backups", "updates", "__pycache__", ".venv"}
+# 内部维护文档（含本机路径，不进公开发布包）
+SKIP_REL = {"docs/上传GitHub.md", "docs/发布清单_v1.0.9.md"}
 
 
 def main():
@@ -42,6 +44,8 @@ def main():
                     continue
                 p = os.path.join(root, f)
                 rel = os.path.relpath(p, ROOT).replace("\\", "/")
+                if rel in SKIP_REL:
+                    continue
                 z.write(p, "DSHQuant/" + rel)
                 n += 1
     print(f"release: {out}  ({n} files / {out.stat().st_size / 1e6:.1f} MB)")

@@ -52,3 +52,7 @@ backups/
 # ---- 顶层单文件 EXE（>100MB，走 Release 附件） ----
 /QuantDeck.exe
 harness/home/profiles/node_modules/
+
+# ---- 内部维护文档（含本机路径，不进公开仓库） ----
+docs/上传GitHub.md
+docs/发布清单_v1.0.9.md
