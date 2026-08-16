@@ -2028,7 +2028,7 @@ _minute_meta_cache = {"ts": 0, "k5": "", "i1": ""}
 def _minute_node() -> dict:
     """★#341 分钟数据环节自检（修复"花架子"）：如实反映 5 分钟因子 + 1 分钟因子状态
     - 5 分钟因子：kline5m_factors.parquet（baostock 当日管道，覆盖至最新交易日）
-    - 1 分钟因子：intraday_factors_v2.parquet（网盘交付，滞后 3-5 天）
+    - 1 分钟因子：intraday_factors_v2.parquet（数据交付，滞后 3-5 天）
     ★关键：内容日期检查（读 parquet date max，10min 缓存）——只靠 mtime 会误判"文件新鲜但内容滞后"（#123 竞价信号教训）
     旧实现检查 incr_parquet/*.parquet（08-10 的 1 分钟原始数据）已过时，分钟因子早已落盘到根目录。"""
     from pathlib import Path as _P
@@ -2108,7 +2108,7 @@ def _minute_node() -> dict:
     else:
         _note.append("5m因子缺失")
     if _i1.exists():
-        _note.append(("1m因子至%s（网盘，滞后3-5天）" % _i1cov) if _i1cov else "1m因子（网盘）")
+        _note.append(("1m因子至%s（数据，滞后3-5天）" % _i1cov) if _i1cov else "1m因子（数据）")
     else:
         _note.append("1m因子缺失")
     return {"name": "分钟数据", "ok": _ok, "age_h": _age,
@@ -2209,7 +2209,7 @@ def live_chain() -> dict:
         #   原"1分钟竞价数据未更新"不含关键词被误判 hard failure → 每晚 health_scan 假 ❌
         if name == "竞价信号" and _cdate and _latest_td and _cdate < _latest_td:
             _nd["ok"] = False
-            _nd["note"] = f"数据至 {_cdate}，滞后于最新交易日 {_latest_td}（供应商1分钟竞价数据未交付，需网盘新版或 Tushare 分钟权限）"
+            _nd["note"] = f"数据至 {_cdate}，滞后于最新交易日 {_latest_td}（供应商1分钟竞价数据未交付，需数据新版或 Tushare 分钟权限）"
         # ★2026-08-12 百轮#97：实盘裁决环节附降权状态（门户/Pitch 决策链直接看到裁决结论）
         if name == "实盘裁决":
             try:

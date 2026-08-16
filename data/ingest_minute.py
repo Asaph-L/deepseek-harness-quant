@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """data/ingest_minute.py — A股/期货分钟数据入库（2026-08-09）
 
-数据来源：网盘每日更新（用户下载到 DOWNLOAD_DIR）
+数据来源：数据每日更新（用户下载到 DOWNLOAD_DIR）
   - 夸克：期货分钟历史数据
-  - 百度网盘：A股1分钟历史数据（每日 16-18 点更新当日全部分钟数据）
+  - 用户提供：A股1分钟历史数据（每日 16-18 点更新当日全部分钟数据）
 
 流程：扫描下载目录 → 自动探测格式 → 解析 → 入库 minute.db → 更新 meta
 
@@ -25,7 +25,7 @@ sys.path.insert(0, str(BASE))
 
 import pandas as pd
 
-# 用户把网盘下载的数据放到这里（文件夹内可嵌套，脚本递归扫描）
+# 用户把数据下载的数据放到这里（文件夹内可嵌套，脚本递归扫描）
 DOWNLOAD_DIR = Path(r"data/minute/download")
 MINUTE_DB = r"data\cache\minute.db"
 
@@ -164,7 +164,7 @@ def scan(limit: int = None):
     if limit:
         files = files[:limit]
     if not files:
-        print(f"下载目录无数据文件: {DOWNLOAD_DIR}（请把网盘下载的数据放到这里）")
+        print(f"下载目录无数据文件: {DOWNLOAD_DIR}（请把数据下载的数据放到这里）")
         return
     print(f"发现 {len(files)} 个数据文件，开始入库...")
     ok = 0

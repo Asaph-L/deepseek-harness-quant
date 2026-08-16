@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """data/minute_reader.py — A股分钟数据读取器（2026-08-09）
 
-数据源：用户下载的网盘分钟数据（parquet 按交易日分片，zip 压缩按年打包）
+数据源：用户下载的分钟数据（parquet 按交易日分片，zip 压缩按年打包）
   1m_price_zip/YYYY.zip  内含 YYYYMMDD.parquet（全市场当日 1 分钟）
   5m_price_zip/YYYY.zip  内含 YYYYMMDD.parquet（全市场当日 5 分钟）
 

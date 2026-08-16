@@ -1,67 +1,116 @@
 # DeepSeek HARNESS Quant
 
-**自然语言驱动的 AI 量化系统**：DeepSeek HARNESS 深度嵌入——用自然语言控制系统、魔改系统、自动挖掘因子；全模块化、信息 API 化、数据每日动态更新。
+自然语言驱动的 A 股量化系统。低频。主观决策 + 写死引擎 + 数据裁决。
 
-> 开源 MIT ｜ 代码 + HARNESS 运行时 + 演示数据随包分发 ｜ 密钥零残留，开箱即用
+AI 不预测个股。这是硬约束，不是选项。
 
-## 为什么有效
+```
+驱动层  语言模型        控制 · 挖因子 · 审计 · 牛散蒸馏
+执行层  写死引擎        评分 · 回测 · 风控 · 扫描（确定性 Python，可复现）
+事实层  数据系统        PIT · T+1 · 覆盖率分年核查（可证伪）
+```
 
-不靠单一神奇因子，靠三样：**被严格证伪过的因子、正确的组合结构、机械化的纪律执行**。
+## 接入 DeepSeek API
 
-- **三重实证纪律**：T+1 无前视（信号日收盘→次日开盘）· PIT 口径（真实披露日）· 分年度 + 覆盖率分年核查
-- **证伪文化**：17+ 项假 alpha 公开留档（热度板块/散户情绪择时/MA20 择时/GTJA191/Qlib-ML 全量等），不造神只实证
-- **关键洞察**：因子 ICIR 高 = 排序能力（雷达）≠ 持仓收益。高分集中持仓实证 -60% 回撤；主力走 turn_low 分散防守（+15.95%/-8.7%/1.11，2022 熊市 +6.7%），pitch 高分只做卫星仓
-- **纪律执行**：持股 ≤5、先卖后买、一字板跳过、类型定制止损（防守类删除硬止损，避免策略被摧毁）
+接入 API 后，语言模型接管驱动层。控制、挖因子、审计、魔改，全部解锁。不接入，则只有写死引擎，没有 AI。
 
-## 什么策略
+```bash
+# 1. 获取 Key
+#    https://platform.deepseek.com/api_keys
 
-**低频主观量化 + Pitch 决策系统 + 自动挖掘验证的因子池。**
+# 2. 复制凭据模板，填入 Key
+copy harness\home\.credentials.yaml.example harness\home\.credentials.yaml
+#    编辑 .credentials.yaml：
+#    DEEPSEEK_API_KEY: sk-xxxxxxxxxxxxxxxx
 
-- **低频**：周/月频调仓，容量友好（0.5-1 亿）；买入指令 = L2 决策卡片聚合，由人审批，非全自动黑箱
-- **Pitch 系统**：全市场扫描 → 候选卡（评分/胜率/1/2/3 年证据/止损）→ 人工审批 → 唯一买入指令；远期池自动追踪 T+1/5/20/60 实际收益
-- **自动挖掘因子**：AlphaGPT 方法论蒸馏成 skill（公式语言 + StackVM + REINFORCE 生成器迭代），AI 自动生成因子公式
-- **自带大量因子**：123+ 因子（量价/短线涨跌停/情绪日内/机构/基本面低频/行业/Alpha101 复刻），全库最强 limup_ex_5 1.239、open_prem_20 0.958、lhb_jg_cnt_20 0.900
-- **统一验证链**：九步入池（ICIR 初筛→去重→组合层 T+1→分年度 holdout→正交→容量→归档）
+# 3. 启动，打开控制页
+python launcher.py
+#    http://127.0.0.1:8787/control
+```
 
-## 为什么创新
+接入后，直接对话：
 
-把 AI 从"写代码的工具"升级为"系统本身的一部分"，并用工程化实证兜底。
+- **控制系统**：发「1」触发自主推进（审计 / 修复 / 归档，系统自我进化）
+- **挖因子**：说「研究散户情绪量化」——AI 拆假设 → 生成因子 → 九步验证 → 入池或证伪
+- **审计**：让 AI 自查前视、覆盖率、共线性、过拟合
+- **牛散**：7 位牛散人格对话选股，决策自动入远期池验证
+- **魔改**：动态 Cordis 插件热更新，系统行为运行时改，不重编译
 
-- **AI 原生架构**：HARNESS 深度嵌入，AI 控制层与量化执行层分离；自然语言控制系统、自主审计/修复/归档、动态插件热更新
-- **因子研究生成器驱动**：LLM/RL 自动生成+回测+迭代，替代人工枚举
-- **主观智慧可验证**：7 位牛散蒸馏成可验证假设，接入五池远期验证（按决策者分组，数据说话）
-- **证伪文化工程化**：把量化最隐蔽的坑（截面 ICIR ≠ 组合层、前视、覆盖率污染、过拟合）做成强制流程
-- **全模块化动态更新**：因子注册即自动接入；配置化 + API 化；每日自愈式自动链 + 因子健康实时监控
+其余数据源（Tushare 等）接入后让 AI 指导完成。核心逻辑：先接 AI 的 API，AI 帮你接剩下的。
 
 ## 架构
 
-```
-data/       数据获取（Tushare/akshare/baostock）+ 本地缓存 + Point-in-Time（cache.py 唯一读取接口）
-factors/    因子引擎 + 机会扫描（scan.py --pitch）+ 远期池（五池验证）+ 择时/政策
-strategy/   决策链（L0 择时 → L2 Pitch 审批 → T+1 执行）+ 组合构建（turn_low 防守主力 + pitch 卫星）
-risk/       风控（RiskAgent 六道 + 类型定制止损 + 数据审计 + Beneish M-Score + 假信号排雷）
-backtest/   回测引擎（T+1 开盘执行 / 一字板过滤 / 成本模型 / 结论分级）
-etf/        ETF 映射（策略暴露表达成可交易配置）
-deck/ ui_v2/  Web 决策台（9 页：门户/控制/决策/持仓/因子/回测/ETF/远期/说明）
-harness/    DeepSeek HARNESS 运行时（核心：AI 控制台对话 / 牛散主观桥 / 动态插件 /quant/*）
-config/     动态化配置（strategies.yaml / etf_pool.yaml，带 .example 模板）
-```
+| 模块 | 职责 |
+|---|---|
+| data/ | 数据获取 + 本地缓存 + Point-in-Time（cache.py 唯一读取接口） |
+| factors/ | 因子引擎 + 机会扫描 + 远期池（五池 T+1/5/20/60 验证） |
+| strategy/ | 决策链（L0 择时 → L2 Pitch 审批 → T+1 执行）+ 组合构建 |
+| risk/ | 风控七道（数据审计 / 因子健康 / FRC 排雷 / Beneish / 竞价 / 单因子 / L0 门控） |
+| backtest/ | 回测引擎（T+1 开盘 / 一字板过滤 / 成本模型 / 结论分级） |
+| etf/ | ETF 映射（策略暴露 → 可交易配置） |
+| deck/ ui_v2/ | Web 决策台（9 页，前端零硬编码） |
+| harness/ | DeepSeek HARNESS 运行时（AI 控制台 / 牛散桥 / 动态插件） |
+| config/ | 策略注册表 / ETF 池 / 阈值，全部配置化 + .example 模板 |
 
-## 快速开始（演示数据开箱即用）
+## 因子
+
+123+ 因子，全部 A 股本地实证（PIT / T+1 / 分年度）。九步入池，17+ 项证伪留档。
+
+| 维度 | 代表 | 实证 |
+|---|---|---|
+| 换手率 | turn_mid_prox / turnover / turn_std20 | turn_mid_prox ICIR 0.87 |
+| 低波动 | lowvol / std20 / downside_vol | 防守底仓主力 |
+| 反转 | reversal20 / o2c 日内反转族 | limup_ex_5 ICIR 1.24 |
+| 流动性 | amihud | 0.43，多空夏普 1.12 |
+| 彩票/偏度 | max_ret20 / skew20 / rmax | max_ret20 0.64 |
+| 振幅/动量 | amp20 / open_prem_20 | open_prem_20 0.96 |
+| 基本面低频 | f_score / sue / accruals / asset_growth / bp | f_score 120日 0.49 |
+| 短线涨跌停 | limit_up_* / consec_limit_down | 跌停排雷 0.97 |
+| 机构行为 | lhb_jg_cnt_20 / shebao_chg | lhb 0.90 |
+| 行业层 | ind_crowd_60 / ind_rs_20 | 拥挤 0.30 |
+| Alpha101 | alpha015 / alpha050 / alpha006 / alpha003 / alpha044 | alpha015 0.76 |
+
+来源：学术复现 · 开源策略库复刻 · 事件驱动实证 · 牛散蒸馏 · AI 自动挖掘 · 机构资金行为。
+
+## Skill
+
+12 个技能文件，封装方法论 + 资产 + 踩坑记录，AI 按需加载。
+
+- 因子挖掘：factor-mining-workflow · alpha-gpt-factor-mining · alpha-gpt-researcher · backtest-acceptance
+- 牛散蒸馏：niu-san-distillation + 林园 / 陈小群 / 章盟主 / 赵老哥 / 炒股养家 / 冯柳
+- 系统维护：github-maintainer
+
+## 安装与运行
 
 ```bash
+# 源码
 pip install -r requirements.txt
-python scripts/build_demo_db.py     # 生成合成演示数据（30 股 × 250 日）
-python launcher.py                  # 一键启动 deck:8787 + HARNESS:3080（AI 控制台）
+python scripts/build_demo_db.py      # 生成演示数据
+python launcher.py                   # deck:8787 + HARNESS:3080
+
+# 单文件
+QuantDeck.exe                        # 双击即用，自动开浏览器
+
+# 完整包
+DSHQuant-v1.0.8-Release.zip          # 解压即用，含 HARNESS 运行时
 ```
 
-也可用单文件 EXE（Release 附件）或完整包（Release zip，含 HARNESS 运行时）。可选配置：`config/params.yaml.example`（Tushare token）、`harness/home/.credentials.yaml.example`（DeepSeek API Key）。启动后打开 http://127.0.0.1:8787，门户→控制页即可与 AI 对话（发「1」触发自主推进）。
+运行要求：Python 3.10+（源码）/ 无（exe）。HARNESS 控制台需 Node.js 18+（可选）。
 
-## 数据与许可
+## 数据
 
-- MIT License；行情数据来自第三方（Tushare 等），禁止再分发——只提供获取脚本 + 合成演示数据
-- 仅供个人研究学习，不构成投资建议
+数据由用户自行获取。系统不分发数据。
 
-## 版本
+- 行情来自第三方（Tushare 等）。仓库只含获取脚本 + 合成演示数据。
+- 换手率 2019 年前缺失，2019 前换手类结论作废。
+- 配置：`config/params.yaml.example`（Tushare token）。
 
-见 `CHANGELOG.md`；更新机制 `scripts/update.py`（manifest 驱动，用户配置/数据保护，应用前自动备份）。
+## 许可
+
+MIT。仅供研究学习。不构成投资建议。
+
+## 文档
+
+[资产盘点](docs/资产盘点.md) · [架构说明](docs/架构.md) · [快速开始](docs/快速开始.md) · [HARNESS 接入](docs/HARNESS接入.md) · [数据说明](docs/数据说明.md) · [分钟数据接入](docs/分钟数据接入说明.md)
+
+更新机制：`scripts/update.py`（manifest 驱动，用户配置保护，应用前自动备份）。

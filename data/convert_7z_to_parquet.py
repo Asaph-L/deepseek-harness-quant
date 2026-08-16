@@ -144,7 +144,7 @@ def main():
     ap.add_argument("--min-date", type=str, default="20260411")
     args = ap.parse_args()
 
-    # ★2026-08-10 自动发现最新更新目录（用户每日网盘更新生成新目录）
+    # ★2026-08-10 自动发现最新更新目录（用户每日数据更新生成新目录）
     _ROOT = Path(r"data/minute/download/【2】2026单年A股分钟日频-持续更新到年底")
     _DEFAULT_DIR = Path(r"data/minute/download/【2】2026单年A股分钟日频-持续更新到年底/8.9日更新/2026(1)/每日数据")
     if _ROOT.exists():
