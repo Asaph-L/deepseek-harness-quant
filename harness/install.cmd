@@ -1,17 +1,17 @@
 @echo off
-REM DSHQuant harness è¿è¡Œæ—¶å®‰è£…è„šæœ¬ï¼ˆgit clone ç”¨æˆ·ä½¿ç”¨ï¼›Release zip å·²è‡ªå¸¦ node_modulesï¼‰
-REM éœ€è¦ï¼šNode.js 18+ï¼ˆhttps://nodejs.orgï¼‰
+REM DSHQuant harness ÔËĞĞÊ±°²×°½Å±¾£¨git clone ÓÃ»§Ê¹ÓÃ£»Release zip ÒÑ×Ô´ø node_modules£©
+REM ĞèÒª£ºNode.js 18+£¨https://nodejs.org£©
 cd /d "%~dp0"
-echo [1/2] å®‰è£… DeepSeek HARNESS è¿è¡Œæ—¶ä¾èµ–ï¼ˆçº¦ 530 åŒ… / 250MBï¼Œéœ€å‡ åˆ†é’Ÿï¼‰...
+echo [1/2] °²×° DeepSeek HARNESS ÔËĞĞÊ±ÒÀÀµ£¨Ô¼ 530 °ü / 250MB£¬Ğè¼¸·ÖÖÓ£©...
 call npm install --no-audit --no-fund
 if errorlevel 1 (
-  echo å®‰è£…å¤±è´¥ï¼šè¯·ç¡®è®¤ Node.js å·²å®‰è£…ä¸” npm å¯ç”¨
+  echo °²×°Ê§°Ü£ºÇëÈ·ÈÏ Node.js ÒÑ°²×°ÇÒ npm ¿ÉÓÃ
   pause
   exit /b 1
 )
-echo [2/2] å®Œæˆã€‚å¯åŠ¨æ–¹å¼ï¼šè¿è¡Œä»“åº“æ ¹ launcher.pyï¼Œæˆ–æ‰‹åŠ¨ï¼š
+echo [2/2] Íê³É¡£Æô¶¯·½Ê½£ºÔËĞĞ²Ö¿â¸ù launcher.py£¬»òÊÖ¶¯£º
 echo   set DSH_HOME=%~dp0home
 echo   node node_modules\@deepseek-ai\dsh\lib\bin.js web
 echo.
-echo é¦–æ¬¡ä½¿ç”¨è¯·é…ç½® API Keyï¼šå¤åˆ¶ home\.credentials.yaml.example ä¸º home\.credentials.yaml å¹¶å¡«å…¥ DeepSeek API Key
+echo Ê×´ÎÊ¹ÓÃÇëÅäÖÃ API Key£º¸´ÖÆ home\.credentials.yaml.example Îª home\.credentials.yaml ²¢ÌîÈë DeepSeek API Key
 pause

@@ -70,7 +70,7 @@ L1 因子参考 → 机会池/机器池(machine_pool)/竞价/turn_low 防守参�
 |---|---|
 | 仓库 | https://github.com/yuanwang589-dev/deepseek-harness-quant（PUBLIC · MIT · master） |
 | 本地源 | `D:\deepseek-harness-quant`（33,856 文件 / 430MB；代码 379 文件 4.6MB 入 git） |
-| 版本 | VERSION=1.0.8（CHANGELOG 记 v1.0.0，命名不一致沿用） |
+| 版本 | VERSION=1.0.9（CHANGELOG 记 v1.0.0，命名不一致沿用） |
 | 发布产物 | `D:\quant-release\`（LWQuant-v{ver}-Release.zip 完整包 / Source zip / Windows-Full zip） |
 | EXE | `dist\QuantDeck.exe`（PyInstaller onefile，~300MB；顶层 QuantDeck.exe 为运行中旧版勿覆盖） |
 | 账号/CLI | yuanwang589-dev；gh=`C:\Program Files\GitHub CLI\gh.exe`（PATH 可能未刷新，用全路径） |
