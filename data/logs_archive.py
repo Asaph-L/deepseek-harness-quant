@@ -23,7 +23,10 @@ import shutil
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent.parent
-TRASH = Path("<home>/Desktop/垃圾桶")
+# ★2026-08-22 跨平台：原硬编码 Windows 占位符 "<home>/Desktop/垃圾桶"（发布时由
+#   build_update.py 替换）在 macOS 未被替换 → 归档到工作区字面量 "<home>/" 目录。
+#   改为 Path.home() 动态取用户主目录（macOS/Win 通用）。
+TRASH = Path.home() / "Desktop" / "垃圾桶"
 TS = re.compile(r"^(.+)_(\d{8}_\d{6})\.(json|md|csv)$")
 # 各模式独立保留数（未列出的走 --keep 默认）
 KEEP_OVERRIDE = {

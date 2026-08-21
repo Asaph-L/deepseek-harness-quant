@@ -40,7 +40,7 @@ from strategy.stock_state import classify_series
 from strategy.breakout_confirm import breakout_filter
 
 CFG = yaml.safe_load((BASE / "config" / "params.yaml").read_text(encoding="utf-8"))
-MV_MAP_CSV = r"data\cache\circ_mv_map.csv"
+MV_MAP_CSV = r"data/cache/circ_mv_map.csv"
 
 # 分类策略参数（params.yaml stock_state/layers 可覆盖）
 HARD_STOP = CFG.get("risk", {}).get("stop_loss_pct", 0.07)

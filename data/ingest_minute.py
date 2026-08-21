@@ -27,7 +27,7 @@ import pandas as pd
 
 # 用户把数据下载的数据放到这里（文件夹内可嵌套，脚本递归扫描）
 DOWNLOAD_DIR = Path(r"data/minute/download")
-MINUTE_DB = r"data\cache\minute.db"
+MINUTE_DB = r"data/cache/minute.db"
 
 # 支持的扩展名
 EXTS = {".csv", ".txt", ".csv.gz", ".txt.gz", ".gz"}

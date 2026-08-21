@@ -37,8 +37,8 @@ from pathlib import Path
 BASE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE))
 
-QD_DB = r"data\cache\finance_quality.db"
-FIN_DB = r"data\cache\finance.db"
+QD_DB = r"data/cache/finance_quality.db"
+FIN_DB = r"data/cache/finance.db"
 OUT = BASE / "logs" / "stock_risk_map_v2.json"   # v2（接入 Beneish 完整版 2026-08-09；v1 文件被外包占用锁）
 # ★2026-08-11 写保护免疫：固定名多次写被锁（实测 scan_all PermissionError）→ 每次写时间戳文件；
 #   读取端（deck_server /api/risk glob、portfolio._risk_map）取最新；固定名仅首写兼容

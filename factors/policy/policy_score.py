@@ -30,7 +30,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-MACRO_DB = Path(r"data\cache\macro.db")
+MACRO_DB = Path(r"data/cache/macro.db")
 EPU_DB = BASE / "data" / "cache" / "policy" / "epu.db"
 
 WEIGHTS = {"epu": -0.35, "epu_chg3m": -0.20, "sf_yoy": 0.30, "spread": 0.15}

@@ -35,7 +35,7 @@ import pandas as pd
 BASE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE))
 
-BARS_DB = r"data\cache\bars.db"
+BARS_DB = r"data/cache/bars.db"
 PORTFOLIO = BASE / "logs" / "portfolio.json"
 DECISIONS = BASE / "logs" / "deck_decisions.json"
 PITCH_V2 = BASE / "logs" / "pitch_v2.json"

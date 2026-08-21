@@ -46,10 +46,10 @@ from factors.opportunities.score import (opportunity_score, gains_score, prob_sc
                                          EXPRESS_MIN_FAMILY, CONSENSUS_MIN_FAMILY,
                                          EXPRESS_PER_LINE, CONSENSUS_PER_LINE)
 
-BARS_DB = r"data\cache\bars.db"
-FIN_DB = r"data\cache\finance.db"
-QD_DB = r"data\cache\finance_quality.db"
-BASIC_DB = r"data\cache\stock_basic.db"
+BARS_DB = str(BASE / "data" / "cache" / "bars.db")  # ★绝对路径：Path.as_uri() 不支持相对路径
+FIN_DB = str(BASE / "data" / "cache" / "finance.db")
+QD_DB = str(BASE / "data" / "cache" / "finance_quality.db")
+BASIC_DB = str(BASE / "data" / "cache" / "stock_basic.db")
 OUT = BASE / "logs" / f"opp_pool_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"   # 每次运行唯一文件名（安全层限制同名文件只能写一次）
 # 兼容读取：pitch_v2.py 用 get_latest_pool() 取最新
 
@@ -1603,11 +1603,9 @@ def compute_factors(px: pd.DataFrame, vx: pd.DataFrame, fin: pd.DataFrame,
                     left_on="code6", right_index=True, how="left", suffixes=("", "_q"))
         f["liability"] = f["liability_to_asset"]
         f["cfo_health"] = (f["cfo_to_np"] > 0).astype(int)
-        # ★ROE 口径统一（2026-08-09）：质量表 roe_avg 为年化 ROE（小数），
-        #   finance_report.roe 为单季 ROE（Q1 单季>8% 极少 → value/quality_gap 触发稀少）
-        #   → 有 roe_avg 的股票用年化值覆盖（质量数据全量后 5388 只覆盖）
+        # finance_report v2 是可信年化口径；现存 quality 库无版本标记且仍可能
+        # 是累计口径，因此暂不让 roe_avg 参与合并，只保留负债/CFO 字段。
         f["roe_avg"] = pd.to_numeric(f["roe_avg"], errors="coerce")
-        f["roe"] = f["roe_avg"].fillna(f["roe"])
 
     # 基本面硬筛标记
     f["roe"] = pd.to_numeric(f["roe"], errors="coerce")
@@ -1682,8 +1680,7 @@ def triggers():
             # ★真实估值：PB<20%分位（或 PB<1.5 兜底）且 PE>0 且 PE<20%分位，股息率>0 加分
             (r["pb_pct"] or 1) <= 0.20 and ((r["pb"] or 99) < 1.5 or True) and
             (r["pe_ttm"] or 0) > 0 and (r["pe_pct"] or 1) <= 0.30 and
-            # ★ROE 口径（2026-08-09）：单季 ROE（Q1 单季>8% 极少）→ 阈值按年化/4 换算：0.08/4=0.02
-            (r["roe"] or 0) > 0.02 and
+            (r["roe"] or 0) > 0.08 and
             (r["liability"] if pd.notna(r.get("liability")) else 1) < 0.70 and r["non_st"] == 1 and r["non_lowprice"] == 1),
         "breakout": lambda r: (
             (r["near_high_250"] or -1) > -0.05 and (r["vol_ratio"] or 1) >= 1.5 and
@@ -1694,8 +1691,7 @@ def triggers():
         "event": lambda r: (
             (r["roe"] or 0) > 0.08 and (r["sq_nyoy"] or 0) > 0.20 and r["non_st"] == 1 and r["non_lowprice"] == 1),
         "quality_gap": lambda r: (
-            # ★ROE 阈值 0.15 按单季口径换算：年化 15% ≈ 单季 0.0375（2026-08-09）
-            (r["roe"] or 0) > 0.0375 and (r["drawdown_60d"] or 0) < -0.25 and
+            (r["roe"] or 0) > 0.15 and (r["drawdown_60d"] or 0) < -0.25 and
             (r["liability"] if pd.notna(r.get("liability")) else 1) < 0.60 and
             (r["cfo_health"] if pd.notna(r.get("cfo_health")) else 1) == 1 and
             r["non_st"] == 1 and r["non_lowprice"] == 1),

@@ -66,13 +66,23 @@ def _latest_roe(code: str):
     """最新已披露财报 ROE（ann_date ≤ 今日；n_income/equity）"""
     try:
         con = _ro(FIN_TS_DB)
+        columns = {x[1] for x in con.execute("PRAGMA table_info(financials_ts)")}
+        attr_profit = "n_income_attr_p" if "n_income_attr_p" in columns else "n_income"
+        equity = ("total_hldr_eqy_exc_min_int"
+                  if "total_hldr_eqy_exc_min_int" in columns else "NULL")
         r = con.execute(
-            "SELECT ann_date, n_income, total_hldr_eqy_exc_min_int FROM financials_ts "
+            f"SELECT end_date,ann_date,{attr_profit},n_income,"
+            f"{equity} AS total_hldr_eqy_exc_min_int FROM financials_ts "
             "WHERE code=? AND ann_date IS NOT NULL AND ann_date != '' "
-            "ORDER BY ann_date DESC LIMIT 1", (code,)).fetchone()
+            "AND date(ann_date)<=date('now','localtime') "
+            "ORDER BY end_date DESC,ann_date DESC LIMIT 1", (code,)).fetchone()
         con.close()
-        if r and r[1] is not None and r[2] and float(r[2]) > 0:
-            return {"ann_date": str(r[0])[:10], "roe": float(r[1]) / float(r[2])}
+        profit = (r[2] if r and r[2] is not None else r[3] if r else None)
+        if r and profit is not None and r[4] and float(r[4]) > 0:
+            month = str(r[0]).replace("-", "")[4:6]
+            annualizer = {"03": 4.0, "06": 2.0, "09": 4.0 / 3.0, "12": 1.0}.get(month, 1.0)
+            return {"ann_date": str(r[1])[:10],
+                    "roe": float(profit) * annualizer / float(r[4])}
     except Exception:
         pass
     return None

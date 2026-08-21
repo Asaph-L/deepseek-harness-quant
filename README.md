@@ -18,7 +18,7 @@ AI 不预测个股。这是硬约束，不是选项。
 
 接入 API 后，语言模型接管驱动层。控制、挖因子、审计、魔改，全部解锁。不接入，则只有写死引擎，没有 AI。
 
-**前提**：完整包（zip）已内置 HARNESS 运行时；单文件（exe）不含 HARNESS，AI 控制台不可用。系统需 Node.js 18+（https://nodejs.org），无则 HARNESS 自动跳过、量化系统照常。
+**前提**：完整包（zip）已内置 HARNESS 运行时；单文件（exe）不含 HARNESS，AI 控制台不可用。系统需 Node.js 22.19+ 或 24+（https://nodejs.org），无则 HARNESS 自动跳过、量化系统照常。
 
 **最快方式**：双击 `接入API.cmd`，粘贴 Key，自动写入并验证。
 
@@ -107,7 +107,7 @@ DSHQuant-v1.0.9-Release.zip          # 解压即用，含 HARNESS 运行时
 > **不要**下载页面底部的 "Source code (zip)" —— 那是源码包，harness/node_modules 被排除，没有 AI 控制台。
 > 判断：解压后 `harness\node_modules` 文件夹存在 = 完整包；不存在 = 下错了。
 
-运行要求：Python 3.10+（源码）/ 无（exe）。HARNESS 控制台需 Node.js 18+（可选）。
+运行要求：Python 3.10–3.12（源码）/ 无（exe）。HARNESS 控制台需 Node.js 22.19+ 或 24+（可选）。
 
 ## 数据
 
@@ -116,6 +116,14 @@ DSHQuant-v1.0.9-Release.zip          # 解压即用，含 HARNESS 运行时
 - 行情来自第三方（Tushare 等）。仓库只含获取脚本 + 合成演示数据。
 - 换手率 2019 年前缺失，2019 前换手类结论作废。
 - 配置：`config/params.yaml.example`（Tushare token）。
+
+## 计划任务（每日自动更新）
+
+原 Windows 版用 `schtasks` 注册 8 个任务（TushareInc 17:30 / 盘后扫描 17:35 / 因子档案 17:40 / 每日全链 18:30 / 因子池 19:15 / dev_auto 每 4h / 突破监控与守护每 30min）。
+
+- **macOS**：`python scripts/setup_launchd.py` 一键安装为 LaunchAgent（`~/Library/LaunchAgents/com.lwquant.*.plist`，模板见 `scripts/launchd/`）；`--status` 查看、`--uninstall` 卸载。
+- **Windows**：保持原 schtasks 方式（任务名 `LWQuant-*`）。
+- 状态看板：量化门户「系统实时」页展示各任务下次运行与加载状态（`deck/system_live.py` 跨平台读取）。
 
 ## 许可
 

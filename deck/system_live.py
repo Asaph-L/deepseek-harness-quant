@@ -26,13 +26,35 @@ DBS = {
     "hist_mv": r"data/cache/hist_mv.db",
 }
 
-SCHEDULED_TASKS = [
-    ("LWQuant-DevDriver", "每 4h 巡检"),
-    ("LWQuant-AfterCloseScan", "17:35 盘后机会扫描"),
-    ("LWQuant-FactorDaily", "19:15 因子池"),
-    ("LWQuant-DailyPipeline", "18:30 每日全链"),
-    ("LWQuant-DeckGuard", "每 30min 守护"),
-]
+# 全部计划任务（win32 只注册前 5 个 schtasks 任务；darwin 按 launchd plist 全量发现）
+TASK_DESC = {
+    "LWQuant-DevDriver": "每 4h 巡检",
+    "LWQuant-AfterCloseScan": "17:35 盘后机会扫描",
+    "LWQuant-FactorDaily": "19:15 因子池",
+    "LWQuant-DailyPipeline": "18:30 每日全链",
+    "LWQuant-DeckGuard": "每 30min 守护",
+    "LWQuant-TushareInc": "17:30 日线增量",
+    "LWQuant-FactorArchive": "17:40 因子档案",
+    "LWQuant-BreakoutMon": "每 30min 突破监控",
+    "LWQuant-DailyReport": "20:00 日报+自动选股",
+}
+SCHEDULED_TASKS = [(k, v) for k, v in TASK_DESC.items()
+                   if k in ("LWQuant-DevDriver", "LWQuant-AfterCloseScan",
+                            "LWQuant-FactorDaily", "LWQuant-DailyPipeline",
+                            "LWQuant-DeckGuard")]
+
+# Windows 计划任务名 → macOS launchd label（scripts/setup_launchd.py 安装）
+TASK_LABELS = {
+    "LWQuant-DevDriver": "com.lwquant.devdriver",
+    "LWQuant-AfterCloseScan": "com.lwquant.afterclose",
+    "LWQuant-FactorDaily": "com.lwquant.factordaily",
+    "LWQuant-DailyPipeline": "com.lwquant.dailypipeline",
+    "LWQuant-DeckGuard": "com.lwquant.deckguard",
+    "LWQuant-TushareInc": "com.lwquant.tushareinc",
+    "LWQuant-FactorArchive": "com.lwquant.factorarchive",
+    "LWQuant-BreakoutMon": "com.lwquant.breakoutmon",
+    "LWQuant-DailyReport": "com.lwquant.dailyreport",
+}
 
 
 _db_cache = {"ts": 0, "data": None}
@@ -95,14 +117,85 @@ def _dev_auto_tail(n=8) -> list:
     return []
 
 
-_sched_cache = {"ts": 0, "data": None}
+_task_cache = {"ts": 0, "data": None}
 
 
-def _scheduled() -> dict:
-    """计划任务下次运行时间（5 分钟缓存，schtasks 慢会阻塞 API）"""
-    now = time.time()
-    if _sched_cache["data"] is not None and now - _sched_cache["ts"] < 300:
-        return _sched_cache["data"]
+def _launchd_loaded(label) -> bool:
+    """launchd 任务是否已加载：launchctl print gui/<uid>/<label> 成功 = 已加载
+    （launchctl list 只列当前会话域，gui 域任务需用 print 验证）"""
+    try:
+        uid = subprocess.run(["id", "-u"], capture_output=True, text=True,
+                             errors="replace", timeout=5).stdout.strip()
+        r = subprocess.run(["launchctl", "print", f"gui/{uid}/{label}"],
+                           capture_output=True, text=True, errors="replace", timeout=8)
+        return r.returncode == 0
+    except Exception:
+        return False
+
+
+def _calc_next_launchd(d: dict):
+    """按 plist 调度字段计算下次运行时间 → "MM-DD HH:MM" / "每 Nmin" / "—"
+    StartCalendarInterval: {Hour, Minute, Weekday}（Weekday: 0/7=周日，1-6=周一~六）"""
+    import datetime as _dt
+    now = _dt.datetime.now()
+    cal = d.get("StartCalendarInterval")
+    if cal:
+        if isinstance(cal, dict):
+            cal = [cal]
+        cands = []
+        for c in cal:
+            try:
+                h = c.get("Hour", 0)
+                m = c.get("Minute", 0)
+                wd = c.get("Weekday")
+            except Exception:
+                continue
+            for days in range(0, 9):
+                t = now + _dt.timedelta(days=days)
+                if wd is not None:
+                    pw = 7 if wd in (0, 7) else wd
+                    if t.isoweekday() != pw:
+                        continue
+                cand = t.replace(hour=h, minute=m, second=0, microsecond=0)
+                if cand > now:
+                    cands.append(cand)
+                    break
+        if cands:
+            return min(cands).strftime("%m-%d %H:%M")
+    iv = d.get("StartInterval")
+    if iv:
+        return f"每 {max(1, int(iv) // 60)}min"
+    return "—"
+
+
+def _darwin_tasks() -> dict:
+    """macOS：读 ~/Library/LaunchAgents/com.lwquant.*.plist → 各任务状态
+    （launchd 替代 Windows schtasks；plist 由 scripts/setup_launchd.py 安装）"""
+    import plistlib
+    agents = Path.home() / "Library" / "LaunchAgents"
+    out = {}
+    if not agents.is_dir():
+        return out
+    for p in sorted(agents.glob("com.lwquant.*.plist")):
+        try:
+            with open(p, "rb") as f:
+                d = plistlib.load(f)
+            label = d.get("Label", p.stem)
+            name = next((n for n, l in TASK_LABELS.items() if l == label), label)
+            desc = TASK_DESC.get(name, label)
+            out[name] = {
+                "desc": desc,
+                "next": _calc_next_launchd(d),
+                "loaded": _launchd_loaded(label),
+                "plist": p.name,
+            }
+        except Exception:
+            continue
+    return out
+
+
+def _win_tasks() -> dict:
+    """Windows：schtasks 查询（原实现）"""
     out = {}
     for name, desc in SCHEDULED_TASKS:
         try:
@@ -110,11 +203,31 @@ def _scheduled() -> dict:
                                capture_output=True, text=True, errors="replace",
                                encoding="gbk", timeout=8)
             m = re.search(r"下次运行时间:\s*(.+)", r.stdout)
-            out[name] = {"desc": desc, "next": m.group(1).strip() if m else "—"}
+            out[name] = {"desc": desc, "next": m.group(1).strip() if m else "—",
+                         "loaded": True}
         except Exception as e:
-            out[name] = {"desc": desc, "next": f"ERR {str(e)[:30]}"}
-    _sched_cache["ts"] = now
-    _sched_cache["data"] = out
+            out[name] = {"desc": desc, "next": f"ERR {str(e)[:30]}", "loaded": False}
+    return out
+
+
+def _platform_task_status() -> dict:
+    """计划任务状态（5 分钟缓存）：win32 → schtasks；darwin → launchd plist"""
+    now = time.time()
+    if _task_cache["data"] is not None and now - _task_cache["ts"] < 300:
+        return _task_cache["data"]
+    data = _win_tasks() if sys.platform == "win32" else _darwin_tasks()
+    _task_cache.update({"ts": now, "data": data})
+    return data
+
+
+def _scheduled() -> dict:
+    """计划任务下次运行时间（5 分钟缓存，schtasks 慢会阻塞 API）"""
+    out = {}
+    for name, d in _platform_task_status().items():
+        item = {"desc": d["desc"], "next": d["next"]}
+        if sys.platform != "win32":
+            item["loaded"] = d.get("loaded", False)
+        out[name] = item
     return out
 
 
@@ -156,10 +269,19 @@ def _api_health() -> dict:
 
 def _deck_pid() -> int:
     try:
-        r = subprocess.run(["netstat", "-ano"], capture_output=True, text=True, errors="replace", timeout=15)
-        for line in r.stdout.splitlines():
-            if ":8787" in line and "LISTENING" in line:
-                return int(line.split()[-1])
+        if sys.platform == "win32":
+            r = subprocess.run(["netstat", "-ano"], capture_output=True, text=True,
+                               errors="replace", timeout=15)
+            for line in r.stdout.splitlines():
+                if ":8787" in line and "LISTENING" in line:
+                    return int(line.split()[-1])
+        else:
+            # macOS/Linux：lsof 按监听端口取 PID
+            r = subprocess.run(["lsof", "-ti", "tcp:8787"], capture_output=True,
+                               text=True, errors="replace", timeout=8)
+            for line in r.stdout.splitlines():
+                if line.strip().isdigit():
+                    return int(line.strip())
     except Exception:
         pass
     return 0
@@ -189,38 +311,45 @@ def _activity_feed(minutes: int = 60) -> list:
 
 def _next_schedule() -> list:
     """★2026-08-10 距下次各计划任务倒计时（分钟）
-    ★2026-08-14 修复：schtasks 输出"下次运行时间"为本地化格式（如 2026/8/14 10:00:00，
-    月份/日期不补零），strptime 在部分环境解析失败或类型异常导致 portal_dash 间歇 500。
-    改为容错解析：手写拆分（年/月/日/时/分/秒）→ datetime；任何失败返回 None 不抛错。"""
+    跨平台：darwin 直接由 plist 计算（"MM-DD HH:MM" 精确倒计时）；
+    win32 容错解析 schtasks 本地化输出（2026/8/14 10:00:00 或 2026-08-14 10:00:00）。
+    任何失败返回 None 不抛错。"""
     out = []
     try:
-        import re as _re
-        from datetime import datetime as _dt
-        for name, desc in SCHEDULED_TASKS:
+        import datetime as _dt
+        for name, d in _platform_task_status().items():
+            nxt = d["next"]
             try:
-                r = subprocess.run(["schtasks", "/Query", "/TN", name, "/FO", "LIST", "/V"],
-                                   capture_output=True, text=True, errors="replace",
-                                   encoding="gbk", timeout=8)
-                m = _re.search(r"下次运行时间:\s*(.+)", r.stdout)
-                if not m:
+                # darwin 计算值："MM-DD HH:MM" → 精确倒计时（跨年自动 +1 年）
+                m = re.match(r"(\d{2})-(\d{2}) (\d{2}):(\d{2})", nxt)
+                if m:
+                    mo, dd, h, mi = (int(m.group(1)), int(m.group(2)),
+                                     int(m.group(3)), int(m.group(4)))
+                    now = _dt.datetime.now()
+                    cand = now.replace(month=mo, day=dd, hour=h, minute=mi,
+                                       second=0, microsecond=0)
+                    if cand < now:
+                        cand = cand.replace(year=now.year + 1)
+                    out.append({"name": name, "desc": d["desc"], "next": nxt,
+                                "mins_left": int(round((cand - now).total_seconds() / 60))})
                     continue
-                nxt = m.group(1).strip()
-                # ★容错解析：拆分数字（兼容 2026/8/14 10:00:00 和 2026-08-14 10:00:00）
-                parts = _re.findall(r"\d+", nxt)
+            except Exception:
+                pass
+            # win32：schtasks 文本（容错解析：拆分数字，月份/日期不补零）
+            try:
+                parts = re.findall(r"\d+", nxt)
                 if len(parts) >= 5:
                     y, mo, d, h, mi = (int(parts[0]), int(parts[1]), int(parts[2]),
                                        int(parts[3]), int(parts[4]))
                     s = int(parts[5]) if len(parts) >= 6 else 0
-                    try:
-                        nxt_dt = _dt(y, mo, d, h, mi, s)
-                        mins = round((nxt_dt - _dt.now()).total_seconds() / 60, 0)
-                        out.append({"name": name, "desc": desc, "next": nxt,
-                                    "mins_left": int(mins)})
-                    except Exception:
-                        out.append({"name": name, "desc": desc, "next": nxt,
-                                    "mins_left": None})
+                    nxt_dt = _dt.datetime(y, mo, d, h, mi, s)
+                    mins = round((nxt_dt - _dt.datetime.now()).total_seconds() / 60, 0)
+                    out.append({"name": name, "desc": d["desc"], "next": nxt,
+                                "mins_left": int(mins)})
+                    continue
             except Exception:
-                continue
+                pass
+            out.append({"name": name, "desc": d["desc"], "next": nxt, "mins_left": None})
     except Exception:
         pass
     return out

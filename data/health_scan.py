@@ -130,22 +130,48 @@ def main() -> int:
 
     # 4) ★计划任务（调度层健康，2026-08-12 百轮后#113：7 个 LWQuant 任务应全部就绪——
     #    防 dev_auto 熔断/手动禁用后静默停摆；08-11 DailyPipeline 0xC0000142 误杀事故归因后加）
-    SCHED_TASKS = ["LWQuant-DevDriver", "LWQuant-DailyPipeline", "LWQuant-TushareInc",
-                   "LWQuant-FactorDaily", "LWQuant-FactorArchive", "LWQuant-BreakoutMon",
-                   "LWQuant-DeckGuard"]
+    #    ★2026-08-21 跨平台：win32 → schtasks；macOS → launchd（com.lwquant.* plist）
+    from deck.system_live import TASK_LABELS
+    SCHED_TASKS = list(TASK_LABELS.keys())
     sched_ok = True
     sched_disabled = []
     try:
         import subprocess as _sp
-        _r = _sp.run(["schtasks", "/query", "/fo", "LIST", "/v"], capture_output=True, timeout=30)
-        _txt = _r.stdout.decode("gbk", errors="replace") + _r.stderr.decode("gbk", errors="replace")
-        for _t in SCHED_TASKS:
-            _idx = _txt.find(_t)
-            _seg = _txt[_idx:_idx + 400] if _idx >= 0 else ""
-            if "禁用" in _seg or "Disabled" in _seg:
-                sched_disabled.append(_t)
-            elif _idx < 0:
-                sched_disabled.append(_t + "(缺失)")
+        if sys.platform == "win32":
+            _r = _sp.run(["schtasks", "/query", "/fo", "LIST", "/v"], capture_output=True, timeout=30)
+            _txt = _r.stdout.decode("gbk", errors="replace") + _r.stderr.decode("gbk", errors="replace")
+            for _t in SCHED_TASKS:
+                _idx = _txt.find(_t)
+                _seg = _txt[_idx:_idx + 400] if _idx >= 0 else ""
+                if "禁用" in _seg or "Disabled" in _seg:
+                    sched_disabled.append(_t)
+                elif _idx < 0:
+                    sched_disabled.append(_t + "(缺失)")
+        else:
+            # macOS：plist 存在 + launchctl print gui/<uid>/<label> 已加载
+            from pathlib import Path as _P
+            _agents = _P.home() / "Library" / "LaunchAgents"
+            try:
+                _uid = _sp.run(["id", "-u"], capture_output=True, text=True,
+                               errors="replace", timeout=5).stdout.strip()
+            except Exception:
+                _uid = ""
+            for _t in SCHED_TASKS:
+                _label = TASK_LABELS[_t]
+                _plist = _agents / f"{_label}.plist"
+                _loaded = False
+                if _uid:
+                    try:
+                        _lr = _sp.run(["launchctl", "print", f"gui/{_uid}/{_label}"],
+                                      capture_output=True, text=True,
+                                      errors="replace", timeout=8)
+                        _loaded = _lr.returncode == 0
+                    except Exception:
+                        pass
+                if not _plist.exists():
+                    sched_disabled.append(_t + "(缺失)")
+                elif not _loaded:
+                    sched_disabled.append(_t + "(未加载)")
         if sched_disabled:
             sched_ok = False
             bad.append(f"计划任务禁用/缺失: {','.join(sched_disabled)}")

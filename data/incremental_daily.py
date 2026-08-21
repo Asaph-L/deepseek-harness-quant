@@ -21,7 +21,7 @@ sys.path.insert(0, str(BASE))
 from data.fetcher_baostock import ensure_daily
 from data.cache import DailyCache
 
-BASIC_DB = r"data\cache\stock_basic.db"
+BASIC_DB = r"data/cache/stock_basic.db"
 
 
 def load_codes():

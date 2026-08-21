@@ -74,7 +74,7 @@ def pool_equal_return(codes: list, date: str) -> float:
     if not codes:
         return 0.0
     import sqlite3 as sq
-    con = sq.connect(r"data\cache\bars.db")
+    con = sq.connect(r"data/cache/bars.db")
     ph = ",".join("?" * len(codes))
     rows = con.execute(
         f"SELECT pct_chg FROM daily_bar WHERE date=? AND adjust='qfq' AND code IN ({ph}) "

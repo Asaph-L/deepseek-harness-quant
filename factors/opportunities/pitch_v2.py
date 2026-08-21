@@ -42,7 +42,7 @@ import pandas as pd
 
 from factors.opportunities.backtest_winrate import _add_months, _holding_stats
 
-BARS_DB = r"data\cache\bars.db"
+BARS_DB = r"data/cache/bars.db"
 LOGS = BASE / "logs"
 OUT_FILE = LOGS / f"pitch_v2_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"   # ★动态时间戳文件名（安全层同名二次写被锁，2026-08-09 改）；读取方用 glob 取最新
 

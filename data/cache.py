@@ -238,20 +238,45 @@ class DailyCache:
                     finally:
                         con0.close()
         rows = []
+        meta_ranges = {}
         for _, r in df.iterrows():
+            code = str(r["code"]).upper()
+            date = str(r["date"])[:10]
             rows.append((
-                str(r["code"]).upper(), r["date"],
+                code, date,
                 _f(r.get("open")), _f(r.get("high")), _f(r.get("low")), _f(r.get("close")),
                 _f(r.get("preclose")), _f(r.get("volume")), _f(r.get("amount")),
                 _f(r.get("turn")), _f(r.get("pct_chg")), int(r.get("is_st") or 0),
                 adjust, source,
             ))
+            old_range = meta_ranges.get(code)
+            meta_ranges[code] = (
+                min(old_range[0], date) if old_range else date,
+                max(old_range[1], date) if old_range else date,
+            )
         con = sqlite3.connect(target)
         try:
             con.executemany(
                 "INSERT OR REPLACE INTO daily_bar "
                 "(code,date,open,high,low,close,preclose,volume,amount,turn,pct_chg,is_st,adjust,source) "
                 "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
+            updated_at = time.strftime("%Y-%m-%d %H:%M:%S")
+            for code, (dmin, dmax) in meta_ranges.items():
+                old = con.execute(
+                    "SELECT start_date,end_date FROM bar_meta WHERE code=? AND adjust=?",
+                    (code, adjust),
+                ).fetchone()
+                start = min(old[0], dmin) if old and old[0] else dmin
+                end = max(old[1], dmax) if old and old[1] else dmax
+                count = con.execute(
+                    "SELECT COUNT(*) FROM daily_bar WHERE code=? AND adjust=?",
+                    (code, adjust),
+                ).fetchone()[0]
+                con.execute(
+                    "INSERT OR REPLACE INTO bar_meta "
+                    "(code,adjust,start_date,end_date,rows,updated_at) VALUES (?,?,?,?,?,?)",
+                    (code, adjust, start, end, count, updated_at),
+                )
             con.commit()
         finally:
             con.close()
@@ -357,7 +382,8 @@ class DailyCache:
         ★2026-08-10 性能修复：主库 immutable 只读连接（0.01s，绕 20s 等锁）；增量库 timeout=3"""
         code = code.upper()
         frames = []
-        for p in self._inc_paths() + [self.db_path]:   # 增量在前 → drop_duplicates keep last = 增量覆盖
+        # 主库先、增量库后；同 key 去重保留最后一行，确保增量覆盖主库。
+        for p in [self.db_path] + self._inc_paths():
             if not Path(p).exists():
                 continue
             sql = ("SELECT code,date,open,high,low,close,preclose,volume,amount,"
@@ -421,8 +447,8 @@ class DailyCache:
             flds = [f for f in fields if f in _NUM_COLS or f == "is_st"]
             sel_cols = ["code", "date"] + flds + ["adjust"]
             num_cols = [f for f in flds if f in _NUM_COLS]
-        out_all = {}   # code -> list[DataFrame]（增量在前 → concat 后 drop_duplicates keep=last 覆盖）
-        db_paths = self._inc_paths() + [self.db_path]
+        out_all = {}   # code -> list[DataFrame]（主库在前、增量在后，keep=last 覆盖）
+        db_paths = [self.db_path] + self._inc_paths()
         sql_head = ("SELECT " + ",".join(sel_cols) +
                     " FROM daily_bar WHERE adjust=? AND code IN (")
         for p in db_paths:
@@ -430,7 +456,7 @@ class DailyCache:
                 continue
             try:
                 # ★2026-08-10：主库与时间戳增量库 immutable；固定 inc 库普通连接（可能正写）
-                if p == str(self.db_path) or p != str(self.inc_path):
+                if Path(p) == self.db_path or Path(p) != self.inc_path:
                     con = sqlite3.connect(self._ro_uri(p), uri=True, timeout=3)
                 else:
                     con = sqlite3.connect(p, timeout=3)
@@ -479,6 +505,7 @@ class DailyCache:
         ★双库：合并主库+所有增量库（start=min / end=max / rows=sum）"""
         code = code.upper()
         metas = []
+        covered_dates = set()
         for p in [self.db_path] + self._inc_paths():
             if not Path(p).exists():
                 continue
@@ -490,6 +517,21 @@ class DailyCache:
                         "SELECT code,adjust,start_date,end_date,rows,updated_at "
                         "FROM bar_meta WHERE code=? AND adjust=?", (code, adjust))
                     row = cur.fetchone()
+                    # 兼容早期批量导入：旧库可能只有 daily_bar、bar_meta 为空。
+                    if not row:
+                        stat = con.execute(
+                            "SELECT MIN(date),MAX(date),COUNT(*) FROM daily_bar "
+                            "WHERE code=? AND adjust=?", (code, adjust)
+                        ).fetchone()
+                        if stat and stat[2]:
+                            row = (code, adjust, stat[0], stat[1], stat[2], None)
+                    if row:
+                        covered_dates.update(
+                            r[0] for r in con.execute(
+                                "SELECT date FROM daily_bar WHERE code=? AND adjust=?",
+                                (code, adjust),
+                            ).fetchall()
+                        )
                 finally:
                     con.close()
             except Exception:
@@ -506,7 +548,9 @@ class DailyCache:
         ed = [m["end_date"] for m in metas if m["end_date"]]
         merged["start_date"] = min(st) if st else None
         merged["end_date"] = max(ed) if ed else None
-        merged["rows"] = sum(m["rows"] or 0 for m in metas)
+        # 主库与增量库可能包含同一天；覆盖行数按联合后的唯一日期计数。
+        merged["rows"] = (len(covered_dates) if covered_dates
+                          else sum(m["rows"] or 0 for m in metas))
         return merged
 
     def covers(self, code, start, end, adjust="qfq"):

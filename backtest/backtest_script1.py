@@ -29,7 +29,7 @@ import sqlite3
 
 from data.cache import DailyCache
 
-CACHE = r"data\cache"
+CACHE = r"data/cache"
 
 
 def _q(sql, db, params=()):
@@ -92,9 +92,15 @@ def load_revenue_growth(codes):
     df["code6"] = df["code"].str[:6]
     df["end"] = pd.to_datetime(df["end_date"])
     df["ann"] = pd.to_datetime(df["ann_date"])
-    df = df.sort_values(["code6", "end"])
-    # 同比（4 季度前 = 上年同期；total_revenue 年内累计，同季对比）
-    df["rev_yoy"] = df.groupby("code6")["total_revenue"].transform(lambda s: s / s.shift(4) - 1)
+    df = df.sort_values(["code6", "end"]).drop_duplicates(["code6", "end"], keep="last")
+    # 精确按去年同报告期匹配；shift(4) 在缺季时会把不同季度串在一起。
+    prev = df[["code6", "end", "total_revenue"]].copy()
+    prev["end"] = prev["end"] + pd.DateOffset(years=1)
+    prev = prev.rename(columns={"total_revenue": "prev_revenue"})
+    df = df.merge(prev, on=["code6", "end"], how="left")
+    den = pd.to_numeric(df["prev_revenue"], errors="coerce").abs().replace(0, np.nan)
+    df["rev_yoy"] = (pd.to_numeric(df["total_revenue"], errors="coerce")
+                     - pd.to_numeric(df["prev_revenue"], errors="coerce")) / den
     return df[["code6", "end", "ann", "rev_yoy", "n_income"]]
 
 

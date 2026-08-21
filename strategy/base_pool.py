@@ -28,8 +28,9 @@ from pathlib import Path
 
 BASE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE))
+from data.cache import CACHE_DIR
 
-CACHE = Path(r"data/cache")
+CACHE = CACHE_DIR
 OUT = BASE / "output" / "base_pool.json"
 
 MIN_MV_YI = 30.0          # 市值下限 30 亿
@@ -41,6 +42,10 @@ MIN_IPO_YEARS = 2         # 上市满 2 年
 def build() -> dict:
     bars = sqlite3.connect(str(CACHE / "bars.db"))
     bcur = bars.cursor()
+    code_map = {str(r[0]).split(".", 1)[0]: str(r[0]).upper() for r in bcur.execute(
+        "SELECT DISTINCT code FROM daily_bar "
+        "WHERE code LIKE '%.SH' OR code LIKE '%.SZ' OR code LIKE '%.BJ'"
+    ).fetchall()}
     last = bcur.execute("SELECT MAX(date) FROM daily_bar WHERE adjust='qfq'").fetchone()[0]
     # H1 ST
     st_codes = {r[0] for r in bcur.execute(
@@ -68,7 +73,14 @@ def build() -> dict:
             for row in csv.DictReader(f):
                 c = str(row.get("code", "")).strip().upper()
                 if c:
-                    delisted.add(c if "." in c else c + (".SH" if c[:2] in ("60", "68") else ".SZ"))
+                    if "." in c:
+                        delisted.add(c)
+                    elif c in code_map:
+                        delisted.add(code_map[c])
+                    elif c[:1] in ("4", "8") or c.startswith("92"):
+                        delisted.add(c + ".BJ")
+                    else:
+                        delisted.add(c + (".SH" if c[:2] in ("60", "68") else ".SZ"))
     # H3 上市日期
     ipo = {}
     try:
@@ -115,10 +127,8 @@ def build() -> dict:
     for code, recs in by_code.items():
         recs.sort(reverse=True)  # 最新在前
         p0, np0, sq0, yoy0, roe0 = recs[0]
-        # ★ROE 年化修正：finance.db roe 为当期单季值（Q1 的 8% ≈ 年化 32%）
-        # 按报告期类型年化：Q1×4 / 中报×2 / Q3×4/3 / 年报×1
-        mult = {"03": 4.0, "06": 2.0, "09": 4 / 3, "12": 1.0}.get(p0[5:7], 1.0)
-        roe_ann = float(roe0) * mult if roe0 is not None else None
+        # finance_report 的 ROE 已统一为年化小数口径，不再按季度重复年化。
+        roe_ann = float(roe0) if roe0 is not None else None
         if roe_ann is None or roe_ann < MIN_ROE:       # Q1
             continue
         if yoy0 is None or float(yoy0) <= 0:           # Q2
@@ -126,7 +136,9 @@ def build() -> dict:
         sq_ok = [float(r[2]) for r in recs[:4] if r[2] is not None]  # Q3 近4季（可得期）
         if len(sq_ok) < 3 or sum(sq_ok) <= 0:
             continue
-        c = code if "." in code else code + (".SH" if code[:2] in ("60", "68") else ".SZ")
+        c = code if "." in code else code_map.get(code)
+        if not c:
+            continue
         if c in st_codes:                               # H1
             continue
         if c in delisted:                               # H2

@@ -70,27 +70,31 @@ def ensure() -> bool:
     # ★2026-08-15 双开免疫：杀【全部】deck_server 进程（按命令行匹配，非仅端口占用者——
     #   Windows SO_REUSEADDR 允许两进程同绑 8787，端口法只杀一个会留冗余实例累积；
     #   且杀共享 socket 组中的单个会导致监听中断——必须全杀后单实例重启）
+    # ★2026-08-21 跨平台：win32 → wmic/taskkill；macOS/Linux → pkill -f
     try:
         import subprocess as sp
-        _cmdline = ""
-        try:
-            _cmdline = sp.run(["wmic", "process", "where", "name='python.exe'", "get", "ProcessId,CommandLine"],
-                              capture_output=True, text=True, errors="replace", timeout=15).stdout or ""
-        except Exception:
+        if sys.platform == "win32":
             _cmdline = ""
-        if "deck_server.py" not in _cmdline:
             try:
-                _cmdline = sp.run(
-                    ["powershell", "-NoProfile", "-Command",
-                     "(Get-CimInstance Win32_Process -Filter \"Name='python.exe'\").CommandLine"],
-                    capture_output=True, text=True, errors="replace", timeout=15).stdout or ""
+                _cmdline = sp.run(["wmic", "process", "where", "name='python.exe'", "get", "ProcessId,CommandLine"],
+                                  capture_output=True, text=True, errors="replace", timeout=15).stdout or ""
             except Exception:
                 _cmdline = ""
-        for line in _cmdline.splitlines():
-            if "deck_server.py" in line:
-                _pid = line.split()[-1].strip()
-                if _pid.isdigit():
-                    sp.run(["taskkill", "/PID", _pid, "/F"], capture_output=True)
+            if "deck_server.py" not in _cmdline:
+                try:
+                    _cmdline = sp.run(
+                        ["powershell", "-NoProfile", "-Command",
+                         "(Get-CimInstance Win32_Process -Filter \"Name='python.exe'\").CommandLine"],
+                        capture_output=True, text=True, errors="replace", timeout=15).stdout or ""
+                except Exception:
+                    _cmdline = ""
+            for line in _cmdline.splitlines():
+                if "deck_server.py" in line:
+                    _pid = line.split()[-1].strip()
+                    if _pid.isdigit():
+                        sp.run(["taskkill", "/PID", _pid, "/F"], capture_output=True)
+        else:
+            sp.run(["pkill", "-f", "deck_server.py"], capture_output=True, timeout=10)
         time.sleep(2)
     except Exception:
         pass

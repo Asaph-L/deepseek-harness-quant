@@ -12,16 +12,53 @@
 备用服务器（HTTP API）：data/fetcher_tushare_backup.py（<your-backup-server>）
 """
 import os
+import threading
 import time
+from collections import defaultdict
+from functools import partial
 from pathlib import Path
 
-os.environ.setdefault("NO_PROXY", "*")  # 数据抓取不走代理，防限频/握手问题
+# 行情/财务源必须直连；继承到的本机代理若已退出，会让所有请求稳定失败。
+for _proxy_key in (
+    "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"
+):
+    os.environ.pop(_proxy_key, None)
+os.environ["NO_PROXY"] = "*"
 
 import pandas as pd
 
 _PRO = None
-_LAST_CALL = 0.0
-_MIN_INTERVAL = 0.05  # 主服务器宽松节流（实测单次 ~1s，此值仅防手滑打爆）
+_LAST_CALLS = defaultdict(float)
+_RATE_LOCKS = defaultdict(threading.Lock)
+# 每个接口上限 500 次/分钟；125ms 间隔对应 480/min，留出重试余量。
+_MIN_INTERVAL = 0.125
+
+
+class _ProShim:
+    """tushare 1.4.29 客户端把 api_name 拼进 URL 路径（旧 waditu 风格，如 .../stock_basic），
+    与 Pro 主服务器"POST 根端点 + JSON body 带 api_name"的协议不兼容（404 → 静默空表）。
+    本 shim 按官方 JSON 协议直连根端点，接口形态与 pro_api 一致（pro.daily(...) → DataFrame）。"""
+
+    def __init__(self, token: str, url: str, timeout: int = 10):
+        import requests
+        self._token = token
+        self._url = url
+        self._timeout = timeout
+
+    def query(self, api_name: str, fields: str = "", **kwargs):
+        import requests
+        body = {"api_name": api_name, "token": self._token, "params": kwargs, "fields": fields}
+        res = requests.post(self._url, json=body, timeout=self._timeout)
+        if res.status_code != 200:
+            raise RuntimeError(f"Tushare HTTP {res.status_code}: {res.text[:120]}")
+        result = res.json()
+        if result.get("code") != 0:
+            raise RuntimeError(result.get("msg", f"Tushare code={result.get('code')}"))
+        data = result.get("data") or {}
+        return pd.DataFrame(data.get("items", []), columns=data.get("fields", []))
+
+    def __getattr__(self, name):
+        return partial(self.query, name)
 
 
 def _load_cfg():
@@ -32,30 +69,33 @@ def _load_cfg():
 
 
 def _pro():
-    """按 params.yaml 的 token + api_url 构造 Pro 对象（带自定义 HTTP 地址）
+    """按 params.yaml 的 token + api_url 构造 Pro 对象（POST 根端点直连）
     ★2026-08-14 超时 30s→10s：代理服务器 镜像间歇读超时（默认 30s 让单次失败等满 30s，
-      重试链累加 = 整链 100s+）；10s 快速失败 + _call 重试 5 次更稳更快。"""
+      重试链累加 = 整链 100s+）；10s 快速失败 + _call 重试 5 次更稳更快。
+    ★2026-08-17 修复：tushare 1.4.29 客户端 URL 路径拼接 bug（404→空表），改用 _ProShim。"""
     global _PRO
     if _PRO is None:
-        import tushare as ts
         cfg = _load_cfg()
-        p = ts.pro_api(cfg["tushare_token"])
-        p._DataApi__http_url = cfg.get("tushare_api_url", "https://api.tushare.pro")
-        try:
-            p._DataApi__timeout = 10
-        except Exception:
-            pass
-        _PRO = p
+        _PRO = _ProShim(cfg["tushare_token"],
+                        cfg.get("tushare_api_url", "https://api.tushare.pro"),
+                        timeout=10)
     return _PRO
 
 
-def _rate_limit():
-    global _LAST_CALL
-    now = time.time()
-    wait = _MIN_INTERVAL - (now - _LAST_CALL)
-    if wait > 0:
-        time.sleep(wait)
-    _LAST_CALL = time.time()
+def _rate_limit(key="global"):
+    # 同一接口的多线程调用共用锁；不同接口可并行，各自遵守 500/min 上限。
+    with _RATE_LOCKS[key]:
+        now = time.monotonic()
+        wait = _MIN_INTERVAL - (now - _LAST_CALLS[key])
+        if wait > 0:
+            time.sleep(wait)
+        _LAST_CALLS[key] = time.monotonic()
+
+
+def _rate_key(fn):
+    if isinstance(fn, partial) and fn.args:
+        return str(fn.args[0])
+    return getattr(fn, "__name__", "global")
 
 
 def _call(fn, *args, max_retry=5, **kwargs):
@@ -63,7 +103,7 @@ def _call(fn, *args, max_retry=5, **kwargs):
     last_err = "unknown"
     for attempt in range(max_retry):
         try:
-            _rate_limit()
+            _rate_limit(_rate_key(fn))
             return fn(*args, **kwargs)
         except Exception as e:
             last_err = str(e)

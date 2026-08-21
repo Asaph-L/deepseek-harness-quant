@@ -27,9 +27,10 @@ import pandas as pd
 
 BASE = Path(__file__).resolve().parent.parent.parent   # factors/opportunities/ → deepseek-harness-quant
 sys.path.insert(0, str(BASE))
+from data.cache import CACHE_DIR
 
-BARS_DB = r"data/cache/bars.db"
-FIN_TS_DB = r"data/cache/finance_ts.db"
+BARS_DB = str(CACHE_DIR / "bars.db")
+FIN_TS_DB = str(CACHE_DIR / "finance_ts.db")
 
 # 回放点（季度初，近 5 个季度：2025-06 起）
 REPLAY_DATES = ["2025-06-03", "2025-09-01", "2026-01-05", "2026-04-01", "2026-07-01"]
@@ -39,12 +40,18 @@ FWD_MONTHS = [1, 3, 6]  # 远期收益窗口（月）
 def load_pit_valuation(asof: str) -> pd.DataFrame:
     """自算历史 PB/PE（PIT：ann_date <= asof，每只取最新披露）"""
     con = sqlite3.connect(FIN_TS_DB)
-    rows = con.execute("""
-        SELECT code, end_date, ann_date, n_income, total_share, total_hldr_eqy_exc_min_int
+    columns = {r[1] for r in con.execute("PRAGMA table_info(financials_ts)")}
+    attr_profit = "n_income_attr_p" if "n_income_attr_p" in columns else "n_income"
+    share = "total_share" if "total_share" in columns else "NULL"
+    equity = ("total_hldr_eqy_exc_min_int"
+              if "total_hldr_eqy_exc_min_int" in columns else "NULL")
+    rows = con.execute(f"""
+        SELECT code, end_date, ann_date, n_income, {attr_profit} AS n_income_attr_p,
+               {share} AS total_share, {equity} AS total_hldr_eqy_exc_min_int
         FROM financials_ts
-        WHERE ann_date <= ?
-        ORDER BY code, ann_date DESC
-    """, (asof + " 23:59:59",)).fetchall()
+        WHERE date(ann_date) <= date(?)
+        ORDER BY code, end_date DESC, ann_date DESC
+    """, (asof,)).fetchall()
     con.close()
     latest = {}
     for r in rows:
@@ -67,9 +74,13 @@ def load_pit_valuation(asof: str) -> pd.DataFrame:
             full = code6_map.get(c6)
         if not full:
             continue
+        profit = r[4] if r[4] is not None else r[3]
+        month = str(r[1]).replace("-", "")[4:6]
+        annualizer = {"03": 4.0, "06": 2.0, "09": 4.0 / 3.0, "12": 1.0}.get(month, 1.0)
+        profit_ann = float(profit) * annualizer if profit is not None else None
         out[full] = {
             "pb": None, "pe": None, "roe_ts": None,
-            "total_share": r[4], "equity": r[5], "n_income": r[3],
+            "total_share": r[5], "equity": r[6], "n_income": profit_ann,
             "ann_date": str(r[2])[:10] if r[2] else None,
         }
     return pd.DataFrame.from_dict(out, orient="index")

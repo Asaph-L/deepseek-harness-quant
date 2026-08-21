@@ -57,7 +57,7 @@ def main():
         [PY, "-X", "utf8", str(BASE / "strategy/pool_layers.py"), "--n", "100", "--capital", "200000", "--regime-cash", "0.3"],
         timeout=1800)
     run("今日信号",
-        [PY, "-X", "utf8", str(BASE / "report/daily_signal.py")], timeout=1800)
+        [PY, "-X", "utf8", str(BASE / "data" / "daily_signal.py")], timeout=1800)
     log("=== 刷新链完成 ===")
 
 if __name__ == "__main__":

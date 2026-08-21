@@ -24,8 +24,8 @@ from pathlib import Path
 BASE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE))
 
-HIST_DB = Path(r"data\cache\hist_mv.db")
-BARS_DB = Path(r"data\cache\bars.db")
+HIST_DB = BASE / "data" / "cache" / "hist_mv.db"  # ★2026-08-17 跨平台修复
+BARS_DB = BASE / "data" / "cache" / "bars.db"
 
 
 def _conn():

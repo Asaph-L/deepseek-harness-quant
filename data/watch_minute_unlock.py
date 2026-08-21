@@ -25,7 +25,7 @@ def minute_writable() -> bool:
     """探测 minute.db 是否可写"""
     try:
         import sqlite3
-        con = sqlite3.connect(r"data\cache\minute.db", timeout=8)
+        con = sqlite3.connect(r"data/cache/minute.db", timeout=8)
         con.execute("CREATE TABLE IF NOT EXISTS _rw_probe (x INT)")
         con.execute("DROP TABLE IF EXISTS _rw_probe")
         con.commit()

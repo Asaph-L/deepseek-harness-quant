@@ -162,6 +162,10 @@ def _resolve_route(path: str) -> Path:
             # ★2026-08-10 产出在 output/ 的路径（daily_signal 等）也搜 output 目录
             matches = [m for m in sorted(OUTPUT.glob(pat), key=lambda x: x.stat().st_mtime)
                        if not any(t in m.name for t in ("test", "done", "calib", "_old"))]
+        if not matches and str(f).startswith(str(REPORT)):
+            # ★2026-08-18 修复：审计报告产出在 report/（LOGS/OUTPUT 都不覆盖 → /api/audit 404）
+            matches = [m for m in sorted(REPORT.glob(pat), key=lambda x: x.stat().st_mtime)
+                       if not any(t in m.name for t in ("test", "done", "calib", "_old"))]
         if matches:
             return matches[-1]
     # ★2026-08-11 审批链路修复：/api/pool 读最新含 pitch 的 opp_pool_*.json（原固定名 opportunity_pool.json 是 08-08 旧数据）
@@ -268,7 +272,16 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 _hs = BASE / "output" / "harness_state.json"
                 if _hs.exists():
-                    return self._send_json(json.loads(_hs.read_text(encoding="utf-8")))
+                    _hd = json.loads(_hs.read_text(encoding="utf-8"))
+                    # 快照保留任务/轮次信息；在线状态必须以实时端口为准，避免停机后仍显示在线。
+                    import socket as _socket
+                    try:
+                        with _socket.create_connection(("127.0.0.1", 3080), timeout=0.25):
+                            _online = True
+                    except OSError:
+                        _online = False
+                    _hd.setdefault("harness", {})["online"] = _online
+                    return self._send_json(_hd)
                 return self._send_json({"harness": {"online": False}, "error": "harness_state.json 未生成"}, 404)
             except Exception as e:
                 return self._send_json({"error": str(e)}, 500)
@@ -321,6 +334,27 @@ class Handler(BaseHTTPRequestHandler):
                                     pass
                             presets.append({"name": d.name, "desc": desc})
                 return self._send_json({"ok": True, "skills": skills, "presets": presets})
+            except Exception as e:
+                return self._send_json({"ok": False, "error": str(e)}, 500)
+        if path == "/api/launch-desktop":   # ★2026-08-19 统一管理后：拉起桌面版 DeepSeek Harness（macOS）
+            # 历史记录已统一到桌面版 home；内嵌 HARNESS 仅作为量化门户的后端继续运行。
+            try:
+                if sys.platform != "darwin":
+                    return self._send_json(
+                        {"ok": False, "error": "仅 macOS 支持拉起桌面版；请直接访问 http://127.0.0.1:3080"}, 400)
+                import subprocess as _sp
+                _sp.Popen(["open", "-a", "DeepSeek Harness"],
+                          stdout=_sp.DEVNULL, stderr=_sp.DEVNULL)
+                _html = (
+                    "<!doctype html><html><head><meta charset=\"utf-8\">"
+                    "<title>DeepSeek Harness</title></head>"
+                    "<body style=\"font-family:system-ui,sans-serif;background:#0f0f12;color:#e8e8ea;"
+                    "display:flex;align-items:center;justify-content:center;height:100vh;margin:0\">"
+                    "<p>已拉起桌面版 DeepSeek Harness，请切换到桌面窗口…</p>"
+                    "<script>setTimeout(function(){window.close()},1500)</script>"
+                    "</body></html>"
+                )
+                return self._send(200, _html.encode("utf-8"), "text/html; charset=utf-8")
             except Exception as e:
                 return self._send_json({"ok": False, "error": str(e)}, 500)
         if path.startswith("/api/proxy/"):   # ★2026-08-16 反向代理 GET → :3080 HARNESS（前端同源访问，零跨源）

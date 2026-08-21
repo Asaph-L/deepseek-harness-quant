@@ -24,7 +24,7 @@ SKIP_REL = {"docs/上传GitHub.md", "docs/发布清单_v1.0.9.md"}
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--version", default=None)
-    ap.add_argument("--out", default=r"D:\quant-release")
+    ap.add_argument("--out", default=str(Path.home() / "Desktop" / "quant-release"))
     args = ap.parse_args()
     ver = args.version or (ROOT / "VERSION").read_text(encoding="utf-8").strip()
     out_dir = Path(args.out)

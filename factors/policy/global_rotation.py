@@ -66,6 +66,21 @@ def _momentum_r2(series, window=25):
 
 
 def compute() -> dict:
+    # ★2026-08-21 数据缺失优雅降级：因子池缓存（外包 data/factorpool）缺失时
+    #   输出标记 JSON 而非崩溃（链路不报错；防守卡前端显示"数据源缺失"）
+    if not (CACHE / "wufu_idx.parquet").exists() or not (CACHE / "wufu_etf.parquet").exists():
+        out = {
+            "date": datetime.now().strftime("%Y-%m-%d"),
+            "a_share_weak": False,
+            "weak_vote": None,
+            "global_rotation": None,
+            "data_missing": True,
+            "note": "因子池缓存缺失（data/factorpool，外包数据）→ 防守卡禁用",
+            "params": {"min_hold": MIN_HOLD, "confirm": CONFIRM, "r2_min": R2_MIN, "ma10": MA10_WIN},
+            "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        }
+        OUT.write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
+        return out
     idx = pd.read_parquet(CACHE / "wufu_idx.parquet")
     etf = pd.read_parquet(CACHE / "wufu_etf.parquet")
     date = idx.index.max().strftime("%Y-%m-%d")
@@ -114,6 +129,10 @@ def widget() -> dict:
     """★2026-08-16 五福轮动门户摆件数据：9 只全球 ETF 代理池常态动量面板（不依赖弱市）。
     供 /api/live/wufu_rotation（门户常显摆件；弱市防守建议仍读 global_rotation.json）。
     列名在因子池生成时损坏（GBK 乱码）→ 按净值轨迹推断的位置映射（沪深300/黄金/恒指/中证500/日经/标普/纳指/德国/黄金2）。"""
+    if not (CACHE / "wufu_etf.parquet").exists():
+        # ★2026-08-21 数据缺失优雅降级（外包因子池缓存缺失 → 空摆件，不抛错）
+        return {"date": datetime.now().strftime("%Y-%m-%d"), "assets": [],
+                "data_missing": True}
     etf = pd.read_parquet(CACHE / "wufu_etf.parquet")
     # 列名在因子池生成时损坏（GBK 乱码）→ 按净值轨迹 + 相关矩阵推断的位置映射：
     # [沪深300, 黄金, 恒指, 中证500, 日经, 标普500, 纳指, 债券/避险(与全资产低相关), 黄金2]

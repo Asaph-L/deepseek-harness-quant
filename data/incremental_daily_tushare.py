@@ -43,7 +43,7 @@ sys.path.insert(0, str(BASE))
 from data.fetcher_tushare import _pro, _call
 from data.cache import DailyCache
 
-BARS_DB = r"data\cache\bars.db"
+BARS_DB = r"data/cache/bars.db"
 
 
 def latest_trade_date(pro=None) -> str:

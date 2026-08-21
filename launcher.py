@@ -43,6 +43,19 @@ def _builtin_node():
     return None
 
 
+def _supported_node(node) -> tuple[bool, str]:
+    """HARNESS rc.6 要求 Node 22.19+（22.x）或 24+；Node 23 不在支持范围。"""
+    try:
+        raw = subprocess.check_output(
+            [str(node), "--version"], text=True, stderr=subprocess.STDOUT, timeout=5
+        ).strip()
+        parts = raw.lstrip("v").split(".")
+        major, minor = int(parts[0]), int(parts[1])
+        return (major >= 24 or (major == 22 and minor >= 19)), raw
+    except Exception:
+        return False, "未知版本"
+
+
 def start_harness(base: Path):
     """启动 DeepSeek HARNESS（harness/ 存在且 Node.js 可用时）。返回进程或 None。"""
     node = _builtin_node() or shutil.which("node")
@@ -51,19 +64,35 @@ def start_harness(base: Path):
     if not node:
         print("[QuantDeck] 未检测到 Node.js —— HARNESS 对话功能跳过（量化系统照常）")
         return None
+    supported, version = _supported_node(node)
+    if not supported:
+        print(f"[QuantDeck] Node.js {version} 不受当前 HARNESS 支持 —— "
+              "请安装 Node 22.19+ 或 24+；对话功能已跳过")
+        return None
     if not dsh_bin.exists():
         print("[QuantDeck] harness 运行时缺失 —— 请先运行 harness/install.cmd 安装 HARNESS")
         return None
-    cred = harness_root / "home" / ".credentials.yaml"
+    # ★2026-08-19 统一管理：macOS 上内嵌 HARNESS 与桌面版共用同一个 DSH_HOME，
+    # 聊天历史两边互通（门户面板的对话也出现在桌面版 GUI 里）。
+    # 桌面版 home 可用环境变量 DSH_QUANT_DESKTOP_HOME 覆盖；非 macOS（如 Windows）无桌面版，保持项目内 home。
+    desktop_home = Path(os.environ.get(
+        "DSH_QUANT_DESKTOP_HOME",
+        str(Path.home() / "Library" / "Application Support" / "DeepSeek Harness" / "home"),
+    ))
+    unified_home = sys.platform == "darwin" and desktop_home.is_dir()
+    data_home = desktop_home if unified_home else (harness_root / "home")
+    cred = data_home / ".credentials.yaml"
     if not cred.exists():
-        print("[QuantDeck] HARNESS 未配置 API Key：把 harness/home/.credentials.yaml.example "
+        print(f"[QuantDeck] HARNESS 未配置 API Key：把 {data_home}/.credentials.yaml.example "
               "复制为 .credentials.yaml 并填入 DeepSeek API Key（见 docs/HARNESS接入.md）")
     env = dict(os.environ)
-    env["DSH_HOME"] = str(harness_root / "home")
-    print(f"[QuantDeck] 启动 DeepSeek HARNESS（DSH_HOME={env['DSH_HOME']}）...")
+    env["DSH_HOME"] = str(data_home)
+    env["DSH_BUNDLED_SKILL_DIR"] = str(base / "assets" / "skills")
+    print(f"[QuantDeck] 启动 DeepSeek HARNESS（DSH_HOME={env['DSH_HOME']}"
+          f"{'，与桌面版统一' if unified_home else ''}）...")
     try:
         proc = subprocess.Popen([str(node), str(dsh_bin), "web"],
-                                cwd=str(harness_root), env=env,
+                                cwd=str(base), env=env,
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return proc
     except Exception as e:
@@ -82,7 +111,7 @@ def _open_browsers():
 def main():
     base = base_dir()
     if not os.environ.get("LWQUANT_CACHE_DIR"):
-        os.environ["LWQUANT_CACHE_DIR"] = str(base / "data")
+        os.environ["LWQUANT_CACHE_DIR"] = str(base / "data" / "cache")
     data_dir = os.environ["LWQUANT_CACHE_DIR"]
     print(f"[QuantDeck] 数据目录: {data_dir}")
     if not (Path(data_dir) / "bars.db").exists():

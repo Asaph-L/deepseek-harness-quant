@@ -32,11 +32,34 @@ warnings.filterwarnings("ignore")
 import pandas as pd
 
 from data.finance_calc import parse_num
+from data.cache import CACHE_DIR
 
-FIN_DB = r"data\cache\finance.db"
+FIN_DB = str(CACHE_DIR / "finance.db")
 LOG_FILE = BASE / "logs" / "finance_load.log"
 PROGRESS_FILE = BASE / "logs" / "finance_progress.txt"
 FAILED_FILE = BASE / "logs" / "finance_failed_codes.json"
+UPSERT_SQL = """INSERT INTO finance_report
+    (code,period,net_profit,revenue,sq_net_profit,sq_net_yoy,sq_revenue,sq_rev_yoy,eps,roe,source)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?)
+    ON CONFLICT(code,period) DO UPDATE SET
+      net_profit=CASE WHEN finance_report.source LIKE '%tushare_v2' THEN finance_report.net_profit
+                      ELSE COALESCE(excluded.net_profit,finance_report.net_profit) END,
+      revenue=CASE WHEN finance_report.source LIKE '%tushare_v2' THEN finance_report.revenue
+                   ELSE COALESCE(excluded.revenue,finance_report.revenue) END,
+      sq_net_profit=CASE WHEN finance_report.source LIKE '%tushare_v2' THEN finance_report.sq_net_profit
+                         ELSE COALESCE(excluded.sq_net_profit,finance_report.sq_net_profit) END,
+      sq_net_yoy=CASE WHEN finance_report.source LIKE '%tushare_v2' THEN finance_report.sq_net_yoy
+                      ELSE COALESCE(excluded.sq_net_yoy,finance_report.sq_net_yoy) END,
+      sq_revenue=CASE WHEN finance_report.source LIKE '%tushare_v2' THEN finance_report.sq_revenue
+                      ELSE COALESCE(excluded.sq_revenue,finance_report.sq_revenue) END,
+      sq_rev_yoy=CASE WHEN finance_report.source LIKE '%tushare_v2' THEN finance_report.sq_rev_yoy
+                      ELSE COALESCE(excluded.sq_rev_yoy,finance_report.sq_rev_yoy) END,
+      eps=CASE WHEN finance_report.source LIKE '%tushare_v2' THEN finance_report.eps
+               ELSE COALESCE(excluded.eps,finance_report.eps) END,
+      roe=CASE WHEN finance_report.source LIKE '%tushare_v2' THEN finance_report.roe
+               ELSE COALESCE(excluded.roe,finance_report.roe) END,
+      source=CASE WHEN finance_report.source LIKE '%tushare_v2' THEN finance_report.source
+                  ELSE excluded.source END"""
 
 
 def log(msg):
@@ -85,26 +108,54 @@ def parse_finance(code6: str, df: pd.DataFrame) -> list:
     if c_period is None or c_net is None:
         return []
 
+    def money_to_yi(raw):
+        """按原始单位标记换算为亿元；无单位数字按接口基础单位“元”处理。"""
+        if raw is None or raw is False or isinstance(raw, bool):
+            return None
+        if isinstance(raw, str):
+            s = raw.strip().replace(",", "")
+            if not s or s.lower() in ("false", "nan", "none", "-"):
+                return None
+            try:
+                if s.endswith("亿"):
+                    return float(s[:-1])
+                if s.endswith("万"):
+                    return float(s[:-1]) / 10000.0
+                if s.endswith("元"):
+                    return float(s[:-1]) / 1e8
+                return float(s) / 1e8
+            except ValueError:
+                return None
+        try:
+            return float(raw) / 1e8
+        except (TypeError, ValueError):
+            return None
+
+    def safe_yoy(current, previous):
+        if current is None or previous is None or abs(previous) < 0.01:
+            return None
+        return max(-10.0, min(10.0, (current - previous) / abs(previous)))
+
     rows = []
     cum_net = {}
     cum_rev = {}
+    eps_map = {}
+    roe_map = {}
     for _, r in df.iterrows():
         period = str(r[c_period])[:10]
         if not period or len(period) != 10:
             continue
-        net = parse_num(r.get(c_net))
-        rev = parse_num(r.get(c_rev)) if c_rev else None
+        net = money_to_yi(r.get(c_net))
+        rev = money_to_yi(r.get(c_rev)) if c_rev else None
         eps = parse_num(r.get(c_eps)) if c_eps else None
         roe = parse_num(r.get(c_roe)) if c_roe else None
         if net is None:
             continue
-        # ★单位归一：akshare 返回"元"时转亿（>1e7 视为元；字符串"145.23亿"已被 parse_num 转亿）
-        net = net / 1e8 if abs(net) > 1e7 else net
-        if rev is not None:
-            rev = rev / 1e8 if abs(rev) > 1e7 else rev
         cum_net[period] = net
         if rev is not None:
             cum_rev[period] = rev
+        eps_map[period] = eps
+        roe_map[period] = roe
 
     # 自算单季值（复用 finance_calc 逻辑）
     def single_quarter(cum_map):
@@ -141,22 +192,18 @@ def parse_finance(code6: str, df: pd.DataFrame) -> list:
             continue
         sqn = sq_net.get(ym)
         # 单季同比：今年该季度 / 去年同季 - 1
-        sqn_yoy = None
         prev_ym = (ym[0] - 1, ym[1])
         prev_sqn = sq_net.get(prev_ym)
-        if sqn is not None and prev_sqn not in (None, 0):
-            sqn_yoy = sqn / prev_sqn - 1
+        sqn_yoy = safe_yoy(sqn, prev_sqn)
 
         sqr = sq_rev.get(ym)
-        sqr_yoy = None
         prev_sqr = sq_rev.get(prev_ym)
-        if sqr is not None and prev_sqr not in (None, 0):
-            sqr_yoy = sqr / prev_sqr - 1
+        sqr_yoy = safe_yoy(sqr, prev_sqr)
 
         rows.append((
             code6, period, net, cum_rev.get(period),
             sqn, sqn_yoy, sqr, sqr_yoy,
-            eps, roe, "akshare_ths"
+            eps_map.get(period), roe_map.get(period), "akshare_ths"
         ))
     return rows
 
@@ -164,7 +211,7 @@ def parse_finance(code6: str, df: pd.DataFrame) -> list:
 def load_codes(limit=None):
     """从行情缓存取股票代码列表"""
     import sqlite3 as s3
-    con = s3.connect(r"data\cache\bars.db")
+    con = s3.connect(str(CACHE_DIR / "bars.db"))
     codes = [r[0] for r in con.execute(
         "SELECT DISTINCT code FROM daily_bar WHERE code NOT LIKE 'sh.%' AND code NOT LIKE 'sz.%'")]
     con.close()
@@ -221,8 +268,7 @@ def main():
             if not rows:
                 empty += 1
                 continue
-            con.executemany(
-                "INSERT OR REPLACE INTO finance_report VALUES (?,?,?,?,?,?,?,?,?,?,?)", rows)
+            con.executemany(UPSERT_SQL, rows)
             con.commit()
             done += 1
         except Exception as e:
@@ -232,8 +278,7 @@ def main():
                 df = fetch_one(code)
                 rows = parse_finance(code, df)
                 if rows:
-                    con.executemany(
-                        "INSERT OR REPLACE INTO finance_report VALUES (?,?,?,?,?,?,?,?,?,?,?)", rows)
+                    con.executemany(UPSERT_SQL, rows)
                     con.commit()
                     done += 1
                     continue

@@ -60,7 +60,7 @@ def _bars_version() -> float:
     """数据源版本 = bars.db + 增量库的最新 mtime（★0.01s；MAX(date) 全表扫 900 万行要 1s+）"""
     try:
         import glob as _g
-        fs = [r"data\cache\bars.db"] + _g.glob(r"data\cache\bars_incr_*.db")
+        fs = [r"data/cache/bars.db"] + _g.glob(r"data/cache/bars_incr_*.db")
         mt = [os.path.getmtime(f) for f in fs if os.path.exists(f)]
         return max(mt) if mt else 0.0
     except Exception:
@@ -986,7 +986,7 @@ def live_funnel() -> dict:
         import glob as _gf
         _mf = sorted(_gf.glob(str(BASE / "logs" / "factor_manifest*.json")), key=_os.path.getmtime)
         if not _mf:
-            _mf = sorted(_gf.glob(r"data\factorpool\output\factor_manifest_*.json"),
+            _mf = sorted(_gf.glob(r"data/factorpool/output/factor_manifest_*.json"),
                          key=_os.path.getmtime)
         if _mf:
             _md = json.load(open(_mf[-1], encoding="utf-8"))
@@ -1024,7 +1024,7 @@ def live_turnlow_top(top_n: int = 20) -> dict:
     import glob as _g
     import os as _os
     import sqlite3 as _sq
-    fs = sorted(_g.glob(r"data\factorpool\output\daily_scores\daily_*.csv"),
+    fs = sorted(_g.glob(r"data/factorpool/output/daily_scores/daily_*.csv"),
                 key=os.path.getmtime)
     if not fs:
         return {"ok": False, "error": "无 daily_scores 文件"}
@@ -3129,11 +3129,30 @@ def live_realtime() -> dict:
         price = _pd.to_numeric(df.get("最新价"), errors="coerce")
         chg = _pd.to_numeric(df.get("涨跌幅"), errors="coerce")
         amt = _pd.to_numeric(df.get("成交额"), errors="coerce")
+        preclose = _pd.to_numeric(df.get("昨收"), errors="coerce")
         up = int((chg > 0).sum())
         down = int((chg < 0).sum())
         flat = int((chg == 0).sum())
-        limit_up = int((chg >= 9.8).sum())     # 近涨停（含 10%/20% 板块近似）
-        limit_down = int((chg <= -9.8).sum())
+        # ★2026-08-22 精确涨停/跌停（同花顺口径）：按代码板块涨跌幅上限 + 昨收推涨停价，逐股判定触及
+        def _limit_pct(raw_code, name):
+            c = str(raw_code).strip().lower()
+            num = c[-6:]
+            nm = str(name)
+            if num.startswith(("30", "68")):            # 创业板/科创板 20%
+                return 0.20
+            if num[0] in ("4", "8") or num.startswith("92"):  # 北交所 30%
+                return 0.30
+            if nm.startswith(("ST", "*ST")):            # 主板 ST 5%
+                return 0.05
+            return 0.10                                  # 主板 10%
+        _codes_l = [str(x) for x in df["代码"].tolist()]
+        _names_l = [str(x) for x in df["名称"].tolist()]
+        _lim = _pd.Series([_limit_pct(c, n) for c, n in zip(_codes_l, _names_l)],
+                          index=price.index)
+        _up_price = (preclose * (1 + _lim)).round(2)
+        _down_price = (preclose * (1 - _lim)).round(2)
+        limit_up = int(((price > 0) & (price >= _up_price - 0.005)).sum())
+        limit_down = int(((price > 0) & (price <= _down_price + 0.005)).sum())
         med = float(chg.median()) if chg.notna().any() else 0.0
         total_amt = float(amt.sum()) if amt.notna().any() else 0.0
         # 领涨/领跌（按涨跌幅排序取 5）

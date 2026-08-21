@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """Tushare 主服务器连通性 & 权限边界测试（v2 · 2026-08-07 升级后）
 
 验证：
@@ -8,6 +8,9 @@
 """
 import os
 import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # 仓库根入 path，供 data.* 导入
 
 os.environ.setdefault("NO_PROXY", "*")
 
@@ -33,12 +36,11 @@ def main():
     print("=" * 60)
     print("Tushare 主服务器可达性测试（15000 积分版）")
     print("=" * 60)
-    import tushare as ts
-    pro = ts.pro_api(os.environ.get("LW_TUSHARE_TOKEN") or
-                     __import__("yaml").safe_load(
-                         open(r"config/params.yaml",
-                              encoding="utf-8"))["data"]["tushare_token"])
-    pro._DataApi__http_url = API_URL
+    import yaml
+    from data.fetcher_tushare import _ProShim
+    token = os.environ.get("LW_TUSHARE_TOKEN") or yaml.safe_load(
+        open(r"config/params.yaml", encoding="utf-8"))["data"]["tushare_token"]
+    pro = _ProShim(token, API_URL)
 
     print("\n[1] 基础连通")
     test("trade_cal 交易日历", lambda: pro.trade_cal(exchange="SSE", start_date="20260801", end_date="20260810"))

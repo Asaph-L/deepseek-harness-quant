@@ -31,7 +31,7 @@ sys.path.insert(0, str(BASE))
 
 import requests
 
-QD_DB = r"data\cache\finance_quality.db"
+QD_DB = r"data/cache/finance_quality.db"
 BACKUP_URL = "http://<your-backup-server>/app-api/openapi/v1/tushare"
 BACKUP_KEY = os.environ.get("LWQUANT_TUSHARE_BACKUP_KEY", "")  # 备用服务器 api_key（环境变量读取，勿硬编码）
 START_QUARTER = "20250101"
@@ -70,7 +70,7 @@ def _load_data_cfg():
 
 def load_codes():
     """全市场代码（stock_basic，带后缀）"""
-    con = sqlite3.connect(r"data\cache\stock_basic.db")
+    con = sqlite3.connect(r"data/cache/stock_basic.db")
     codes = [r[0] for r in con.execute("SELECT code FROM stock_basic").fetchall()]
     con.close()
     return codes

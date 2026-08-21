@@ -26,7 +26,7 @@ sys.path.insert(0, str(BASE))
 
 from data.cache import DailyCache
 
-CACHE = r"data\cache"
+CACHE = str(BASE / "data" / "cache")  # ★2026-08-17 跨平台修复：原 r"data/cache" 仅 Windows 可用
 # 缓存（动态回测重复跑用）
 _PANEL = {"key": None, "closes": None}
 _FIN = None
@@ -172,8 +172,14 @@ def _load_fin():
         fin["code6"] = fin["code"].str[:6]
         fin["end"] = pd.to_datetime(fin["end_date"])
         fin["ann"] = pd.to_datetime(fin["ann_date"])
-        fin = fin.sort_values(["code6", "end"])
-        fin["rev_yoy"] = fin.groupby("code6")["total_revenue"].transform(lambda s: s / s.shift(4) - 1)
+        fin = fin.sort_values(["code6", "end"]).drop_duplicates(["code6", "end"], keep="last")
+        prev = fin[["code6", "end", "total_revenue"]].copy()
+        prev["end"] = prev["end"] + pd.DateOffset(years=1)
+        prev = prev.rename(columns={"total_revenue": "prev_revenue"})
+        fin = fin.merge(prev, on=["code6", "end"], how="left")
+        den = pd.to_numeric(fin["prev_revenue"], errors="coerce").abs().replace(0, np.nan)
+        fin["rev_yoy"] = (pd.to_numeric(fin["total_revenue"], errors="coerce")
+                          - pd.to_numeric(fin["prev_revenue"], errors="coerce")) / den
         _FIN = fin
     return _FIN
 

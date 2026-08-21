@@ -25,21 +25,24 @@ import numpy as np
 import pandas as pd
 
 BASE = Path(__file__).resolve().parent.parent
-CACHE = Path(r"data/cache")
+sys.path.insert(0, str(BASE))
+from data.cache import CACHE_DIR
+
+CACHE = CACHE_DIR
 DAILY_PIVOT = BASE / "output" / "daily_close.parquet"
 HS300_PARQUET = BASE / "output" / "hs300_monthly.parquet"
 HORIZON = 20          # 未来 20 交易日
 MIN_N = 30            # 徽章最低样本
-SUBJ_DB = BASE / "data" / "cache" / "subj_quant.db"
+SUBJ_DB = CACHE / "subj_quant.db"
 
 
 def _to_bar_code(c):
     """6 位代码 → bars.db 格式（加交易所后缀）"""
     c = str(c).strip()[:6]
+    if c[:1] in ("4", "8") or c.startswith("92"):
+        return c + ".BJ"
     if c[:1] in ("6", "9"):
         return c + ".SH"
-    if c[:1] in ("4", "8"):
-        return c + ".BJ"
     return c + ".SZ"
 
 
@@ -54,7 +57,7 @@ SECTOR_MAP = {
 
 def _load_sector():
     """code(6位) → 板块门类（stock_basic.db 证监会行业）"""
-    con = sqlite3.connect(r"data/cache/stock_basic.db")
+    con = sqlite3.connect(str(CACHE / "stock_basic.db"))
     rows = con.execute("SELECT code, industry FROM stock_basic WHERE industry!=''").fetchall()
     con.close()
     return {str(r[0])[:6]: SECTOR_MAP.get(str(r[1])[:1], "其他") for r in rows}
@@ -125,6 +128,7 @@ def _events_finance(daily):
     fr["period"] = fr["period"].astype(str).str.replace("-", "").str[:8]
     fr["code"] = fr["code"].astype(str).str[:6]
     fs["code"] = fs["code"].astype(str).str[:6]
+    fs["end_date"] = pd.to_datetime(fs["end_date"], errors="coerce")
     fs["end_date"] = fs["end_date"].astype(str).str[:10].str.replace("-", "").str[:8]
     fs["ann_date"] = fs["ann_date"].astype(str).str[:10]
 
@@ -158,25 +162,41 @@ def _events_break_net(daily):
     mv = pd.read_sql("SELECT month, code, circ_mv FROM hist_mv", con)
     con.close()
     con = sqlite3.connect(f"file:{CACHE / 'finance_ts.db'}?mode=ro&immutable=1", uri=True)
-    fs = pd.read_sql("SELECT code, end_date, total_hldr_eqy_exc_min_int FROM financials_ts", con)
+    fs = pd.read_sql(
+        "SELECT code,end_date,ann_date,total_hldr_eqy_exc_min_int FROM financials_ts", con
+    )
     con.close()
 
     mv["month"] = mv["month"].astype(str).str.replace("-", "").str[:6]
     mv["code"] = mv["code"].astype(str).str[:6]
     fs["code"] = fs["code"].astype(str).str[:6]
-    fs["end_date"] = fs["end_date"].astype(str).str[:10].str.replace("-", "").str[:8]
-    # 净资产按 code+end_date 取最新（月度事件用最近一期净资产）
-    fs = fs[fs["total_hldr_eqy_exc_min_int"].notna()]
-    fs = fs.sort_values("end_date").drop_duplicates(subset="code", keep="last")
-
-    m = mv.merge(fs, on="code", how="inner")
+    mv["ev_day"] = pd.to_datetime(mv["month"] + "01") + pd.offsets.MonthEnd(0)
+    fs["ann_date"] = pd.to_datetime(fs["ann_date"], errors="coerce")
+    fs = fs[fs["ann_date"].notna() & fs["total_hldr_eqy_exc_min_int"].notna()]
+    pieces = []
+    fs_groups = {code: g.sort_values("ann_date") for code, g in fs.groupby("code")}
+    for code, group in mv.groupby("code"):
+        fg = fs_groups.get(code)
+        if fg is None or fg.empty:
+            continue
+        fg = fg.copy().sort_values(["ann_date", "end_date"])
+        fg = fg[fg["end_date"].eq(fg["end_date"].cummax())]
+        merged = pd.merge_asof(
+            group.sort_values("ev_day"),
+            fg[["end_date", "ann_date", "total_hldr_eqy_exc_min_int"]],
+            left_on="ev_day", right_on="ann_date", direction="backward",
+            allow_exact_matches=True,
+        )
+        merged["code"] = code
+        pieces.append(merged)
+    if not pieces:
+        return []
+    m = pd.concat(pieces, ignore_index=True)
     m["circ_mv"] = pd.to_numeric(m["circ_mv"], errors="coerce")
     m["nav"] = pd.to_numeric(m["total_hldr_eqy_exc_min_int"], errors="coerce")
     m = m[(m["circ_mv"] > 0) & (m["nav"] > 0)]
-    m["pb"] = m["circ_mv"] / m["nav"]
+    m["pb"] = m["circ_mv"] * 1e8 / m["nav"]  # circ_mv=亿元，净资产=元
     m = m[m["pb"] < 1.0]
-    # 月度 → 事件日（当月最后一个交易日）
-    m["ev_day"] = pd.to_datetime(m["month"] + "01") + pd.offsets.MonthEnd(0)
     m = m[m["ev_day"] >= daily.index[0]]
     m["bar_code"] = m["code"].apply(_to_bar_code)
     return list(zip(m["bar_code"], m["ev_day"]))

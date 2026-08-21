@@ -34,8 +34,8 @@ from strategy.timing import RegimeDetector
 # ---- 硬过滤参数（params.yaml strategy_v3 段优先，改配置不改代码）----
 MIN_MV_YI = 0.0             # ★PIT 验收后归 0：市值过滤证实为 look-ahead 幻觉（快照口径 0.95 虚高，真实 PIT 下 0.74→0.57 负贡献）
 MIN_TURNOVER_YI = 0.1       # 日均成交额下限 0.1 亿（流动性）
-DELISTED_CSV = Path(r"data\cache\delisted_list.csv")
-MV_MAP_CSV = Path(r"data\cache\circ_mv_map_full.csv")
+DELISTED_CSV = Path(r"data/cache/delisted_list.csv")
+MV_MAP_CSV = Path(r"data/cache/circ_mv_map_full.csv")
 
 _MV_MAP = None
 
@@ -64,12 +64,26 @@ def load_delisted() -> set:
 
 
 def load_mv_map() -> dict:
-    """流通市值快照映射 {code: 亿元}（circ_mv 单位万元 → 亿；PIT 落地后换 hist_mv）
-    格式：ts_code,circ_mv（万元）"""
+    """流通市值快照映射 {code: 亿元}（PIT 落地后换 hist_mv 口径）
+    ★2026-08-22 修复：优先读 hist_mv.db 最新月 circ_mv（亿元）；原 circ_mv_map_full.csv
+    缺失 → mv_map 空 → 硬过滤市值 is None 全跳过 → 持仓恒 0"""
     global _MV_MAP
     if _MV_MAP is not None:
         return _MV_MAP
     _MV_MAP = {}
+    try:
+        _hm = BASE / "data" / "cache" / "hist_mv.db"
+        if _hm.exists():
+            con = sqlite3.connect(f"file:{_hm}?mode=ro&immutable=1", uri=True)
+            _mx = con.execute("SELECT MAX(month) FROM hist_mv").fetchone()[0]
+            _rows = con.execute("SELECT code, circ_mv FROM hist_mv WHERE month=?",
+                                (_mx,)).fetchall()
+            con.close()
+            _MV_MAP = {str(c): float(v) for c, v in _rows if v is not None}
+            if _MV_MAP:
+                return _MV_MAP
+    except Exception:
+        _MV_MAP = {}
     if MV_MAP_CSV.exists():
         try:
             df = pd.read_csv(MV_MAP_CSV, encoding="utf-8-sig")

@@ -381,7 +381,12 @@ module.exports = {
         try {
           const agent = resolveAgent(sessionId)
           if (!agent) { json(res, 404, { ok: false, error: 'no agent', sessionId: sessionId || defaultAgentId() }); return }
-          const message = { role: 'user', content: [{ type: 'text', text }], source: { kind: 'user' }, ts: Date.now() }
+          const message = {
+            id: require('crypto').randomUUID(),
+            role: 'user',
+            content: [{ type: 'text', text }],
+            source: { kind: 'user' }
+          }
           if (typeof agent.followup === 'function') agent.followup(message)
           else if (typeof agent.steer === 'function') agent.steer(message)
           else { json(res, 500, { ok: false, error: 'no followup/steer' }); return }

@@ -4,6 +4,7 @@
 双击「接入API.cmd」运行本脚本。
 """
 import shutil
+import subprocess
 import sys
 import urllib.error
 import urllib.request
@@ -11,6 +12,24 @@ from pathlib import Path
 
 BASE = Path(__file__).resolve().parent.parent
 CRED = BASE / "harness" / "home" / ".credentials.yaml"
+
+
+def has_supported_node():
+    """Return whether the installed Node.js satisfies the locked HARNESS runtime."""
+    node = shutil.which("node")
+    if not node:
+        return False
+    try:
+        version = subprocess.run(
+            [node, "--version"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip().lstrip("v")
+        major, minor, _patch = (int(part) for part in version.split(".", 2))
+    except (OSError, subprocess.SubprocessError, TypeError, ValueError):
+        return False
+    return major >= 24 or (major == 22 and minor >= 19)
 
 
 def main():
@@ -27,9 +46,9 @@ def main():
         return
 
     # 2. 检测 Node.js
-    if not shutil.which("node"):
+    if not has_supported_node():
         print()
-        print("[!] 未检测到 Node.js 18+。HARNESS 需要 Node.js 才能启动。")
+        print("[!] 未检测到受支持的 Node.js（需要 22.19+，推荐 24+）。")
         print("    下载安装：https://nodejs.org")
         print("    装好后重新运行本程序。")
         input("按回车退出...")

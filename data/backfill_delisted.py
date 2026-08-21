@@ -40,7 +40,7 @@ sys.path.insert(0, str(BASE))
 from data.cache import DailyCache
 from data.fetcher_baostock import fetch_daily  # 已修复 isST 解析（F-1）
 
-CACHE_DIR = Path(r"data\cache")
+CACHE_DIR = Path(r"data/cache")
 DELISTED_CSV = CACHE_DIR / "delisted_list.csv"
 LOG_DIR = BASE / "logs"
 PROGRESS_FILE = LOG_DIR / "backfill_delisted_progress.txt"

@@ -32,7 +32,7 @@ import pandas as pd
 
 from data.fetcher_tushare import _pro, _rate_limit
 
-HIST_DB = Path(r"data\cache\hist_mv.db")
+HIST_DB = Path(r"data/cache/hist_mv.db")
 # ★分表（2026-08-07）：hist_mv = 反推版（build_hist_mv.py，主用，PIT 验收已用）
 #                    hist_mv_ts = Tushare 精确版（本脚本，长期慢慢补齐，完成后交叉验证）
 TS_TABLE = "hist_mv_ts"
@@ -54,7 +54,7 @@ def _conn():
 def month_ends(pro, start, end):
     """每月末交易日列表（★用本地 bars.db 计算，不占用 Tushare trade_cal 限频额度）
     start/end 形如 '2020-01-01'；返回 ['YYYYMMDD', ...]"""
-    bcon = sqlite3.connect(r"data\cache\bars.db")
+    bcon = sqlite3.connect(r"data/cache/bars.db")
     rows = bcon.execute(
         "SELECT substr(date,1,7) ym, MAX(date) md FROM daily_bar "
         "WHERE code NOT LIKE 'SH.%' AND code NOT LIKE 'sh.%' AND substr(date,1,7) >= ? "

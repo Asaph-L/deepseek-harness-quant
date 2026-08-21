@@ -136,13 +136,13 @@
       <h2 style="margin:0;flex:1"> DeepSeek HARNESS · 对话 <span class="tag">原生直连 · 发「1」触发自主推进</span></h2>
       <span class="hz-conn-badge" id="hz-conn-badge"><span class="st-dot"></span><span id="hz-conn-txt">连接中…</span></span>
       <button id="hz-import-btn" class="hz-import-btn" title="导入 Skill / Agent 预设">+</button>
-      <a class="hz-open-gui" href="http://127.0.0.1:3080" target="_blank" rel="noopener">打开完整 GUI ↗</a>
+      <a class="hz-open-gui" href="/api/launch-desktop" target="_blank" rel="noopener">打开完整 GUI ↗</a>
     </div>
     <div class="hz-chat-native">
       <div class="hz-sess-panel">
         <div class="hz-sess-head"><span>会话</span></div>
         <input id="hz-sess-filter" class="hz-sess-filter" placeholder="筛选会话（标题/内容）…">
-        <div class="hz-bulk-bar">
+        <div class="hz-bulk-bar" style="display:none">
           <button id="hz-ck-all" class="hz-bulk-btn" title="全选可删除会话">全选</button>
           <button id="hz-del-sel" class="hz-bulk-btn" title="删除选中的对话">删除所选</button>
           <button id="hz-clear-all" class="hz-bulk-btn danger" title="清空所有未锁定的对话">一键清空</button>
@@ -164,7 +164,7 @@
       <span id="hz-snap" class="hz-snap">Pitch 快照: 未加载</span>
       <span style="flex:1"></span>
       <button id="hz-snap-btn" class="v2-btn" style="padding:3px 10px;font-size:12px">同步 Pitch</button>
-      <a class="mini" href="http://127.0.0.1:3080" target="_blank" rel="noopener" style="color:var(--navy2)">完整 GUI 另开 ↗</a>
+      <a class="mini" href="/api/launch-desktop" target="_blank" rel="noopener" style="color:var(--navy2)">完整 GUI 另开 ↗</a>
     </div>
   </div>
 
@@ -190,7 +190,7 @@
   <div class="v2-card anim-fade-in-up d1" style="margin-top:14px">
     <h2> 快速操作与架构</h2>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
-      <a class="hz-open-gui" href="http://127.0.0.1:3080" target="_blank" rel="noopener">打开完整 GUI ↗</a>
+      <a class="hz-open-gui" href="/api/launch-desktop" target="_blank" rel="noopener">打开完整 GUI ↗</a>
       <a class="v2-btn" href="/" style="text-decoration:none">返回量化门户</a>
       <button id="hz-refresh" class="v2-btn">刷新状态</button>
     </div>
@@ -327,8 +327,8 @@
   function targetQuery() {
     if (!curTarget) return null;
     return curTarget.kind === 'niu'
-      ? '/api/proxy/niuapi/recent?persona=' + encodeURIComponent(curTarget.persona) + '&limit=30'
-      : '/api/proxy/quantapi/recent?sessionId=' + encodeURIComponent(curTarget.id) + '&limit=30';
+      ? '/api/proxy/quant/niu/recent?persona=' + encodeURIComponent(curTarget.persona) + '&limit=30'
+      : '/api/proxy/quant/recent?sessionId=' + encodeURIComponent(curTarget.id) + '&limit=30';
   }
   function loadRecent() {
     var q = targetQuery();
@@ -339,7 +339,7 @@
     }).catch(function (e) {
       document.getElementById('hz-msgs').innerHTML =
         '<div class="hz-msg sys">🔌 HARNESS 暂不可达（' + esc((e && e.message) || e) + '）—— 自动重连中…（完整 GUI：' +
-        '<a href="http://127.0.0.1:3080" target="_blank" style="color:var(--navy2)">打开 ↗</a>）</div>';
+        '<a href="/api/launch-desktop" target="_blank" style="color:var(--navy2)">打开 ↗</a>）</div>';
     });
   }
   /* 会话分类菜单：主系统（根会话）+ 主观·牛散 */
@@ -366,16 +366,14 @@
     html += rel.map(function (s) {
       var locked = s.locked === true;
       var active = curTarget && curTarget.kind === 'root' && curTarget.id === s.id ? ' active' : '';
-      var ck = locked ? '' : '<input type="checkbox" class="hz-sess-ck" data-ck="' + esc(s.id) + '"' + (selectedSess[s.id] ? ' checked' : '') + '>';
+      var ck = '';
       return '<div class="hz-sess-item' + active + '" data-kind="root" data-sid="' + esc(s.id) + '">' +
         '<div class="trow">' + ck + '<span class="tt">' + esc(s.title) +
         (s.current ? ' <span class="cur">●当前</span>' : '') +
-        (locked ? (s.coreLocked
-          ? ' <span class="hz-lock core" title="核心会话（主系统）永久锁死">🔒</span>'
-          : ' <span class="hz-lock unlockable" data-unlock="' + esc(s.id) + '" title="点击解锁后可删除">🔒</span>') : '') +
+        (locked ? ' <span class="hz-lock core" title="受保护会话">🔒</span>' : '') +
         '</span></div>' +
         (s.preview ? '<div class="p">' + esc(s.preview) + '</div>' : '<div class="p">空会话</div>') +
-        (locked ? '' : '<button class="hz-sess-del" data-del="' + esc(s.id) + '" title="删除对话">×</button>') +
+        '' +
         '</div>';
     }).join('');
     html += '<div class="hz-sess-cat">主观 · 牛散 <span style="color:#71717a">基于 Pitch 卡选股</span></div>';
@@ -401,7 +399,7 @@
         ev.stopPropagation();
         var sid = lk.getAttribute('data-unlock');
         if (!confirm('解锁该会话？解锁后可从列表删除（若为运行中会话，删除前请确认不再使用）')) return;
-        hzPost('/api/proxy/quantapi/unlock', { sessionId: sid }).then(function (res) {
+        hzPost('/api/proxy/quant/unlock', { sessionId: sid }).then(function (res) {
           if (res && res.ok) {
             loadSessions();
           } else {
@@ -426,7 +424,7 @@
         ev.stopPropagation();
         var sid = btn.getAttribute('data-del');
         if (!confirm('确认删除该对话？（从工作区归档，不可撤销）')) return;
-        hzPost('/api/proxy/quantapi/delete', { sessionId: sid }).then(function (res) {
+        hzPost('/api/proxy/quant/delete', { sessionId: sid }).then(function (res) {
           if (res && res.ok) {
             if (curTarget && curTarget.kind === 'root' && curTarget.id === sid) curTarget = null;
             loadSessions();
@@ -455,7 +453,7 @@
       var ids = Object.keys(selectedSess);
       if (!ids.length) { alert('未勾选任何会话（锁死会话不可选）'); return; }
       if (!confirm('确认删除选中的 ' + ids.length + ' 个对话？（从工作区归档，不可撤销）')) return;
-      hzPost('/api/proxy/quantapi/delete-batch', { sessionIds: ids }).then(function (res) {
+      hzPost('/api/proxy/quant/delete-batch', { sessionIds: ids }).then(function (res) {
         if (res && res.ok) {
           selectedSess = {};
           alert('已删除 ' + res.deleted + ' 个对话' + (res.skipped && res.skipped.length ? '，跳过锁死 ' + res.skipped.length + ' 个' : ''));
@@ -467,7 +465,7 @@
     };
     document.getElementById('hz-clear-all').onclick = function () {
       if (!confirm('⚠️ 一键清空：隐藏本面板所有未锁定的对话！\n仅本面板生效——GUI 面板与聊天历史完全不受影响（可随时点「恢复」找回）。\n\n确认继续？')) return;
-      hzPost('/api/proxy/quantapi/clear-all', {}).then(function (res) {
+      hzPost('/api/proxy/quant/clear-all', {}).then(function (res) {
         if (res && res.ok) {
           selectedSess = {};
           alert('已隐藏 ' + res.deleted + ' 个对话（仅本面板），锁死保留 ' + res.locked + ' 个');
@@ -479,7 +477,7 @@
     };
     /* ★2026-08-16 恢复：清空本面板隐藏名单，全部会话重现（GUI 不受影响） */
     document.getElementById('hz-restore').onclick = function () {
-      hzPost('/api/proxy/quantapi/restore-all', {}).then(function (res) {
+      hzPost('/api/proxy/quant/restore-all', {}).then(function (res) {
         if (res && res.ok) {
           selectedSess = {};
           loadSessions();
@@ -575,8 +573,8 @@
   /* ★2026-08-16 健壮轮询：失败自动重试（指数退避），恢复后刷新会话 */
   function loadSessions() {
     return Promise.all([
-      hzGet('/api/proxy/quantapi/sessions', 20000).then(function (d) { rootsCache = d.sessions || []; }),
-      hzGet('/api/proxy/niuapi/sessions', 15000).then(function (d) { niuCache = d.personas || []; })
+      hzGet('/api/proxy/quant/sessions', 20000).then(function (d) { rootsCache = d.sessions || []; }),
+      hzGet('/api/proxy/quant/niu/sessions', 15000).then(function (d) { niuCache = d.personas || []; })
     ]).then(function () {
       if (!curTarget) {
         var rel = relatedRoots();
@@ -612,8 +610,8 @@
     renderMsgs([]);
     document.getElementById('hz-chat-status').textContent = '发送中…';
     var p = curTarget.kind === 'niu'
-      ? hzPost('/api/proxy/niuapi/chat', { persona: curTarget.persona, text: text, snapshot: snapshotCache })
-      : hzPost('/api/proxy/quantapi/chat2', { text: text, sessionId: curTarget.id });
+      ? hzPost('/api/proxy/quant/niu/chat', { persona: curTarget.persona, text: text, snapshot: snapshotCache })
+      : hzPost('/api/proxy/quant/chat2', { text: text, sessionId: curTarget.id });
     p.then(function (res) {
       if (res.ok && res.accepted) {
         document.getElementById('hz-chat-status').textContent = '已送达 · 等回复…';
@@ -679,7 +677,7 @@
   }, 20000);
   setInterval(function () {
     if (connState === 'down' || connState === 'retry') {
-      hzGet('/api/proxy/quantapi/sessions', 15000).then(function () {
+      hzGet('/api/proxy/quant/sessions', 15000).then(function () {
         setConn('ok', '已连接');
         loadSessions();
       }).catch(function () {});

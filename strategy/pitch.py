@@ -36,10 +36,10 @@ sys.path.insert(0, str(BASE))
 import pandas as pd
 import numpy as np
 
-from data.cache import DailyCache
+from data.cache import CACHE_DIR, DailyCache
 from strategy.ranking_v2 import load_basic
 
-CACHE = Path(r"data/cache")
+CACHE = CACHE_DIR
 OUT_JSON = BASE / "output" / "pitch_report.json"
 OUT_MD = BASE / "output" / "pitch_report.md"
 
@@ -191,6 +191,7 @@ def build_pitch(n=MAX_N, force=False) -> dict:
         return {"error": "底座池未生成（先跑 strategy/base_pool.py）", "picks": []}
     fin, latest = _load_finance()
     basic = load_basic()
+    full_by_code6 = {c.split(".", 1)[0]: c for c in pool}
     codes6 = [c.split(".")[0] for c in pool]
     fin6 = {c6: v for c6, v in fin.items() if c6 in set(codes6)}
     # 候选：成长 + 质量（F-Score 就绪则加分；未就绪用 ROE 门槛）
@@ -214,7 +215,8 @@ def build_pitch(n=MAX_N, force=False) -> dict:
     if not cand:
         return {"error": f"底座池 {len(pool)} 只中无候选通过成长+质量门槛（yoy≥{MIN_YOY}% & ROE≥{MIN_ROE_ANN*100:.0f}%）", "picks": []}
     # 技术状态 + F-Score
-    codes = [c6 + (".SH" if c6[:2] in ("60", "68") else ".SZ") for c6 in [x["code6"] for x in cand]]
+    codes = [full_by_code6[c6] for c6 in [x["code6"] for x in cand]
+             if c6 in full_by_code6]
     tech = _tech(codes)
     try:
         from factors.fscore import fscore_batch
@@ -224,7 +226,9 @@ def build_pitch(n=MAX_N, force=False) -> dict:
     # 打分：质量 40%（F-Score 归一）+ 成长 30%（yoy 分位）+ 时机 30%（回撤位置）
     scored = []
     for x in cand:
-        c = x["code6"] + (".SH" if x["code6"][:2] in ("60", "68") else ".SZ")
+        c = full_by_code6.get(x["code6"])
+        if not c:
+            continue
         t = tech.get(c, {})
         dist = t.get("dist_high_pct")
         # ★dist_high_pct 为负值（-28.9 = 回撤 28.9%）：区间按 |回撤| ∈ [10, 40] 判断

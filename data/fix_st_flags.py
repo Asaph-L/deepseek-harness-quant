@@ -39,7 +39,7 @@ for k in ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy",
 BASE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE))
 
-CACHE_DIR = Path(r"data\cache")
+CACHE_DIR = Path(r"data/cache")
 BARS_DB = CACHE_DIR / "bars.db"
 LOG_DIR = BASE / "logs"
 PROGRESS_FILE = LOG_DIR / "fix_st_progress.txt"

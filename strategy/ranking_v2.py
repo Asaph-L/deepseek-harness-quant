@@ -32,11 +32,12 @@ sys.path.insert(0, str(BASE))
 
 import numpy as np
 import pandas as pd
+from data.cache import CACHE_DIR
 
-BARS_DB = Path(r"D:/劳威派量化数据/cache/bars.db")
-FIN_DB = Path(r"D:/劳威派量化数据/cache/finance.db")
-BASIC_DB = Path(r"D:/劳威派量化数据/cache/stock_basic.db")
-MV_CSV = Path(r"D:/劳威派量化数据/cache/circ_mv_map_full.csv")
+BARS_DB = CACHE_DIR / "bars.db"
+FIN_DB = CACHE_DIR / "finance.db"
+BASIC_DB = CACHE_DIR / "stock_basic.db"
+MV_CSV = CACHE_DIR / "circ_mv_map_full.csv"
 
 
 def load_close_panel(days=300, end=None) -> pd.DataFrame:
@@ -194,7 +195,8 @@ def rank(date: str = None, n: int = 30) -> dict:
     f["mv_yi"] = pd.Series(mv).reindex(f.index)
 
     # ---- 数据清洗（优中选优前提：盈利 + 无脏数据）----
-    f["nyoy"] = pd.to_numeric(f["nyoy"], errors="coerce").clip(-300, 300)  # 异常同比截断
+    # finance_report 同比统一为小数；截断到 ±300%，避免近零分母异常支配排名。
+    f["nyoy"] = pd.to_numeric(f["nyoy"], errors="coerce").clip(-3, 3)
     f["roe"] = pd.to_numeric(f["roe"], errors="coerce")
 
     # ST 过滤（最新交易日 is_st=1 剔除）
@@ -276,7 +278,7 @@ def rank(date: str = None, n: int = 30) -> dict:
                 "vol60": round(float(r["vol60"]) * 100, 1),
                 "mom120": round(float(r["mom120"]) * 100, 1),
                 "roe": round(float(r["roe"]) * 100, 1) if pd.notna(r.get("roe")) else None,
-                "nyoy": round(float(r["nyoy"]), 1) if pd.notna(r.get("nyoy")) else None,
+                "nyoy": round(float(r["nyoy"]) * 100, 1) if pd.notna(r.get("nyoy")) else None,
             },
             "reason": build_reason(r, score.loc[code], b),
         })
@@ -294,8 +296,8 @@ def build_reason(row, fscore, basic) -> str:
     parts = []
     if pd.notna(row.get("roe")) and row["roe"] > 0.1:
         parts.append(f"ROE {row['roe']*100:.1f}% 质量良好")
-    if pd.notna(row.get("nyoy")) and row["nyoy"] > 20:
-        parts.append(f"净利润同比 +{row['nyoy']:.0f}% 成长强劲")
+    if pd.notna(row.get("nyoy")) and row["nyoy"] > 0.20:
+        parts.append(f"净利润同比 +{row['nyoy'] * 100:.0f}% 成长强劲")
     if pd.notna(row.get("vol60")) and row["vol60"] < 0.03:
         parts.append(f"60日波动 {row['vol60']*100:.1f}% 低波稳健")
     if pd.notna(row.get("mom120")) and row["mom120"] < -0.1:

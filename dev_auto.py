@@ -93,26 +93,55 @@ def _write_state(state: dict):
     STATE_FILE.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+LAUNCHD_LABEL = "com.lwquant.devdriver"   # macOS launchd 标签（scripts/setup_launchd.py 安装）
+
+
 def _task_enabled() -> bool:
-    """查询计划任务是否启用（Windows 输出可能为 GBK 编码，容错处理）"""
+    """查询计划任务是否启用（win32 → schtasks；macOS → launchctl loaded）
+    ★2026-08-21 跨平台：原 schtasks 在 macOS 不存在 → 查询失败保守返回 True"""
     try:
-        r = subprocess.run(["schtasks", "/Query", "/TN", TASK_NAME, "/FO", "LIST"],
-                           capture_output=True, timeout=15)
-        out = r.stdout.decode("gbk", errors="ignore") + r.stderr.decode("gbk", errors="ignore")
-        return "禁用" not in out and "Disabled" not in out
+        if sys.platform == "win32":
+            r = subprocess.run(["schtasks", "/Query", "/TN", TASK_NAME, "/FO", "LIST"],
+                               capture_output=True, timeout=15)
+            out = r.stdout.decode("gbk", errors="ignore") + r.stderr.decode("gbk", errors="ignore")
+            return "禁用" not in out and "Disabled" not in out
+        r = subprocess.run(["id", "-u"], capture_output=True, text=True,
+                           errors="replace", timeout=5)
+        _uid = r.stdout.strip()
+        r = subprocess.run(["launchctl", "print", f"gui/{_uid}/{LAUNCHD_LABEL}"],
+                           capture_output=True, text=True, errors="replace", timeout=8)
+        return r.returncode == 0
     except Exception:
         return True  # 查询失败时保守假设启用（由自动熔断兜底）
 
 
 def _set_task(enabled: bool) -> bool:
-    """启用/禁用计划任务"""
-    flag = "/Enable" if enabled else "/Disable"
+    """启用/禁用计划任务（win32 → schtasks；macOS → launchctl enable/disable）"""
+    if sys.platform == "win32":
+        flag = "/Enable" if enabled else "/Disable"
+        try:
+            r = subprocess.run(["schtasks", "/Change", "/TN", TASK_NAME, flag],
+                               capture_output=True, timeout=15)
+            return r.returncode == 0
+        except Exception as e:
+            log(f"计划任务 {flag} 失败: {e}")
+            return False
+    # macOS：launchctl enable/disable（gui 域持久；disable 后需 bootstrap 才能重新加载）
+    verb = "enable" if enabled else "disable"
     try:
-        r = subprocess.run(["schtasks", "/Change", "/TN", TASK_NAME, flag],
-                           capture_output=True, timeout=15)
+        import subprocess as _sp
+        _uid = _sp.run(["id", "-u"], capture_output=True, text=True, timeout=5).stdout.strip()
+        r = _sp.run(["launchctl", verb, f"gui/{_uid}/{LAUNCHD_LABEL}"],
+                    capture_output=True, text=True, errors="replace", timeout=10)
+        if enabled:
+            # 重新加载（disable 会阻止 bootstrap；enable 后需显式 bootstrap）
+            _plist = Path.home() / "Library" / "LaunchAgents" / f"{LAUNCHD_LABEL}.plist"
+            if _plist.exists():
+                _sp.run(["launchctl", "bootstrap", f"gui/{_uid}", str(_plist)],
+                        capture_output=True, text=True, errors="replace", timeout=10)
         return r.returncode == 0
     except Exception as e:
-        log(f"计划任务 {flag} 失败: {e}")
+        log(f"launchctl {verb} 失败: {e}")
         return False
 
 
@@ -429,7 +458,7 @@ def run_update():
     try:
         import subprocess
         r = subprocess.run(
-            [sys.executable, "-X", "utf8", str(BASE / "report" / "daily_signal.py")],
+            [sys.executable, "-X", "utf8", str(BASE / "data" / "daily_signal.py")],
             capture_output=True, text=True, timeout=600, encoding="utf-8", errors="replace")
         out = (r.stdout or "")[-800:]
         log(f"每日信号(v3): exit={r.returncode} {out.strip()[:200]}")

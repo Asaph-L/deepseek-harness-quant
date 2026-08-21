@@ -77,21 +77,25 @@ def evaluate_factor(reg: FactorRegistry, f: dict) -> dict:
         reg.update_score(f["name"], res["score"], status=status, detail=res)
         return res
     # cross_sectional：调 factor_evaluator（8 维体检）——通过子进程避免污染主进程
+    import re
     import subprocess
     r = subprocess.run(
         [sys.executable, "-X", "utf8", str(BASE / "validation" / "factor_evaluator.py"),
          "--factors", f["name"]],
         capture_output=True, text=True, timeout=1800, encoding="utf-8", errors="replace")
     out = (r.stdout or "")[-1500:]
-    # 从输出解析评分（factor_evaluator 输出格式为评分卡；宽松解析 score 行）
+    # 从输出解析评分（★2026-08-18 修复：输出为 "评分 71.9 ｜ 反向强有效 ｜ ..."，
+    #   原 split(":") 解析失败 → score=None → 全部误判 retired；改用正则取 "评分" 后数字）
     score = None
     for line in out.splitlines():
-        if "总评" in line or "score" in line.lower() or "评分" in line:
-            try:
-                score = float(line.split(":")[-1].split("/")[0].strip())
-                break
-            except ValueError:
-                continue
+        if "评分" in line or "score" in line.lower():
+            m = re.search(r"评分\s*([\d.]+)", line) or re.search(r"score[:\s]*([\d.]+)", line, re.I)
+            if m:
+                try:
+                    score = float(m.group(1))
+                    break
+                except ValueError:
+                    continue
     status = "active" if score and score >= 65 else ("candidate" if score and score >= 40 else "retired")
     detail = {"stdout_tail": out, "score_parsed": score}
     reg.update_score(f["name"], score, status=status, detail=detail)

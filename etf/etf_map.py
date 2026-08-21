@@ -23,8 +23,8 @@ import pandas as pd
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # deepseek-harness-quant
 OUT_PATH = os.path.join(BASE, 'output', 'etf_map.json')
-BARS = r'data\cache\bars.db'
-ETF_CACHE = r'data\cache\etf'
+BARS = r'data/cache/bars.db'
+ETF_CACHE = r'data/cache/etf'
 START = '20190101'   # turn_low 可验证区间 2019+
 END = datetime.date.today().strftime('%Y%m%d')
 

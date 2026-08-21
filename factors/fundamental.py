@@ -26,7 +26,7 @@ import numpy as np
 import pandas as pd
 import sqlite3
 
-FIN_DB = r"data\cache\finance.db"
+FIN_DB = r"data/cache/finance.db"
 
 # 披露延迟：报告期 → 可用日（月末）
 DISCLOSE_LAG = {

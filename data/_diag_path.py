@@ -3,7 +3,7 @@
 import sys
 from pathlib import Path
 
-BASE = Path(r"data\minute\download")
+BASE = Path(r"data/minute/download")
 print("BASE 存在:", BASE.exists())
 for sub in ["【2】2026单年A股分钟日频-持续更新到年底", "8.9日更新", "2026(1)", "每日数据"]:
     BASE = BASE / sub

@@ -184,26 +184,41 @@ def _growth_metrics(code: str):
                          if "/" in BARS_DB else
                          "file:data/cache/finance_ts.db?mode=ro&immutable=1",
                          uri=True, timeout=3)
+        columns = {x[1] for x in con.execute("PRAGMA table_info(financials_ts)")}
+        attr_profit = "n_income_attr_p" if "n_income_attr_p" in columns else "n_income"
+        equity = ("total_hldr_eqy_exc_min_int"
+                  if "total_hldr_eqy_exc_min_int" in columns else "NULL")
         rows = con.execute(
-            "SELECT ann_date, n_income, total_hldr_eqy_exc_min_int FROM financials_ts "
+            f"SELECT end_date,ann_date,{attr_profit},n_income,"
+            f"{equity} AS total_hldr_eqy_exc_min_int FROM financials_ts "
             "WHERE code=? AND ann_date IS NOT NULL AND ann_date != '' "
-            "ORDER BY ann_date DESC LIMIT 4", (code,)).fetchall()
+            "AND date(ann_date)<=date('now','localtime') "
+            "ORDER BY end_date DESC,ann_date DESC LIMIT 12", (code,)).fetchall()
         con.close()
         if not rows:
             return None
-        # 最新 + 找去年同期（ann_date 月日近似）
+        # 最新 + 精确找去年同报告期；公告月份会因年报延期等发生漂移，不能用于同比匹配。
         latest = rows[0]
-        ann = str(latest[0])[:10]
+        ann = str(latest[1])[:10]
+        latest_end = str(latest[0]).replace("-", "")[:8]
+        latest_profit = latest[2] if latest[2] is not None else latest[3]
         yoy = None
         for r in rows[1:]:
-            r_ann = str(r[0])[:10]
-            if r_ann[:4] == str(int(ann[:4]) - 1) or abs(int(r_ann[5:7]) - int(ann[5:7])) <= 1:
-                if r[1] and latest[1] and float(r[1]) != 0:
-                    yoy = float(latest[1]) / float(r[1]) - 1
+            prev_end = str(r[0]).replace("-", "")[:8]
+            if (len(latest_end) == 8 and len(prev_end) == 8
+                    and prev_end[:4] == str(int(latest_end[:4]) - 1)
+                    and prev_end[4:] == latest_end[4:]):
+                prev_profit = r[2] if r[2] is not None else r[3]
+                if (prev_profit is not None and latest_profit is not None
+                        and abs(float(prev_profit)) >= 1e6):
+                    yoy = (float(latest_profit) - float(prev_profit)) / abs(float(prev_profit))
+                    yoy = max(-10.0, min(10.0, yoy))
                 break
         roe = None
-        if latest[1] is not None and latest[2]:
-            roe = float(latest[1]) / float(latest[2])
+        if latest_profit is not None and latest[4]:
+            month = latest_end[4:6]
+            annualizer = {"03": 4.0, "06": 2.0, "09": 4.0 / 3.0, "12": 1.0}.get(month, 1.0)
+            roe = float(latest_profit) * annualizer / float(latest[4])
         return {"ann_date": ann, "np_yoy": yoy, "roe": roe}
     except Exception:
         return None

@@ -93,7 +93,7 @@ def main():
     args = ap.parse_args()
 
     import sqlite3
-    con = sqlite3.connect(r"data\cache\bars.db")
+    con = sqlite3.connect(r"data/cache/bars.db")
     # 选「回测窗口内」有 ≥1000 交易日的股票，保证面板 ~1400 天（贴近真实全量回测）
     codes = [r[0] for r in con.execute(
         "SELECT code FROM daily_bar WHERE code NOT LIKE 'sh.%' AND code NOT LIKE 'sz.%' "

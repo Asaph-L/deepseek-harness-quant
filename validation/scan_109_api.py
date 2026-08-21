@@ -22,7 +22,7 @@ os.environ["NO_PROXY"] = "*"
 BASE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE))
 
-import tushare as ts
+from data.fetcher_tushare import _ProShim
 
 API_URL = "https://api.tushare.pro"
 REPORT = BASE / "logs" / "api_scan_report.md"
@@ -155,8 +155,7 @@ def log(msg):
 def main():
     import yaml
     cfg = yaml.safe_load((BASE / "config" / "params.yaml").read_text(encoding="utf-8"))["data"]
-    pro = ts.pro_api(cfg["tushare_token"])
-    pro._DataApi__http_url = cfg.get("tushare_api_url", API_URL)
+    pro = _ProShim(cfg["tushare_token"], cfg.get("tushare_api_url", API_URL))
 
     results = []
     log(f"开始扫描 {len(SCAN)} 个接口（串行，后台任务继续跑）")

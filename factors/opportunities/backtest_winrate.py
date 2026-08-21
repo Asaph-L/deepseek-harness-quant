@@ -33,10 +33,10 @@ import pandas as pd
 
 from factors.opportunities.scan import triggers
 
-BARS_DB = r"data\cache\bars.db"
-FIN_DB = r"data\cache\finance.db"
-QD_DB = r"data\cache\finance_quality.db"
-BASIC_DB = r"data\cache\stock_basic.db"
+BARS_DB = r"data/cache/bars.db"
+FIN_DB = r"data/cache/finance.db"
+QD_DB = r"data/cache/finance_quality.db"
+BASIC_DB = r"data/cache/stock_basic.db"
 OUT = BASE / "logs" / "opportunity_winrates.json"
 
 HORIZONS = {1: 1, 3: 3, 6: 6}          # 持有月数
@@ -201,6 +201,8 @@ def panel_from_pre(t: pd.Timestamp, pre: dict, fin_pit: dict, q_pit: dict,
     f["roe"] = pd.to_numeric(f["roe"], errors="coerce")
     f["sq_nyoy"] = pd.to_numeric(f["sq_nyoy"], errors="coerce")
     f["non_st"] = (~f.index.isin(st_codes)).astype(int)
+    # ★2026-08-17 修复：与 compute_factors_pit 同款——triggers 需要 non_lowprice
+    f["non_lowprice"] = (f["close"] >= 1.5).astype(int) if "close" in f.columns else 1
     f["pb"] = np.nan
     f["pe_ttm"] = 1.0
     f["pb_pct"] = f["close"].rank(pct=True)
@@ -261,6 +263,9 @@ def compute_factors_pit(px: pd.DataFrame, vx: pd.DataFrame,
     f["roe"] = pd.to_numeric(f["roe"], errors="coerce")
     f["sq_nyoy"] = pd.to_numeric(f["sq_nyoy"], errors="coerce")
     f["non_st"] = (~f.index.isin(st_codes)).astype(int)
+    # ★2026-08-17 修复：scan.py triggers 引用 non_lowprice（min_price=1.5 硬筛），
+    #   此前 compute_factors_pit 未生成该列 → KeyError（PIT 回测触发全部失败）
+    f["non_lowprice"] = (f["close"] >= 1.5).astype(int) if "close" in f.columns else 1
     # ★估值列（PIT 回测近似，2026-08-08 主程序 v1.1 引入真实估值后对齐）：
     #   历史 daily_basic 估值无本地缓存 → 用价格分位近似（与 scan.py 无估值数据时的
     #   降级语义一致）：pb 置 NaN（触发兜底不阻塞）、pe_ttm 置 1.0（正数满足 >0 检查）

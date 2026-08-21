@@ -8,7 +8,7 @@ sys.path.insert(0, str(BASE))
 
 from data.ingest_minute_7z import ingest_7z, _conn
 
-DATA_DIR = Path(r"data\minute\download\【2】2026单年A股分钟日频-持续更新到年底\8.9日更新\2026(1)\每日数据")
+DATA_DIR = Path(r"data/minute/download/【2】2026单年A股分钟日频-持续更新到年底/8.9日更新/2026(1)/每日数据")
 MIN_DATE = "20260411"   # 4/11 之后为增量（4/10 前在 1m_price_zip parquet 中）
 
 

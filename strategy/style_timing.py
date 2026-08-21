@@ -98,7 +98,7 @@ if __name__ == "__main__":
 
     mv_map = {}
     try:
-        m = pd.read_csv(r"data\cache\circ_mv_map.csv")
+        m = pd.read_csv(r"data/cache/circ_mv_map.csv")
         m["code6"] = m["code"].astype(str).str[:6]
         mv_map = dict(zip(m["code6"], m["mv_yi"]))
     except Exception:

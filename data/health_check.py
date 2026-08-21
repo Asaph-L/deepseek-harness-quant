@@ -24,7 +24,7 @@ from pathlib import Path
 
 BASE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE))
-BARS_DB = r"data\cache\bars.db"
+BARS_DB = str(BASE / "data" / "cache" / "bars.db")   # 绝对路径（跨平台；原相对路径依赖 cwd）
 
 # (名称, glob 模式, 目录, 期望最大时效(小时), 说明)
 CHAINS = [
@@ -72,14 +72,42 @@ def check_chains() -> list:
 
 
 def check_tasks() -> list:
-    names = ["DSHQuant-DevDriver", "DSHQuant-DailyPipeline", "DSHQuant-FactorDaily",
-             "DSHQuant-FactorArchive", "DSHQuant-DeckGuard", "DSHQuant-BreakoutMon"]
+    """计划任务状态：win32 → schtasks；macOS → launchd（com.lwquant.* plist）
+    ★2026-08-21 跨平台修复：原 schtasks 在 macOS 不存在 → FileNotFoundError 直接崩溃"""
+    from deck.system_live import TASK_LABELS
+    names = list(TASK_LABELS.keys())
     rows = []
+    if sys.platform == "win32":
+        for n in names:
+            try:
+                r = subprocess.run(["schtasks", "/query", "/tn", n], capture_output=True,
+                                   text=True, errors="replace", timeout=8)
+                rows.append({"name": n, "ok": r.returncode == 0,
+                             "issue": "" if r.returncode == 0 else "计划任务缺失"})
+            except Exception as e:
+                rows.append({"name": n, "ok": False, "issue": f"查询异常 {str(e)[:40]}"})
+        return rows
+    # macOS：launchd（launchctl print gui/<uid>/<label> 成功 = 已加载）
+    agents = Path.home() / "Library" / "LaunchAgents"
+    try:
+        r = subprocess.run(["id", "-u"], capture_output=True, text=True, timeout=5)
+        _uid = r.stdout.strip()
+    except Exception:
+        _uid = ""
     for n in names:
-        r = subprocess.run(["schtasks", "/query", "/tn", n], capture_output=True,
-                           text=True, errors="replace")
-        rows.append({"name": n, "ok": r.returncode == 0,
-                     "issue": "" if r.returncode == 0 else "计划任务缺失"})
+        plist = agents / f"{TASK_LABELS[n]}.plist"
+        loaded_ok = False
+        if _uid:
+            try:
+                r = subprocess.run(
+                    ["launchctl", "print", f"gui/{_uid}/{TASK_LABELS[n]}"],
+                    capture_output=True, text=True, errors="replace", timeout=8)
+                loaded_ok = r.returncode == 0
+            except Exception:
+                pass
+        ok = plist.exists() and loaded_ok
+        issue = "" if ok else ("plist 未安装" if not plist.exists() else "launchd 未加载")
+        rows.append({"name": n, "ok": ok, "issue": issue})
     return rows
 
 
@@ -104,7 +132,7 @@ def check_db() -> dict:
         con = sqlite3.connect(f"file:{BARS_DB}?mode=ro&immutable=1", uri=True, timeout=3)
         out["bars_latest"] = con.execute(
             "SELECT MAX(date) FROM daily_bar WHERE adjust='qfq'").fetchone()[0]
-        out["n_inc_db"] = len(glob.glob(r"data\cache\bars_incr_*.db"))
+        out["n_inc_db"] = len(glob.glob(r"data/cache/bars_incr_*.db"))
         con.close()
     except Exception as e:
         out["error"] = str(e)[:80]

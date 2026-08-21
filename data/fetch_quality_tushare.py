@@ -6,7 +6,7 @@ data/fetch_quality_tushare.py — ★质量因子全市场补拉（主服务器�
       主服务器 fina_indicator 单接口即含全部所需指标 → 并发 8 线程全市场 ~10 分钟。
 
 与 baostock 版同表（finance_quality.db / quality），字段映射：
-  roe_avg          ← roe（年化 ROE，fina_indicator 已年化口径）
+  roe_avg          ← roe_yearly（缺失时由累计 roe 按报告期年化）
   gp_margin        ← grossprofit_margin
   np_margin        ← netprofit_margin
   current_ratio    ← current_ratio
@@ -37,7 +37,7 @@ sys.path.insert(0, str(BASE))
 import pandas as pd
 import concurrent.futures
 
-QD_DB = Path(r"data/cache/finance_quality.db")
+QD_DB = BASE / "data" / "cache" / "finance_quality.db"
 LOG_FILE = BASE / "logs" / "quality_tushare.log"
 START_QUARTER = "20240101"
 END_QUARTER = "20260630"
@@ -67,7 +67,8 @@ def _conn():
 def load_codes():
     con = sqlite3.connect(r"data/cache/stock_basic.db")
     codes = [r[0] for r in con.execute(
-        "SELECT code FROM stock_basic WHERE code LIKE '%.SH' OR code LIKE '%.SZ'").fetchall()]
+        "SELECT code FROM stock_basic WHERE code LIKE '%.SH' OR code LIKE '%.SZ' "
+        "OR code LIKE '%.BJ'").fetchall()]
     con.close()
     return codes
 
@@ -95,7 +96,11 @@ def _fetch_one(pro, code):
     """
     for attempt in range(3):
         try:
-            d = pro.fina_indicator(ts_code=code, start_date=START_QUARTER, end_date=END_QUARTER)
+            from data.fetcher_tushare import _call
+            d = _call(
+                pro.fina_indicator, ts_code=code,
+                start_date=START_QUARTER, end_date=END_QUARTER,
+            )
             break
         except Exception as e:
             if attempt == 2:
@@ -114,23 +119,30 @@ def _fetch_one(pro, code):
         rev_ps = _num(r.get("revenue_ps"))
         cfo_np = (ocfps / eps) if (eps and eps > 0 and ocfps is not None) else None
         cfo_or = (ocfps / rev_ps) if (rev_ps and rev_ps > 0 and ocfps is not None) else None
-        # ★口径：Tushare 返回百分数（2.8165=2.82%），baostock 版存小数（0.028165）→ 统一 /100
+        # ★口径：优先官方年化 roe_yearly；缺失时才按报告月年化累计 roe。
         #   current_ratio 两源都是倍率（6.07 倍），不除
         pct = lambda v: (v / 100.0) if v is not None else None
+        roe_yearly = _num(r.get("roe_yearly"))
+        if roe_yearly is None:
+            roe_yearly = _num(r.get("roe"))
+            multiplier = {"03": 4.0, "06": 2.0, "09": 4.0 / 3.0, "12": 1.0}.get(
+                str(r.get("end_date") or "")[4:6], 1.0
+            )
+            roe_yearly = roe_yearly * multiplier if roe_yearly is not None else None
         rows.append((code, period,
-                     pct(_num(r.get("roe"))), pct(_num(r.get("grossprofit_margin"))),
+                     pct(roe_yearly), pct(_num(r.get("grossprofit_margin"))),
                      pct(_num(r.get("netprofit_margin"))), _num(r.get("current_ratio")),
                      pct(_num(r.get("debt_to_assets"))), cfo_np, cfo_or,
                      str(r.get("ann_date")) if r.get("ann_date") else None))
     return code, rows, None
 
 
-def run(workers=8, limit=None):
-    from data.fetcher_tushare import _pro, _rate_limit
+def run(workers=8, limit=None, only_missing=False):
+    from data.fetcher_tushare import _pro
     pro = _pro()
     codes = load_codes()
     done = _done_codes()
-    todo = [c for c in codes if c not in done]
+    todo = [c for c in codes if c not in done] if only_missing else codes
     if limit:
         todo = todo[:limit]
     log(f"开始全市场质量补拉: 总 {len(codes)} 只, 已完成 {len(done)}, 待拉 {len(todo)} 只, workers={workers}")
@@ -176,8 +188,10 @@ if __name__ == "__main__":
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--status", action="store_true")
+    ap.add_argument("--only-missing", action="store_true",
+                    help="仅拉从未出现的股票；默认刷新目标股票以获取新季度")
     args = ap.parse_args()
     if args.status:
         status()
     else:
-        run(workers=args.workers, limit=args.limit)
+        run(workers=args.workers, limit=args.limit, only_missing=args.only_missing)

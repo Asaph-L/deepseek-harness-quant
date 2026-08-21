@@ -34,7 +34,7 @@ from pathlib import Path
 BASE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE))
 
-BARS_DB = r"data\cache\bars.db"
+BARS_DB = r"data/cache/bars.db"
 
 import numpy as np
 import pandas as pd

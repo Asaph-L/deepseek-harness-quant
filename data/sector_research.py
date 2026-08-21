@@ -25,7 +25,10 @@ import numpy as np
 import pandas as pd
 
 BASE = Path(__file__).resolve().parent.parent
-CACHE = Path(r"data/cache")
+sys.path.insert(0, str(BASE))
+from data.cache import CACHE_DIR
+
+CACHE = CACHE_DIR
 DAILY_PIVOT = BASE / "output" / "daily_close.parquet"
 HS300_PARQUET = BASE / "output" / "hs300_monthly.parquet"
 HORIZON = 20
@@ -63,23 +66,25 @@ SECTOR_MAP = {
 
 def _to_bar_code(c):
     c = str(c).strip()[:6]
+    if c[:1] in ("4", "8") or c.startswith("92"):
+        return c + ".BJ"
     if c[:1] in ("6", "9"):
         return c + ".SH"
-    if c[:1] in ("4", "8"):
-        return c + ".BJ"
     return c + ".SZ"
 
 
 def _load_sector_detail():
-    """code(带后缀) → (大类代码, 大类名称)；返回全量映射 + 大类列表"""
-    con = sqlite3.connect(r"data/cache/stock_basic.db")
+    """code(带后缀) → (板块, 板块)。★2026-08-22 修复：stock_basic.industry 为纯中文
+    行业名（如"银行"/"全国地产"），无"代码+名称"前缀结构；原 ind[:3]/ind[3:] 切分
+    会把"IT设备"错切成 code="IT设"/name="备"。改为 code=name=完整行业名（110 类）。"""
+    con = sqlite3.connect(str(CACHE / "stock_basic.db"))
     rows = con.execute("SELECT code, industry FROM stock_basic WHERE industry!=''").fetchall()
     con.close()
     m = {}
     for code, ind in rows:
         c = str(code).strip()
         if len(c) >= 6 and ind:
-            m[c] = (ind[:3], ind[3:])
+            m[c] = (ind, ind)
     return m
 
 
@@ -95,6 +100,16 @@ def list_sectors():
 
 
 def _daily():
+    """日线收盘透视（qfq），缓存 parquet；缺失时从 bars.db 生成（★2026-08-22 修复：
+    原直接 read_parquet 无 fallback，daily_close.parquet 缺失 → 板块研究台全线 500）"""
+    if not DAILY_PIVOT.exists():
+        con = sqlite3.connect(f"file:{CACHE / 'bars.db'}?mode=ro&immutable=1", uri=True)
+        df = pd.read_sql("SELECT date, code, close FROM daily_bar WHERE adjust='qfq' AND close>0", con)
+        con.close()
+        p = df.pivot_table(index="date", columns="code", values="close").sort_index()
+        p.index = pd.to_datetime(p.index)
+        DAILY_PIVOT.parent.mkdir(parents=True, exist_ok=True)
+        p.to_parquet(DAILY_PIVOT)
     return pd.read_parquet(DAILY_PIVOT)
 
 
@@ -138,10 +153,45 @@ def _finance():
     con.close()
     fr["code"] = fr["code"].astype(str).str[:6]
     fr["period"] = fr["period"].astype(str).str.replace("-", "").str[:8]
+    fr["end_date"] = pd.to_datetime(fr["period"], format="%Y%m%d", errors="coerce")
     fr["sq_net_yoy"] = pd.to_numeric(fr["sq_net_yoy"], errors="coerce")
     fr["sq_net_profit"] = pd.to_numeric(fr["sq_net_profit"], errors="coerce")
     fr["roe"] = pd.to_numeric(fr["roe"], errors="coerce")
+    con = sqlite3.connect(f"file:{CACHE / 'finance_ts.db'}?mode=ro&immutable=1", uri=True)
+    ann = pd.read_sql("SELECT code,end_date,ann_date FROM financials_ts", con)
+    con.close()
+    ann["code"] = ann["code"].astype(str).str[:6]
+    ann["period"] = ann["end_date"].astype(str).str.replace("-", "").str[:8]
+    ann["ann_date"] = pd.to_datetime(ann["ann_date"], errors="coerce")
+    ann = ann.sort_values("ann_date").drop_duplicates(["code", "period"], keep="last")
+    fr = fr.merge(ann[["code", "period", "ann_date"]], on=["code", "period"], how="left")
     return fr
+
+
+def _asof_by_code(left, right, left_on, right_on):
+    """逐股票向后 as-of；确保每个月只看到当时已公告的财务数据。"""
+    pieces = []
+    right_groups = {code: g.sort_values(right_on) for code, g in right.groupby("code")}
+    for code, group in left.groupby("code"):
+        rg = right_groups.get(code)
+        if rg is None or rg.empty:
+            continue
+        if "end_date" in rg.columns:
+            rg = rg.copy()
+            rg["end_date"] = pd.to_datetime(rg["end_date"], errors="coerce")
+            rg = rg[rg["end_date"].notna()].sort_values([right_on, "end_date"])
+            # 晚披露的旧期修订不能盖过已经披露的新季度；只保留报告期前沿。
+            rg = rg[rg["end_date"].eq(rg["end_date"].cummax())]
+            if rg.empty:
+                continue
+        lg = group.sort_values(left_on)
+        merged = pd.merge_asof(
+            lg, rg.drop(columns=["code"]), left_on=left_on, right_on=right_on,
+            direction="backward", allow_exact_matches=True,
+        )
+        merged["code"] = code
+        pieces.append(merged)
+    return pd.concat(pieces, ignore_index=True) if pieces else pd.DataFrame()
 
 
 def _break_net():
@@ -149,19 +199,27 @@ def _break_net():
     mv = pd.read_sql("SELECT month, code, circ_mv FROM hist_mv", con)
     con.close()
     con = sqlite3.connect(f"file:{CACHE / 'finance_ts.db'}?mode=ro&immutable=1", uri=True)
-    fs = pd.read_sql("SELECT code, end_date, total_hldr_eqy_exc_min_int FROM financials_ts", con)
+    fs = pd.read_sql(
+        "SELECT code,end_date,ann_date,total_hldr_eqy_exc_min_int FROM financials_ts", con
+    )
     con.close()
     mv["month"] = mv["month"].astype(str).str.replace("-", "").str[:6]
     mv["code"] = mv["code"].astype(str).str[:6]
     fs["code"] = fs["code"].astype(str).str[:6]
-    fs["end_date"] = fs["end_date"].astype(str).str[:10].str.replace("-", "").str[:8]
-    fs = fs[fs["total_hldr_eqy_exc_min_int"].notna()].sort_values("end_date").drop_duplicates(subset="code", keep="last")
-    m = mv.merge(fs, on="code", how="inner")
+    mv["day"] = pd.to_datetime(mv["month"] + "01") + pd.offsets.MonthEnd(0)
+    fs["ann_date"] = pd.to_datetime(fs["ann_date"], errors="coerce")
+    fs["end_date"] = pd.to_datetime(fs["end_date"], errors="coerce")
+    fs = fs[fs["ann_date"].notna() & fs["total_hldr_eqy_exc_min_int"].notna()]
+    m = _asof_by_code(
+        mv, fs[["code", "end_date", "ann_date", "total_hldr_eqy_exc_min_int"]],
+        "day", "ann_date"
+    )
+    if m.empty:
+        return pd.DataFrame(columns=["code", "day", "pb"])
     m["circ_mv"] = pd.to_numeric(m["circ_mv"], errors="coerce")
     m["nav"] = pd.to_numeric(m["total_hldr_eqy_exc_min_int"], errors="coerce")
     m = m[(m["circ_mv"] > 0) & (m["nav"] > 0)]
     m["pb"] = m["circ_mv"] * 1e8 / m["nav"]   # circ_mv 单位=亿元 → 换算成元再除以净资产
-    m["day"] = pd.to_datetime(m["month"] + "01") + pd.offsets.MonthEnd(0)
     return m[["code", "day", "pb"]]
 
 
@@ -203,7 +261,16 @@ def _fwd_winrate(daily, hs300, events, sector_map, horizon=HORIZON):
 def sector_strong_factors(sector):
     """七大机会类型在该板块内的历史胜率排名"""
     daily = _daily()
-    hs300 = pd.read_parquet(HS300_PARQUET)["close"].sort_index()
+    # ★2026-08-22 修复：HS300 缓存缺失时回退 bars.db（SH.000300），避免 read_parquet 抛错
+    if HS300_PARQUET.exists():
+        hs300 = pd.read_parquet(HS300_PARQUET)["close"].sort_index()
+    else:
+        con = sqlite3.connect(f"file:{CACHE / 'bars.db'}?mode=ro&immutable=1", uri=True)
+        rows = con.execute(
+            "SELECT date, close FROM daily_bar WHERE code='SH.000300' AND adjust='none' ORDER BY date"
+        ).fetchall()
+        con.close()
+        hs300 = pd.Series({pd.Timestamp(r[0]): float(r[1]) for r in rows}).sort_index()
     hs300.index = pd.to_datetime(hs300.index)
     fr = _finance()
     bn = _break_net()
@@ -229,13 +296,15 @@ def sector_strong_factors(sector):
     # 低估值：PB < 1
     events["value"] = mk_events(bn[bn["pb"] < 1.0])
     # 质量折价：ROE>15% 且 60日回撤<-25%
-    fr_latest = fr.sort_values("period").drop_duplicates(subset="code", keep="last")
-    q = dd.merge(fr_latest[["code", "roe"]], on="code", how="inner")
+    fr_known = fr[fr["ann_date"].notna()].sort_values("ann_date")
+    q = _asof_by_code(
+        dd, fr_known[["code", "end_date", "ann_date", "roe"]], "day", "ann_date"
+    )
     events["quality_gap"] = mk_events(q[(q["roe"] > 0.15) & (q["dd"] < -0.25)])
-    # 价值重估：单季净利同比 > 50%（公告日近似用月末）
-    fr2 = fr[fr["sq_net_yoy"] > 0.5].sort_values("period").drop_duplicates(subset="code", keep="last")
+    # 价值重估：每次单季净利同比 > 50% 的实际公告日。
+    fr2 = fr[(fr["sq_net_yoy"] > 0.5) & fr["ann_date"].notna()].copy()
     fr2 = fr2.copy()
-    fr2["day"] = pd.to_datetime(fr2["period"]) + pd.offsets.MonthEnd(0)
+    fr2["day"] = fr2["ann_date"]
     events["revalue"] = mk_events(fr2)
     # 反转：60日回撤<-25% 且 20日动量>0
     r = dd.merge(mom, on=["day", "code"], how="inner")
@@ -284,7 +353,7 @@ def stock_search(q, limit=20):
     q = str(q or "").strip()
     if not q:
         return []
-    con = sqlite3.connect(r"data/cache/stock_basic.db")
+    con = sqlite3.connect(str(CACHE / "stock_basic.db"))
     rows = con.execute(
         "SELECT code, name FROM stock_basic WHERE code LIKE ? OR name LIKE ? LIMIT ?",
         (f"%{q}%", f"%{q}%", limit)).fetchall()
@@ -317,7 +386,7 @@ def stock_factors(code):
 
     sec_map = _load_sector_detail()
     sc, sn = sec_map.get(code, ("", ""))
-    con = sqlite3.connect(r"data/cache/stock_basic.db")
+    con = sqlite3.connect(str(CACHE / "stock_basic.db"))
     row = con.execute("SELECT name FROM stock_basic WHERE code=?", (code,)).fetchone()
     con.close()
     name = row[0] if row else ""
@@ -340,7 +409,7 @@ def stock_factors(code):
     hit("event", _n_limup > 0, f"近20日涨停 {_n_limup} 次" if _n_limup else "近20日无涨停")
     hits.sort(key=lambda x: (not x["met"], -x["winrate"]))
 
-    return {"ok": True, "code": code, "name": name, "sector": f"{sc} {sn}".strip(),
+    return {"ok": True, "code": code, "name": name, "sector": (sc or sn or "").strip(),
             "price": round(close, 2),
             "factors": {"dd60": round(dd60*100, 1), "mom20": round(mom20*100, 1),
                         "nh250": round(nh250*100, 1), "vol20": round(vol20*100, 1),
@@ -371,11 +440,15 @@ def sector_pitch(sector, topn=20, strong_factors=None):
     bn = _break_net().sort_values("day").drop_duplicates(subset="code", keep="last").set_index("code")
 
     # 散户涌入排雷（因子池研究 2026-08-15：户数大增=散户追涨 → 剔除）
-    con = sqlite3.connect(r"data/cache/gdhs_full.db")
-    gd = pd.read_sql("SELECT code, chg_pct, ann_date FROM gdhs", con)
-    con.close()
-    gd["code"] = gd["code"].astype(str).str[:6]
-    gd = gd.sort_values("ann_date").drop_duplicates(subset="code", keep="last").set_index("code")
+    # ★2026-08-22 降级：gdhs_full.db（股东户数，外包数据）缺失 → 空表，跳过排雷不报错
+    try:
+        con = sqlite3.connect(str(CACHE / "gdhs_full.db"))
+        gd = pd.read_sql("SELECT code, chg_pct, ann_date FROM gdhs", con)
+        con.close()
+        gd["code"] = gd["code"].astype(str).str[:6]
+        gd = gd.sort_values("ann_date").drop_duplicates(subset="code", keep="last").set_index("code")
+    except Exception:
+        gd = pd.DataFrame(columns=["code", "chg_pct", "ann_date"]).set_index("code")
 
     # 板块强因子（复用已算的，避免重复计算）
     strong = strong_factors if strong_factors is not None else sector_strong_factors(sector)
@@ -384,7 +457,7 @@ def sector_pitch(sector, topn=20, strong_factors=None):
     if not strong_names:
         return {"ok": True, "n_total": len(codes), "n_pitch": 0, "strong_factors": [], "pitch": []}
 
-    con = sqlite3.connect(r"data/cache/stock_basic.db")
+    con = sqlite3.connect(str(CACHE / "stock_basic.db"))
     names = dict(con.execute("SELECT code, name FROM stock_basic").fetchall())
     con.close()
 
@@ -441,7 +514,7 @@ def sector_retail(sector, topn=20):
     if len(codes) < 5:
         return {"ok": False, "n": len(codes), "note": "板块成分不足"}
 
-    con = sqlite3.connect(r"data/cache/stock_basic.db")
+    con = sqlite3.connect(str(CACHE / "stock_basic.db"))
     names = dict(con.execute("SELECT code, name FROM stock_basic").fetchall())
     con.close()
 
@@ -449,11 +522,15 @@ def sector_retail(sector, topn=20):
     fr = _finance().sort_values("period").drop_duplicates(subset="code", keep="last").set_index("code")
 
     # 股东户数（每 code 最新一期）
-    con = sqlite3.connect(r"data/cache/gdhs_full.db")
-    gd = pd.read_sql("SELECT code, chg_pct, ann_date FROM gdhs", con)
-    con.close()
-    gd["code"] = gd["code"].astype(str).str[:6]
-    gd = gd.sort_values("ann_date").drop_duplicates(subset="code", keep="last").set_index("code")
+    # ★2026-08-22 降级：gdhs_full.db（外包数据）缺失 → 空表，跳过散户因子不报错
+    try:
+        con = sqlite3.connect(str(CACHE / "gdhs_full.db"))
+        gd = pd.read_sql("SELECT code, chg_pct, ann_date FROM gdhs", con)
+        con.close()
+        gd["code"] = gd["code"].astype(str).str[:6]
+        gd = gd.sort_values("ann_date").drop_duplicates(subset="code", keep="last").set_index("code")
+    except Exception:
+        gd = pd.DataFrame(columns=["code", "chg_pct", "ann_date"]).set_index("code")
 
     # 换手率：最近20日成交额均值 / 流通市值（★只取 tushare 源，amount 单位一致=千元；baostock 源 amount 单位=元会污染）
     dates = daily.index[-20:]
