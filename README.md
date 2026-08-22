@@ -64,21 +64,29 @@ python launcher.py
 
 123+ 因子，全部 A 股本地实证（PIT / T+1 / 分年度）。九步入池，17+ 项证伪留档。
 
-| 维度 | 代表 | 实证 |
+> **本地实证引擎（2026-08-23）**：外包因子池（`data/factorpool/`）不在开源包内。本仓库自建
+> `factors/alpha_panel.py`（32 因子，11 类全覆盖，本地 bars/finance/hist_mv 向量化）
+> + `scripts/evaluate_all_factors.py`（8 维体检）批量实证：**27/32 因子 ≥50 分弱有效以上**，
+> 强有效代表：sue 95.1 / accruals 92.6 / amihud 90.8 / o2c_sum_20 80.5 / open_prem_20 76.2；
+> 换手/低波/涨停族为反向强有效（A 股反转市实证方向）。另含 `factors/alphagpt/`（AlphaGPT
+> 公式语言 A 股蒸馏版：词表 + StackVM + 随机/LLM 生成器 + ICIR 奖励挖掘循环）。
+
+| 维度 | 代表 | 本地实证（2020-2025，可复现） |
 |---|---|---|
-| 换手率 | turn_mid_prox / turnover / turn_std20 | turn_mid_prox ICIR 0.87 |
-| 低波动 | lowvol / std20 / downside_vol | 防守底仓主力 |
-| 反转 | reversal20 / o2c 日内反转族 | limup_ex_5 ICIR 1.24 |
-| 流动性 | amihud | 0.43，多空夏普 1.12 |
-| 彩票/偏度 | max_ret20 / skew20 / rmax | max_ret20 0.64 |
-| 振幅/动量 | amp20 / open_prem_20 | open_prem_20 0.96 |
-| 基本面低频 | f_score / sue / accruals / asset_growth / bp | f_score 120日 0.49 |
-| 短线涨跌停 | limit_up_* / consec_limit_down | 跌停排雷 0.97 |
-| 机构行为 | lhb_jg_cnt_20 / shebao_chg | lhb 0.90 |
-| 行业层 | ind_crowd_60 / ind_rs_20 | 拥挤 0.30 |
-| Alpha101 | alpha015 / alpha050 / alpha006 / alpha003 / alpha044 | alpha015 0.76 |
+| 换手率 | turn_mid_prox / turnover / turn_std20 | 反向强有效（IC ≈ -0.09，ICIR ≈ -0.5） |
+| 低波动 | lowvol / std20 / downside_vol | 反向强有效（低波=好） |
+| 反转 | reversal20 / o2c 日内反转族 | o2c_sum_20 正向强有效 80.5 |
+| 流动性 | amihud | 正向强有效 90.8（ICIR 0.54） |
+| 彩票/偏度 | max_ret20 / skew20 / rmax | 反向有效（IC ≈ -0.09） |
+| 振幅/动量 | amp20 / open_prem_20 | open_prem_20 正向强有效 76.2 |
+| 基本面低频 | f_score / sue / accruals / asset_growth / bp | sue 95.1 / accruals 92.6 强有效 |
+| 短线涨跌停 | limit_up_* / consec_limit_down | limit_up_cnt_20 反向强有效 74.4 |
+| 机构行为 | lhb_jg_cnt_20 / shebao_chg | 需龙虎榜/社保数据源（未接入） |
+| 行业层 | ind_crowd_60 / ind_rs_20 | 边缘（40-44 分） |
+| Alpha101 | alpha015 / alpha050 / alpha006 / alpha003 / alpha044 | alpha003/006/015 强有效（71-78） |
 
 来源：学术复现 · 开源策略库复刻 · 事件驱动实证 · 牛散蒸馏 · AI 自动挖掘 · 机构资金行为。
+完整评分卡：`report/因子评估报告_全量.md`（每次 `python scripts/evaluate_all_factors.py` 重跑）。
 
 ## Skill
 
