@@ -19,30 +19,23 @@ MAX_DEPTH = 6
 
 
 def random_formula(max_depth: int = MAX_DEPTH) -> list:
-    """生成一条随机合法公式（token id 列表，栈平衡单值结束）"""
+    """生成一条随机合法公式（token id 列表，后缀表达式，栈平衡单值结束）
+    ★2026-08-23 修复：递归构建（原 while 循环条件恒假 → 只产单特征 → 去重后死循环）"""
     feat_count = FORMULA_VOCAB.feature_count
     n_ops = len(OP_IDS)
-    stack = 1
-    tokens = [random.randrange(feat_count)]
-    steps = 0
-    while stack > 1 and steps < 24:
-        steps += 1
-        # 若深度已达上限 → 只能压特征
-        if stack >= max_depth:
-            tokens.append(random.randrange(feat_count))
-            stack += 1
-            continue
-        if random.random() < 0.35:
-            # 压算子（需要 stack 足够）
-            op_id = random.randrange(n_ops) + feat_count
-            arity = _arity_of(op_id)
-            if stack >= arity:
-                tokens.append(op_id)
-                stack = stack - arity + 1
-        else:
-            tokens.append(random.randrange(feat_count))
-            stack += 1
-    return tokens
+
+    def gen(depth: int) -> list:
+        # 叶子：特征（保证推进）；非叶子：算子 + 递归操作数
+        if depth <= 1 or random.random() < 0.55:
+            return [random.randrange(feat_count)]
+        op_id = random.randrange(n_ops) + feat_count
+        arity = _arity_of(op_id)
+        parts = []
+        for _ in range(arity):
+            parts += gen(depth - 1)
+        return parts + [op_id]
+
+    return gen(max_depth)
 
 
 def _arity_of(op_id: int) -> int:

@@ -40,25 +40,21 @@ def _op_max3(x):
 
 
 def _op_tsmean(x, n=20):
-    out = np.full_like(x, np.nan)
-    for i in range(x.shape[0]):
-        lo = max(0, i - n + 1)
-        out[i] = np.nanmean(x[lo:i + 1], axis=0)
-    return out
+    """时间序列均值（pandas rolling 向量化）"""
+    import pandas as pd
+    return pd.DataFrame(x).rolling(n, min_periods=1).mean().to_numpy()
 
 
 def _op_tsstd(x, n=20):
-    out = np.full_like(x, np.nan)
-    for i in range(x.shape[0]):
-        lo = max(0, i - n + 1)
-        out[i] = np.nanstd(x[lo:i + 1], axis=0)
-    return out
+    import pandas as pd
+    return pd.DataFrame(x).rolling(n, min_periods=1).std().to_numpy()
 
 
 def _op_tsrank(x, n=20):
-    """时间序列分位：当前值在过去 n 天窗口内的位置分位（0-1）"""
+    """时间序列分位：当前值在过去 n 天窗口内的位置分位（0-1，滑动窗口广播向量化）"""
     out = np.full_like(x, np.nan)
-    for i in range(x.shape[0]):
+    T = x.shape[0]
+    for i in range(T):
         lo = max(0, i - n + 1)
         win = x[lo:i + 1]
         with np.errstate(invalid="ignore"):
@@ -67,16 +63,10 @@ def _op_tsrank(x, n=20):
 
 
 def _op_csrank(x):
-    """截面分位（每日全市场 rank，0-1）"""
-    out = np.full_like(x, np.nan)
-    for i in range(x.shape[0]):
-        row = x[i]
-        valid = ~np.isnan(row)
-        if valid.sum() < 5:
-            continue
-        ranks = np.argsort(np.argsort(row[valid])) / (valid.sum() - 1)
-        out[i, valid] = ranks
-    return out
+    """截面分位（每日全市场 rank，0-1；列数远小于天数 → 转置循环更快）"""
+    import pandas as pd
+    df = pd.DataFrame(x.T)
+    return df.rank(axis=1, pct=True).to_numpy().T
 
 
 OPS_CONFIG = [
