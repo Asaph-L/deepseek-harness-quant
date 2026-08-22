@@ -2753,6 +2753,45 @@ def live_timing_dash() -> dict:
 _fd_cache = {"ts": 0, "data": None}
 
 
+def _load_local_factor_dash(out: dict):
+    """★2026-08-23 本地因子实证 fallback（外包 data/factorpool 缺失时）：
+    读 scripts/evaluate_all_factors.py 的 output/factor_evaluations_full.json，
+    填充 manifest（当前因子表）+ health（风控层分组）"""
+    try:
+        _fp = BASE / "output" / "factor_evaluations_full.json"
+        if not _fp.exists():
+            return
+        _evals = json.loads(_fp.read_text(encoding="utf-8"))
+        factors, health_rows, categories = [], [], {}
+        for _name, _r in _evals.items():
+            _sc = _r.get("scorecard") or {}
+            _ic = _r.get("ic") or {}
+            _layer = _r.get("layer") or {}
+            _fam = _r.get("family", "其他") or "其他"
+            _dir = _r.get("direction", 1)
+            _status = _sc.get("verdict") or "数据不足"
+            factors.append({
+                "code": _name, "name_cn": _name, "category": _fam,
+                "direction": _dir, "icir_60": _ic.get("icir"),
+                "ic": _ic.get("rank_ic_mean"), "status": _status,
+                "score": _sc.get("score"),
+            })
+            health_rows.append({
+                "factor": _name, "status": _status,
+                "icir120": _ic.get("icir"), "t120": _layer.get("ls_t"),
+                "family": _fam, "local": True,
+            })
+            categories[_fam] = categories.get(_fam, 0) + 1
+        out["manifest"] = {"date": "本地实证", "n": len(factors), "factors": factors,
+                           "health_date": "", "health_stale": False, "local": True}
+        out["health"] = {"date": "本地实证", "n": len(health_rows), "rows": health_rows,
+                         "local": True}
+        out["categories"] = categories
+        out["local_fallback"] = True
+    except Exception:
+        pass
+
+
 def live_factor_dash() -> dict:
     """因子池全景单 API 聚合（60s 缓存）：
     manifest（95 因子全量）+ health（83 体检）+ flags（6 反向信号命中数）+
@@ -2763,6 +2802,12 @@ def live_factor_dash() -> dict:
         return _fd_cache["data"]
     out = {"ok": True, "schema_version": "1.0", "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
     _SD = "data/factorpool/output"
+    # ★2026-08-23 本地 fallback：外包因子池（data/factorpool/）缺失时，用本地实证
+    #   （scripts/evaluate_all_factors.py → output/factor_evaluations_full.json）填充 manifest/health
+    if not os.path.isdir(_SD):
+        _load_local_factor_dash(out)
+        _fd_cache.update({"ts": _now, "data": out})
+        return out
     try:
         # 1) manifest 全因子（mtime 取最新）
         _mf = sorted(glob.glob(_SD + "/factor_manifest_*.json"), key=os.path.getmtime)
