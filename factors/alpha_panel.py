@@ -61,7 +61,7 @@ DIRECTION = {
     # 行业层
     "ind_crowd_60": -1, "ind_rs_20": 1,
     # 机构行为（龙虎榜 + 社保）
-    "lhb_cnt_20": 1, "lhb_jg_cnt_20": 1, "shebao_hold": 1, "shebao_chg": 1,
+    "lhb_cnt_20": -1, "lhb_jg_cnt_20": -1, "shebao_hold": 1, "shebao_chg": 1,  # ★实证 IC 负 → 反用
     # Alpha101
     "alpha003": 1, "alpha006": 1, "alpha015": 1, "alpha044": 1, "alpha050": 1,
 }
@@ -617,26 +617,29 @@ def save_panels(panels: dict, start: str = DEFAULT_START):
 
 
 def load_panels(start: str = DEFAULT_START, names: list = None) -> dict:
-    """读缓存面板；缺失/元数据不符时重算"""
+    """读缓存面板；缺失/元数据不符时重算；新因子增量补算（★2026-08-23）"""
+    want = names or list(FACTOR_FUNCS.keys())
     meta = PANEL_CACHE_DIR / "meta.json"
+    out = {}
     if meta.exists():
         try:
             m = json.loads(meta.read_text(encoding="utf-8"))
             if m.get("start") == start:
-                want = names or m["names"]
-                out = {}
                 for n in want:
                     fp = PANEL_CACHE_DIR / f"{n}.parquet"
                     if fp.exists():
                         out[n] = pd.read_parquet(fp)
-                if len(out) == len(want):
-                    print(f"缓存命中 {PANEL_CACHE_DIR}（{len(out)} 因子，start={start}）")
-                    return out
         except Exception:
             pass
-    panels = compute_all(start=start, names=names)
-    save_panels(panels, start)
-    return panels
+    missing = [n for n in want if n not in out]
+    if missing:
+        print(f"补算缺失因子 {len(missing)} 个: {missing}")
+        extra = compute_all(start=start, names=missing)
+        out.update(extra)
+        save_panels(out, start)
+    if out:
+        print(f"面板就绪（{len(out)}/{len(want)} 因子，start={start}）")
+    return out
 
 
 def compute_all(start: str = DEFAULT_START, end: str = None,
