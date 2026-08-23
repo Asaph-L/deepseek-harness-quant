@@ -38,6 +38,7 @@ BASIC_DB = BASE / "data" / "cache" / "stock_basic.db"
 DEFAULT_START = "2019-01-01"
 LHB_DB = BASE / "data" / "cache" / "lhb.db"
 SHEBAO_DB = BASE / "data" / "cache" / "shebao.db"
+GDHS_DB = BASE / "data" / "cache" / "gdhs_full.db"
 
 # 因子方向（A 股实证方向：+1 值越大越好 / -1 值越小越好；与 params.yaml factors.direction 同语义）
 DIRECTION = {
@@ -62,6 +63,7 @@ DIRECTION = {
     "ind_crowd_60": -1, "ind_rs_20": 1,
     # 机构行为（龙虎榜 + 社保）
     "lhb_cnt_20": -1, "lhb_jg_cnt_20": -1, "shebao_hold": 1, "shebao_chg": 1,  # ★实证 IC 负 → 反用
+    "gdhs_chg_pct": -1,  # 股东户数大增 = 散户涌入 = 负向
     # Alpha101
     "alpha003": 1, "alpha006": 1, "alpha015": 1, "alpha044": 1, "alpha050": 1,
 }
@@ -80,6 +82,7 @@ FAMILY = {
     "ind_crowd_60": "行业层", "ind_rs_20": "行业层",
     "lhb_cnt_20": "机构行为", "lhb_jg_cnt_20": "机构行为",
     "shebao_hold": "机构行为", "shebao_chg": "机构行为",
+    "gdhs_chg_pct": "机构行为",
     "alpha003": "Alpha101", "alpha006": "Alpha101", "alpha015": "Alpha101",
     "alpha044": "Alpha101", "alpha050": "Alpha101",
 }
@@ -213,6 +216,47 @@ def _f_shebao_chg(P):
         if col is not None:
             out[col] = chg
     return out
+_gdhs_cache = {"ts": 0.0, "data": None}
+
+
+def _load_gdhs() -> pd.DataFrame:
+    """股东户数（data/cache/gdhs_full.db，tushare stk_holdernumber 2026-08-23 接入）"""
+    global _gdhs_cache
+    import time as _t
+    now = _t.time()
+    if _gdhs_cache["data"] is not None and now - _gdhs_cache["ts"] < 300:
+        return _gdhs_cache["data"]
+    out = pd.DataFrame()
+    if GDHS_DB.exists():
+        try:
+            con = sqlite3.connect(f"file:{GDHS_DB}?mode=ro&immutable=1", uri=True)
+            out = pd.read_sql("SELECT * FROM gdhs", con)
+            con.close()
+            if not out.empty:
+                out["ann"] = pd.to_datetime(out["ann_date"], errors="coerce")
+        except Exception:
+            pass
+    _gdhs_cache.update({"ts": now, "data": out})
+    return out
+
+
+def _f_gdhs_chg_pct(P):
+    """最新披露股东户数变化率（PIT：ann_date 生效；>10%=散户涌入，<0=筹码集中）"""
+    g = _load_gdhs()
+    idx = P["close"].index
+    out = pd.DataFrame(np.nan, index=idx, columns=P["close"].columns)
+    if g.empty:
+        return out
+    code_map = {str(c).split(".")[0]: c for c in P["close"].columns}
+    g = g[g["ann"].notna()].sort_values(["ts_code", "ann"])
+    g = g.drop_duplicates("ts_code", keep="last")
+    g["code6"] = g["ts_code"].astype(str).str[:6]
+    for _, r in g.iterrows():
+        col = code_map.get(r["code6"])
+        if col is not None and pd.notna(r.get("chg_pct")):
+            out[col] = float(r["chg_pct"])
+    return out
+
 
 
 # ---------------- 数据加载 ----------------
@@ -571,6 +615,7 @@ FACTOR_FUNCS = {
     "ind_crowd_60": _f_ind_crowd_60, "ind_rs_20": _f_ind_rs_20,
     "lhb_cnt_20": _f_lhb_cnt_20, "lhb_jg_cnt_20": _f_lhb_jg_cnt_20,
     "shebao_hold": _f_shebao_hold, "shebao_chg": _f_shebao_chg,
+    "gdhs_chg_pct": _f_gdhs_chg_pct,
     "alpha003": _f_alpha003, "alpha006": _f_alpha006, "alpha015": _f_alpha015,
     "alpha044": _f_alpha044, "alpha050": _f_alpha050,
     # 基本面（PIT）

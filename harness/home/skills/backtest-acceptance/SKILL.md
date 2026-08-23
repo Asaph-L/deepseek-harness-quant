@@ -1,11 +1,11 @@
 ---
 name: backtest-acceptance
-description: 回测验收标准与引擎调用指南（deepseek-harness-quant 定稿口径）。T+1/成本/数据边界/口径披露清单 + 如何编写回测程序、调用回测引擎（bt_runner）、把结果放入回测归档（output/backtest_archive/）。当用户要求"回测/验证策略/上传回测/跑回测/把结果放进回测结果"时使用。
+description: 回测验收标准与引擎调用指南（canslim-quant 定稿口径）。T+1/成本/数据边界/口径披露清单 + 如何编写回测程序、调用回测引擎（bt_runner）、把结果放入回测归档（output/backtest_archive/）。当用户要求"回测/验证策略/上传回测/跑回测/把结果放进回测结果"时使用。
 whenToUse: 用户提到回测、策略验证、回测验收、把策略跑一遍、结果放回测结果里、新增策略回测。
 metadata:
   version: v1.0
   created: 2026-08-16
-  scope: deepseek-harness-quant（主系统）
+  scope: canslim-quant（主系统）
 ---
 
 # 回测验收标准与引擎调用指南（v1.0）
@@ -54,7 +54,7 @@ metadata:
 
 ### 1. 动态回测（推荐：即时跑 + 自动归档）
 ```python
-# 在 deepseek-harness-quant 仓库根运行
+# 在 canslim-quant 仓库根运行
 from backtest.bt_runner import run_backtest, list_strategies
 
 print(list_strategies())                       # 策略目录（前端菜单同源）
@@ -77,7 +77,7 @@ print(r["metrics"])                            # 年化/回撤/夏普/索提诺/
 
 ### 3. 独立回测脚本（自定义流程时）
 ```python
-import sys; sys.path.insert(0, r"<deepseek-harness-quant 根>")
+import sys; sys.path.insert(0, r"<canslim-quant 根>")
 from data.cache import DailyCache            # 唯一数据读取接口
 from backtest.bt_report import archive, compute_metrics
 
@@ -113,7 +113,7 @@ archive(returns, params={"name": "我的策略", "strategy": "my_custom"},
 ---
 
 ## 参考
-- 引擎：`deepseek-harness-quant/backtest/bt_runner.py`、`bt_report.py`（归档/指标）
-- 因子全量回测：`deepseek-harness-quant/backtest/backtest_all_factors.py`
-- 数据读取：`deepseek-harness-quant/data/cache.py`
+- 引擎：`canslim-quant/backtest/bt_runner.py`、`bt_report.py`（归档/指标）
+- 因子全量回测：`canslim-quant/backtest/backtest_all_factors.py`
+- 数据读取：`canslim-quant/data/cache.py`
 - 前端：`/backtest`（策略目录 API：`/api/live/backtest_strategies`）

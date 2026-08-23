@@ -178,6 +178,20 @@ def main():
         raw_m = raw.reindex(month_ends)
         raw_m = raw_m.apply(lambda s: s.clip(s.quantile(0.01), s.quantile(0.99)), axis=0)
         ic = ic_stats(_monthly_ic(raw_m, labels20))
+        # ★年度 IC 时序（lifecycle 生命周期图数据：每年 RankIC 均值）
+        yearly_ic = {}
+        for m in raw_m.index:
+            if m not in labels20.index:
+                continue
+            vals = raw_m.loc[m].dropna()
+            labs = labels20.loc[m]
+            common = vals.index.intersection(labs.dropna().index)
+            if len(common) < 30:
+                continue
+            y = pd.Timestamp(m).year
+            c = vals[common].rank().corr(labs[common].rank(), method="spearman")
+            yearly_ic.setdefault(str(y), []).append(c)
+        yearly = {y: round(float(np.mean(v)), 4) for y, v in yearly_ic.items()}
         layer = layered(raw_m, labels20)
         turnover = factor_turnover_v(raw_m)
         decay = decay_curve_v(raw_m, close_panel, month_ends)
@@ -189,7 +203,8 @@ def main():
         sc = score_card(ic, layer, turnover, decay, temporal, DIRECTION.get(name, 1))
         results[name] = {"family": FAMILY.get(name, ""), "direction": DIRECTION.get(name, 1),
                          "ic": ic, "layer": layer, "turnover": turnover,
-                         "decay": decay, "temporal": temporal, "scorecard": sc}
+                         "decay": decay, "temporal": temporal, "scorecard": sc,
+                         "yearly_ic": yearly}
         if ic:
             print(f"  {sc['verdict']} 分{sc['score']} | IC {ic['rank_ic_mean']:.4f} "
                   f"ICIR {ic['icir']:.3f} 胜率 {ic['ic_win_rate']:.0%} 单调 {layer.get('monotonicity')} "

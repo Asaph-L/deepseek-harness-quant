@@ -2370,6 +2370,20 @@ def live_factor_ui_pack() -> dict:
     out = {"ok": True, "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
            "usage": {}, "lifecycle": {}, "corr": {}, "frc_rules": {}, "freshness": {},
            "style_rotation": {}, "alert_rules": {}}
+    # ★2026-08-23 本地 fallback：外包 ui_data 缺失 → 读本地生成
+    #   output/factor_corr_local.json（scripts/build_factor_corr.py：相关矩阵/生命周期/用途/时效）
+    if not _UI_DATA_DIR.is_dir():
+        try:
+            _loc = BASE / "output" / "factor_corr_local.json"
+            if _loc.exists():
+                _d = json.loads(_loc.read_text(encoding="utf-8"))
+                for _k in ("usage", "lifecycle", "corr", "freshness"):
+                    if _d.get(_k):
+                        out[_k] = _clean_nan(_d[_k])
+                out["local_fallback"] = True
+                return out
+        except Exception:
+            pass
     def _latest(prefix):
         try:
             fs = sorted(_UI_DATA_DIR.glob(f"{prefix}_*.json"), key=lambda p: p.stat().st_mtime)
@@ -2787,6 +2801,19 @@ def _load_local_factor_dash(out: dict):
         out["health"] = {"date": "本地实证", "n": len(health_rows), "rows": health_rows,
                          "local": True}
         out["categories"] = categories
+        # ★拥挤度（本地重建 scripts/rebuild_factor_reports.py）
+        _cf = sorted(glob.glob(str(BASE / "report" / "factor_crowding_*.json")),
+                     key=os.path.getmtime)
+        if _cf:
+            try:
+                _cj = json.loads(Path(_cf[-1]).read_text(encoding="utf-8"))
+                out["crowding"] = {
+                    "mkt": _cj.get("crowding_mkt"), "pctile": _cj.get("crowding_pctile_252"),
+                    "zone": _cj.get("zone"), "n_crowded": _cj.get("n_crowded_stocks"),
+                    "date": _cj.get("date"), "local": True,
+                }
+            except Exception:
+                pass
         out["local_fallback"] = True
     except Exception:
         pass

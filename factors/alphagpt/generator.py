@@ -63,40 +63,47 @@ def names_of(tokens: list) -> list:
 def llm_generate(api_key: str = None, base_url: str = "https://api.deepseek.com",
                  n: int = 10, extra_hint: str = "") -> list:
     """LLM 生成公式（DeepSeek API，可选）。无 key 返回 []（走随机生成器）。
-    提示词工程：给出词表与合法语法，要求只输出 token 名序列。"""
+    ★2026-08-23 修复：① 按 n 发多次请求（原 1 次只回 1 行）② 过滤词表外 token 的行
+    （LLM 会编造不存在的特征，如 CSMIX——整条含未知 token 即拒）③ 提示词明确禁止编造"""
     if not api_key:
         return []
     import json
     import urllib.request
     feat_names = "、".join(FORMULA_VOCAB.feature_names)
     op_names = "、".join(FORMULA_VOCAB.operator_names)
-    prompt = (
-        f"你是 A 股因子挖掘引擎。用下面的词表生成一条合法因子公式（后缀表达式，栈式求值，"
-        f"最终栈深=1）。\n特征：{feat_names}\n算子：{op_names}（二元算子用前两个操作数，"
-        f"GATE 三元：cond,x,y）\n{extra_hint}\n"
-        "只输出一行 token 名，空格分隔，例如：RET20 TSRANK20 CSRANK NEG\n"
-    )
-    req = urllib.request.Request(
-        base_url + "/chat/completions",
-        data=json.dumps({
-            "model": "deepseek-chat",
-            "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 200, "temperature": 1.0,
-        }).encode(),
-        headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"})
+    vocab_set = set(FORMULA_VOCAB.token_names)
     out = []
-    try:
-        with urllib.request.urlopen(req, timeout=60) as r:
-            d = json.loads(r.read().decode())
-        for choice in d.get("choices", []):
-            text = choice.get("message", {}).get("content", "")
-            for line in text.splitlines():
-                names = [x.strip() for x in line.replace("，", " ").split() if x.strip()]
-                if names and _valid_names(names):
-                    out.append(FORMULA_VOCAB.encode(names))
-    except Exception:
-        pass
-    return out
+    for _ in range(max(1, min(n, 8))):
+        prompt = (
+            f"你是 A 股因子挖掘引擎。用下面的词表生成一条合法因子公式（后缀表达式，栈式求值，"
+            f"最终栈深=1）。\n特征：{feat_names}\n算子：{op_names}（二元算子用前两个操作数，"
+            f"GATE 三元：cond,x,y）\n{extra_hint}\n"
+            "【硬性要求】只能使用上述词表中的 token，禁止编造任何不存在的名字。"
+            "只输出一行 token 名，空格分隔，例如：RET20 TSRANK20 CSRANK NEG\n"
+        )
+        req = urllib.request.Request(
+            base_url + "/chat/completions",
+            data=json.dumps({
+                "model": "deepseek-chat",
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 200, "temperature": 1.1,
+            }).encode(),
+            headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"})
+        try:
+            with urllib.request.urlopen(req, timeout=60) as r:
+                d = json.loads(r.read().decode())
+            for choice in d.get("choices", []):
+                text = choice.get("message", {}).get("content", "")
+                for line in text.splitlines():
+                    names = [x.strip() for x in line.replace("，", " ").split() if x.strip()]
+                    # ★过滤含词表外 token 的行（LLM 编造如 CSMIX）
+                    if not names or not all(x in vocab_set for x in names):
+                        continue
+                    if _valid_names(names) and names not in out:
+                        out.append(names)
+        except Exception:
+            pass
+    return [FORMULA_VOCAB.encode(x) for x in out]
 
 
 def _valid_names(names: list) -> bool:
