@@ -36,6 +36,8 @@ MV_DB = BASE / "data" / "cache" / "hist_mv.db"
 BASIC_DB = BASE / "data" / "cache" / "stock_basic.db"
 
 DEFAULT_START = "2019-01-01"
+LHB_DB = BASE / "data" / "cache" / "lhb.db"
+SHEBAO_DB = BASE / "data" / "cache" / "shebao.db"
 
 # 因子方向（A 股实证方向：+1 值越大越好 / -1 值越小越好；与 params.yaml factors.direction 同语义）
 DIRECTION = {
@@ -58,6 +60,8 @@ DIRECTION = {
     "consec_limit_down": -1,
     # 行业层
     "ind_crowd_60": -1, "ind_rs_20": 1,
+    # 机构行为（龙虎榜 + 社保）
+    "lhb_cnt_20": 1, "lhb_jg_cnt_20": 1, "shebao_hold": 1, "shebao_chg": 1,
     # Alpha101
     "alpha003": 1, "alpha006": 1, "alpha015": 1, "alpha044": 1, "alpha050": 1,
 }
@@ -74,9 +78,141 @@ FAMILY = {
     "limit_up_cnt_20": "短线涨跌停", "consec_limit_up": "短线涨跌停",
     "limit_down_cnt_20": "短线涨跌停", "consec_limit_down": "短线涨跌停",
     "ind_crowd_60": "行业层", "ind_rs_20": "行业层",
+    "lhb_cnt_20": "机构行为", "lhb_jg_cnt_20": "机构行为",
+    "shebao_hold": "机构行为", "shebao_chg": "机构行为",
     "alpha003": "Alpha101", "alpha006": "Alpha101", "alpha015": "Alpha101",
     "alpha044": "Alpha101", "alpha050": "Alpha101",
 }
+
+
+# ---------------- 龙虎榜（机构行为族） ----------------
+
+_lhb_cache = {"ts": 0.0, "data": None}
+
+
+def _load_lhb() -> dict:
+    """龙虎榜数据（data/cache/lhb.db，tushare top_list + top_inst 2026-08-23 接入）：
+    返回 {code6: DataFrame(index=trade_date, cnt=上榜次数, jg=机构专用净买次数)}"""
+    global _lhb_cache
+    import time as _t
+    now = _t.time()
+    if _lhb_cache["data"] is not None and now - _lhb_cache["ts"] < 300:
+        return _lhb_cache["data"]
+    out = {}
+    if not LHB_DB.exists():
+        return out
+    try:
+        con = sqlite3.connect(f"file:{LHB_DB}?mode=ro&immutable=1", uri=True)
+        tl = pd.read_sql("SELECT trade_date, ts_code FROM top_list", con)
+        ti = pd.read_sql("SELECT trade_date, ts_code, exalterate, net_buy FROM top_inst", con)
+        con.close()
+        for name, df in (("cnt", tl), ("jg", ti)):
+            if df.empty:
+                continue
+            df["code6"] = df["ts_code"].astype(str).str[:6]
+            df["trade_date"] = pd.to_datetime(df["trade_date"])
+            if name == "jg":
+                df = df[df["exalterate"].astype(str).str.contains("机构专用")]
+                df = df[df["net_buy"].astype(float) > 0]
+            g = df.groupby("code6")
+            for c6, gd in g:
+                d = gd.groupby("trade_date").size()
+                d.name = name
+                if c6 not in out:
+                    out[c6] = d.to_frame()
+                else:
+                    out[c6] = out[c6].join(d, how="outer")
+    except Exception:
+        pass
+    _lhb_cache.update({"ts": now, "data": out})
+    return out
+
+
+def _f_lhb_cnt_20(P):
+    """近 20 交易日龙虎榜上榜次数"""
+    lhb = _load_lhb()
+    idx = P["close"].index
+    out = pd.DataFrame(0.0, index=idx, columns=P["close"].columns)
+    code_map = {str(c).split(".")[0]: c for c in P["close"].columns}
+    for c6, d in lhb.items():
+        col = code_map.get(c6)
+        if col is None or "cnt" not in d:
+            continue
+        out[col] = d["cnt"].reindex(idx).fillna(0).rolling(20, min_periods=1).sum()
+    return out
+
+
+def _f_lhb_jg_cnt_20(P):
+    """近 20 交易日机构专用席位净买次数"""
+    lhb = _load_lhb()
+    idx = P["close"].index
+    out = pd.DataFrame(0.0, index=idx, columns=P["close"].columns)
+    code_map = {str(c).split(".")[0]: c for c in P["close"].columns}
+    for c6, d in lhb.items():
+        col = code_map.get(c6)
+        if col is None or "jg" not in d:
+            continue
+        out[col] = d["jg"].reindex(idx).fillna(0).rolling(20, min_periods=1).sum()
+    return out
+
+
+# ---------------- 社保基金（机构行为族） ----------------
+
+_shebao_cache = {"ts": 0.0, "data": None}
+
+
+def _load_shebao() -> pd.DataFrame:
+    """社保持仓（data/cache/shebao.db，tushare top10_holders 过滤社保组合 2026-08-23）：
+    返回长表 code6/end_date/holder_name/hold_amount/hold_ratio/hold_change"""
+    global _shebao_cache
+    import time as _t
+    now = _t.time()
+    if _shebao_cache["data"] is not None and now - _shebao_cache["ts"] < 300:
+        return _shebao_cache["data"]
+    out = pd.DataFrame()
+    if SHEBAO_DB.exists():
+        try:
+            con = sqlite3.connect(f"file:{SHEBAO_DB}?mode=ro&immutable=1", uri=True)
+            out = pd.read_sql("SELECT * FROM shebao", con)
+            con.close()
+            if not out.empty:
+                out["code6"] = out["ts_code"].astype(str).str[:6]
+        except Exception:
+            pass
+    _shebao_cache.update({"ts": now, "data": out})
+    return out
+
+
+def _f_shebao_hold(P):
+    """社保组合持有比例合计（最新报告期，PIT 前向填充）"""
+    sb = _load_shebao()
+    idx = P["close"].index
+    out = pd.DataFrame(0.0, index=idx, columns=P["close"].columns)
+    if sb.empty:
+        return out
+    g = sb.groupby("code6")["hold_ratio"].sum()
+    code_map = {str(c).split(".")[0]: c for c in P["close"].columns}
+    for c6, ratio in g.items():
+        col = code_map.get(c6)
+        if col is not None:
+            out[col] = ratio
+    return out
+
+
+def _f_shebao_chg(P):
+    """社保组合持股变化合计（hold_change，正=加仓）"""
+    sb = _load_shebao()
+    idx = P["close"].index
+    out = pd.DataFrame(0.0, index=idx, columns=P["close"].columns)
+    if sb.empty:
+        return out
+    g = sb.groupby("code6")["hold_change"].sum()
+    code_map = {str(c).split(".")[0]: c for c in P["close"].columns}
+    for c6, chg in g.items():
+        col = code_map.get(c6)
+        if col is not None:
+            out[col] = chg
+    return out
 
 
 # ---------------- 数据加载 ----------------
@@ -433,6 +569,8 @@ FACTOR_FUNCS = {
     "limit_up_cnt_20": _f_limit_up_cnt_20, "consec_limit_up": _f_consec_limit_up,
     "limit_down_cnt_20": _f_limit_down_cnt_20, "consec_limit_down": _f_consec_limit_down,
     "ind_crowd_60": _f_ind_crowd_60, "ind_rs_20": _f_ind_rs_20,
+    "lhb_cnt_20": _f_lhb_cnt_20, "lhb_jg_cnt_20": _f_lhb_jg_cnt_20,
+    "shebao_hold": _f_shebao_hold, "shebao_chg": _f_shebao_chg,
     "alpha003": _f_alpha003, "alpha006": _f_alpha006, "alpha015": _f_alpha015,
     "alpha044": _f_alpha044, "alpha050": _f_alpha050,
     # 基本面（PIT）
