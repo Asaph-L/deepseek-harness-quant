@@ -119,6 +119,17 @@ def main():
                     help="当前择时现金比例（防守档≥0.5 清空决策池）")
     args = ap.parse_args()
 
+    if args.regime_cash is None:
+        try:
+            signals = sorted((BASE / "output").glob("daily_signal_*.json"),
+                             key=lambda path: path.stat().st_mtime_ns)
+            signal_path = signals[-1] if signals else BASE / "output" / "daily_signal.json"
+            args.regime_cash = float(json.loads(signal_path.read_text(encoding="utf-8"))[
+                "regime_cash_ratio"
+            ])
+        except Exception:
+            args.regime_cash = None
+
     from strategy.ranking_v2 import rank
     rk = rank(args.n) if False else rank(None, args.n)
     layers = build_layers(rk, capital=args.capital, regime_cash=args.regime_cash)

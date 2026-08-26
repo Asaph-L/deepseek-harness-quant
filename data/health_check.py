@@ -72,20 +72,24 @@ def check_chains() -> list:
 
 
 def check_tasks() -> list:
-    """计划任务状态：win32 → schtasks；macOS → launchd（com.lwquant.* plist）
-    ★2026-08-21 跨平台修复：原 schtasks 在 macOS 不存在 → FileNotFoundError 直接崩溃"""
-    from deck.system_live import TASK_LABELS
-    names = list(TASK_LABELS.keys())
+    """计划任务状态；任务全部来自单一 launchd 动态配置。"""
+    try:
+        from scripts.setup_launchd import task_definitions
+        labels = [str(item[0]) for item in task_definitions()]
+    except Exception as exc:
+        return [{"name": "launchd-contract", "ok": False,
+                 "issue": f"任务配置异常 {str(exc)[:80]}"}]
     rows = []
     if sys.platform == "win32":
-        for n in names:
+        for label in labels:
             try:
-                r = subprocess.run(["schtasks", "/query", "/tn", n], capture_output=True,
+                r = subprocess.run(["schtasks", "/query", "/tn", label], capture_output=True,
                                    text=True, errors="replace", timeout=8)
-                rows.append({"name": n, "ok": r.returncode == 0,
+                rows.append({"name": label, "ok": r.returncode == 0,
                              "issue": "" if r.returncode == 0 else "计划任务缺失"})
             except Exception as e:
-                rows.append({"name": n, "ok": False, "issue": f"查询异常 {str(e)[:40]}"})
+                rows.append({"name": label, "ok": False,
+                             "issue": f"查询异常 {str(e)[:40]}"})
         return rows
     # macOS：launchd（launchctl print gui/<uid>/<label> 成功 = 已加载）
     agents = Path.home() / "Library" / "LaunchAgents"
@@ -94,20 +98,20 @@ def check_tasks() -> list:
         _uid = r.stdout.strip()
     except Exception:
         _uid = ""
-    for n in names:
-        plist = agents / f"{TASK_LABELS[n]}.plist"
+    for label in labels:
+        plist = agents / f"{label}.plist"
         loaded_ok = False
         if _uid:
             try:
                 r = subprocess.run(
-                    ["launchctl", "print", f"gui/{_uid}/{TASK_LABELS[n]}"],
+                    ["launchctl", "print", f"gui/{_uid}/{label}"],
                     capture_output=True, text=True, errors="replace", timeout=8)
                 loaded_ok = r.returncode == 0
             except Exception:
                 pass
         ok = plist.exists() and loaded_ok
         issue = "" if ok else ("plist 未安装" if not plist.exists() else "launchd 未加载")
-        rows.append({"name": n, "ok": ok, "issue": issue})
+        rows.append({"name": label, "ok": ok, "issue": issue})
     return rows
 
 

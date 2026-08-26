@@ -43,6 +43,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent.parent
+if str(BASE) not in sys.path:
+    sys.path.insert(0, str(BASE))
+
+from harness_runtime import load_harness_settings, read_bridge_token
+
+HARNESS_SETTINGS = load_harness_settings(BASE)
 LOGS = BASE / "logs"
 OUTPUT = BASE / "output"
 REPORT = BASE / "report"
@@ -52,6 +58,37 @@ DECISIONS = LOGS / "deck_decisions.json"
 #   读-改-写（读最新 deck_decisions → append → 写新时间戳文件）存在竞争，
 #   并发审批会丢记录（实测 10 并发仅存 4 条）→ 串行化整个决策读写区
 DECIDE_LOCK = threading.Lock()
+
+
+def _strict_harness_health() -> dict:
+    """Verify the local bridge identity before any token-bearing proxy request."""
+    import urllib.request as _ur
+
+    url = f"http://{HARNESS_SETTINGS.host}:{HARNESS_SETTINGS.port}/quant/health"
+    with _ur.urlopen(url, timeout=2) as response:
+        health = json.loads(response.read().decode("utf-8"))
+    expected = {
+        "protocol": HARNESS_SETTINGS.protocol,
+        "receipt_protocol": HARNESS_SETTINGS.receipt_protocol,
+        "home_fingerprint": HARNESS_SETTINGS.fingerprint,
+    }
+    if not isinstance(health, dict):
+        raise RuntimeError("HARNESS health 不是 JSON 对象")
+    for field, value in expected.items():
+        if health.get(field) != value:
+            raise RuntimeError(f"HARNESS identity mismatch: {field}")
+    if (health.get("ok") is not True or health.get("ready") is not True
+            or health.get("identity_ok") is not True
+            or health.get("home_matches_project") is not True
+            or health.get("mutation_auth") != "local-token"):
+        raise RuntimeError("HARNESS identity mismatch: bridge not ready")
+    project = str(health.get("project_root") or "")
+    home = str(health.get("dsh_home") or "")
+    if not project or Path(project).resolve() != HARNESS_SETTINGS.project_root:
+        raise RuntimeError("HARNESS identity mismatch: project_root")
+    if not home or Path(home).resolve() != HARNESS_SETTINGS.home:
+        raise RuntimeError("HARNESS identity mismatch: dsh_home")
+    return health
 
 
 def _json_safe(o):
@@ -276,7 +313,8 @@ class Handler(BaseHTTPRequestHandler):
                     # 快照保留任务/轮次信息；在线状态必须以实时端口为准，避免停机后仍显示在线。
                     import socket as _socket
                     try:
-                        with _socket.create_connection(("127.0.0.1", 3080), timeout=0.25):
+                        with _socket.create_connection(
+                                (HARNESS_SETTINGS.host, HARNESS_SETTINGS.port), timeout=0.25):
                             _online = True
                     except OSError:
                         _online = False
@@ -336,31 +374,23 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send_json({"ok": True, "skills": skills, "presets": presets})
             except Exception as e:
                 return self._send_json({"ok": False, "error": str(e)}, 500)
-        if path == "/api/launch-desktop":   # ★2026-08-19 统一管理后：拉起桌面版 DeepSeek Harness（macOS）
-            # 历史记录已统一到桌面版 home；内嵌 HARNESS 仅作为量化门户的后端继续运行。
-            try:
-                if sys.platform != "darwin":
-                    return self._send_json(
-                        {"ok": False, "error": "仅 macOS 支持拉起桌面版；请直接访问 http://127.0.0.1:3080"}, 400)
-                import subprocess as _sp
-                _sp.Popen(["open", "-a", "DeepSeek Harness"],
-                          stdout=_sp.DEVNULL, stderr=_sp.DEVNULL)
-                _html = (
-                    "<!doctype html><html><head><meta charset=\"utf-8\">"
-                    "<title>DeepSeek Harness</title></head>"
-                    "<body style=\"font-family:system-ui,sans-serif;background:#0f0f12;color:#e8e8ea;"
-                    "display:flex;align-items:center;justify-content:center;height:100vh;margin:0\">"
-                    "<p>已拉起桌面版 DeepSeek Harness，请切换到桌面窗口…</p>"
-                    "<script>setTimeout(function(){window.close()},1500)</script>"
-                    "</body></html>"
-                )
-                return self._send(200, _html.encode("utf-8"), "text/html; charset=utf-8")
-            except Exception as e:
-                return self._send_json({"ok": False, "error": str(e)}, 500)
+        if path == "/api/launch-desktop":
+            # 桌面 App 自带另一套 home，不能再作为本项目入口；统一打开项目内嵌 Web GUI。
+            target = f"http://{HARNESS_SETTINGS.host}:{HARNESS_SETTINGS.port}"
+            return self._send_json({
+                "ok": True,
+                "url": target,
+                "note": "本项目只使用 harness/home；请打开内嵌 HARNESS Web GUI",
+            })
         if path.startswith("/api/proxy/"):   # ★2026-08-16 反向代理 GET → :3080 HARNESS（前端同源访问，零跨源）
             import urllib.request as _ur
             import urllib.error as _ue
-            _tgt = "http://127.0.0.1:3080/" + path[len("/api/proxy/"):]
+            _upstream_path = "/" + path[len("/api/proxy/"):].lstrip("/")
+            if not _upstream_path.startswith("/quant/"):
+                return self._send_json({"ok": False, "error": "proxy path not allowed"}, 403)
+            if re.fullmatch(r"/quant/tasks/[A-Za-z0-9][A-Za-z0-9._-]{0,79}/verify", _upstream_path):
+                return self._send_json({"ok": False, "error": "verification is restricted to codex-local CLI"}, 403)
+            _tgt = f"http://{HARNESS_SETTINGS.host}:{HARNESS_SETTINGS.port}" + _upstream_path
             if "?" in self.path:
                 _tgt += "?" + self.path.split("?", 1)[1]
             try:
@@ -534,13 +564,6 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send_json(collect())
             except Exception as e:
                 return self._send_json({"error": str(e)}, 500)
-        if path == "/api/manual_update":   # ★2026-08-10 手动全域更新（POST；自动程序运行中自动拒绝）
-            try:
-                sys.path.insert(0, str(BASE))
-                from data.manual_update import start
-                return self._send_json(start())
-            except Exception as e:
-                return self._send_json({"error": str(e)}, 500)
         if path == "/api/update_status":   # ★2026-08-10 手动更新状态（busy/上次结果/日志）
             try:
                 sys.path.insert(0, str(BASE))
@@ -594,6 +617,9 @@ class Handler(BaseHTTPRequestHandler):
                 or path == "/api/live/strong_hits" \
                 or path == "/api/live/timing_dash" \
                 or path == "/api/live/factor_dash" \
+                or path == "/api/live/factor_evidence" \
+                or path == "/api/live/factor_sources" \
+                or path == "/api/live/daily_incremental" \
                 or path == "/api/live/portal_dash" \
                 or path == "/api/live/factor_perf" \
                 or path == "/api/live/enums" \
@@ -627,6 +653,9 @@ class Handler(BaseHTTPRequestHandler):
                       "strong_hits": live_api.live_strong_hits,
                       "timing_dash": live_api.live_timing_dash,
                       "factor_dash": live_api.live_factor_dash,
+                      "factor_evidence": live_api.live_factor_evidence,
+                      "factor_sources": live_api.live_factor_sources,
+                      "daily_incremental": live_api.live_daily_incremental,
                       "portal_dash": live_api.live_portal_dash,
                       "factor_perf": live_api.live_factor_perf,
                       "enums": live_api.live_enums,
@@ -788,11 +817,19 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith("/api/proxy/"):   # ★2026-08-16 反向代理 POST → :3080（删除/批量/清空/发送全走这里）
             import urllib.request as _ur
             import urllib.error as _ue
-            _tgt = "http://127.0.0.1:3080/" + path[len("/api/proxy/"):]
+            _upstream_path = "/" + path[len("/api/proxy/"):].lstrip("/")
+            if not _upstream_path.startswith("/quant/"):
+                return self._send_json({"ok": False, "error": "proxy path not allowed"}, 403)
+            if re.fullmatch(r"/quant/tasks/[A-Za-z0-9][A-Za-z0-9._-]{0,79}/verify", _upstream_path):
+                return self._send_json({"ok": False, "error": "verification is restricted to codex-local CLI"}, 403)
+            _tgt = f"http://{HARNESS_SETTINGS.host}:{HARNESS_SETTINGS.port}" + _upstream_path
             try:
+                _strict_harness_health()
                 _body = self._read_json()
+                _token = read_bridge_token(HARNESS_SETTINGS)
                 _req = _ur.Request(_tgt, data=json.dumps(_body).encode("utf-8"),
-                                   headers={"Content-Type": "application/json"})
+                                   headers={"Content-Type": "application/json",
+                                            "X-DSHQ-Token": _token})
                 _r = _ur.urlopen(_req, timeout=60)
                 _data = _r.read()
                 try:
@@ -822,8 +859,8 @@ class Handler(BaseHTTPRequestHandler):
                 src = BASE / "assets" / ("skills" if typ == "skill" else "presets") / name
                 if not src.is_dir():
                     return self._send_json({"ok": False, "error": "assets 中不存在 " + name}, 404)
-                # 安装目标：DSH_HOME 环境变量 > 随包 harness/home（仅本地开发用，勿硬编码本机路径）
-                _home = Path(os.environ.get("DSH_HOME", str(BASE / "harness" / "home")))
+                # 安装目标只能是项目唯一 HARNESS home。
+                _home = HARNESS_SETTINGS.home
                 dst_root = _home / "skills" if typ == "skill" else _home / ".agent-presets"
                 dst_root.mkdir(parents=True, exist_ok=True)
                 dst = dst_root / name

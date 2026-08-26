@@ -62,18 +62,21 @@ r = run_backtest(strategy="tech3", topn=5, stocks=300,
                  start="2021-01-01", end="2025-12-31")
 print(r["metrics"])                            # 年化/回撤/夏普/索提诺/卡玛/胜率…
 ```
-- 已注册策略：`tech3`（技术三因子·月频）`script1`（大市值三因子·月频）
-  `turn_low`（低换手防御·40 交易日）`factor_all`（因子全量·批处理）
+- 已注册策略以 `list_strategies()` / `config/strategies.yaml` 的实时结果为唯一准绳。
 - **每次运行自动归档**：历史 `output/backtest_archive/bt_{name}_{ts}.json` + 最新 `latest_{key}.json`
   → 前端 /backtest 页「历史记录」自动列出（无需手动放置）
 
 ### 2. 注册新策略（把 AI 写的策略接进菜单/引擎）
-在 `backtest/bt_runner.py`：
-1. `STRATEGIES` 注册表加一条：`{"name","category","desc","factors","defaults","rebalance"}`
-2. 写评分函数（返回 DataFrame：行=交易日，列=股票，**score 越大越好**）：
-   - 例：`_turn_low_score(closes)`（20 日均换手 rank 取反）
-3. `run_backtest` 的评分分发加一个分支
-4. 调仓周期：`rebalance="M"`（月频）/ `"Q"`（季度）/ `40`（交易日数）
+策略业务注册表只在 `config/strategies.yaml`，并须同步开源模板
+`config/strategies.yaml.example`；禁止在 `backtest/bt_runner.py` 写业务策略列表。
+
+1. 配置公共必填字段：`name/category/instant/desc/factors/defaults/rebalance`。
+2. 即时策略必须二选一：
+   - `factor_list: [{name, sign}]`：声明式组合，`sign` 只能为 `+1/-1`；或
+   - `scorer: <实现标识>`：仅可引用运行器严格 allowlist 中已有的评分实现。
+3. 批处理策略设 `instant: false` 并声明 `batch_runner: <实现标识>`，仅可引用严格 allowlist。
+4. 调仓周期：`rebalance: M`（月频）/ `Q`（季度）/ 正整数（交易日数）。
+5. 只有确需新算法实现时才在运行器新增实现函数和 allowlist 标识；配置缺失、字段错误、未知标识或未知策略必须 fail-closed，禁止回落到其他策略。
 
 ### 3. 独立回测脚本（自定义流程时）
 ```python

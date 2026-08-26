@@ -449,7 +449,7 @@ def run_update():
         log(f"因子池: 政策数据刷新 {n} 条")
         reg = FactorRegistry()
         results = evaluate_pool(reg)
-        actives = [x for x in reg.list_factors(status="active")]
+        actives = reg.list_strategy_factors()
         log(f"因子池评估 {len(results)} 个，活跃因子 {len(actives)} 个: {[f['name'] for f in actives]}")
         write_report(reg)
     except Exception as e:

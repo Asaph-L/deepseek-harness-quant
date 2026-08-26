@@ -26,10 +26,11 @@ DEFAULT_CAPITAL = 200000.0   # 模拟/实盘初始资金（pool_layers 默认同
 
 
 def build() -> dict:
-    from factors.policy.timing_system import evaluate as timing_evaluate
+    from factors.policy.timing_system import evaluate as timing_evaluate, write_outputs as write_timing
     from strategy.equal_weight_timing import portfolio as build_portfolio
 
     timing = timing_evaluate()
+    write_timing(timing)
     date = timing.get("date") or datetime.now().strftime("%Y-%m-%d")
     p = build_portfolio(date)
 

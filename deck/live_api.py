@@ -10,6 +10,7 @@
 import glob
 import json
 import os
+import re
 import sys
 import time
 from datetime import datetime
@@ -23,6 +24,7 @@ _fwd_cache = {"ts": 0, "data": None}
 _cal_cache = {"ts": 0, "data": None}   # ★#150 日历缓存（数据源版本 5min）
 _alrt_cache = {"ts": 0, "data": None}  # ★#150 预警缓存（数据源版本 2min）
 _chain_cache = {"ts": 0, "data": None} # ★#150 决策链缓存（数据源版本 2min）
+_daily_incremental_cache = {"ts": 0, "ver": None, "data": None}
 
 
 def _latest_file(pattern: str, subdir: str = "logs") -> Path:
@@ -2767,36 +2769,610 @@ def live_timing_dash() -> dict:
 _fd_cache = {"ts": 0, "data": None}
 
 
+def live_factor_evidence() -> dict:
+    """One fail-closed API for factor evaluation and strategy admission."""
+    from factors.alpha_panel import panel_source_fingerprints, read_panel_meta
+    from factors.evidence import EvidenceContractError, load_artifact, load_policy
+
+    response = {
+        "ok": False,
+        "available": False,
+        "api_schema_version": "factor-evidence-api/v1",
+        "schema_version": "factor-evidence-api/v1",
+        "availability": {"state": "unavailable", "reason_codes": []},
+        "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "error_codes": [],
+        "artifact": {},
+        "reason_catalog": {},
+        "summary": {"total": 0, "eligible": 0, "invalid": 0, "unavailable": 0,
+                    "evaluable": 0, "admitted": 0, "research_only": 0, "blocked": 0},
+        "factors": [],
+    }
+    try:
+        policy = load_policy()
+        response["reason_catalog"] = policy.get("reason_catalog") or {}
+        panel_meta = read_panel_meta()
+        if not panel_meta.get("run_id") or panel_meta.get("status") != "complete":
+            raise EvidenceContractError("PANEL_MANIFEST_INCOMPLETE")
+        if panel_meta.get("source_fingerprints") != panel_source_fingerprints():
+            raise EvidenceContractError("PANEL_SOURCE_CHANGED")
+        artifact = load_artifact(
+            BASE / "output" / "factor_evaluations_full.json",
+            expected_panel_meta=panel_meta,
+            expected_policy=policy,
+        )
+        registry = {}
+        try:
+            import sqlite3 as _sqlite
+            registry_path = BASE / "data" / "cache" / "factor_pool.db"
+            if registry_path.exists():
+                con = _sqlite.connect(f"file:{registry_path}?mode=ro&immutable=1", uri=True, timeout=2)
+                con.row_factory = _sqlite.Row
+                registry = {row["name"]: dict(row) for row in con.execute(
+                    "SELECT name,status,evidence_eligible,strategy_eligible,evidence_run_id FROM factors"
+                ).fetchall()}
+                con.close()
+        except Exception:
+            registry = {}
+        rows = []
+        for name, result in sorted(artifact["factors"].items()):
+            scorecard = result.get("scorecard") or {}
+            train = result.get("train") or {}
+            train_ic_detail = train.get("ic") or {}
+            train_ic = train_ic_detail.get("rank_ic_mean")
+            holdout = result.get("holdout") or {}
+            holdout_ic_detail = holdout.get("ic") or {}
+            holdout_ic = holdout_ic_detail.get("rank_ic_mean")
+            if result.get("strategy_eligible"):
+                state, label = "admitted", "已通过 · 可接策略"
+            elif result.get("eligible"):
+                state, label = "research_only", "仅研究 · 未通过接入门禁"
+            else:
+                state, label = "blocked", "不可评 · 不进入决策链"
+            registry_row = registry.get(name) or {}
+            rows.append({
+                "code": name,
+                "name": name,
+                "family": result.get("family") or "其他",
+                "evidence_state": "eligible" if result.get("eligible") else "invalid",
+                "admission_state": state,
+                "status_label": label,
+                "evaluable": bool(result.get("eligible")),
+                "strategy_eligible": bool(result.get("strategy_eligible")),
+                "direction": result.get("direction"),
+                "direction_detail": {"frozen": result.get("direction"),
+                                     "source": result.get("direction_source")},
+                "direction_source": result.get("direction_source"),
+                "score": scorecard.get("score"),
+                "verdict": scorecard.get("verdict"),
+                "scorecard": result.get("scorecard"),
+                "train_ic": train_ic,
+                "holdout_ic": holdout_ic,
+                "train": {
+                    "start": artifact["artifact"]["train"]["start"],
+                    "end": artifact["artifact"]["train"]["end"],
+                    "months": train_ic_detail.get("n_months"),
+                    "rank_ic_mean": train_ic,
+                    "icir": train_ic_detail.get("icir"),
+                    "score": scorecard.get("score"),
+                },
+                "holdout": {
+                    "start": artifact["artifact"]["holdout"]["start"],
+                    "end": artifact["artifact"]["holdout"]["end"],
+                    "months": holdout_ic_detail.get("n_months"),
+                    "rank_ic_mean": holdout_ic,
+                    "icir": holdout_ic_detail.get("icir"),
+                    "confirmed": bool(holdout.get("confirmed")),
+                },
+                "holdout_confirmed": bool(holdout.get("confirmed")),
+                "reason_codes": result.get("reason_codes") or [],
+                "coverage": result.get("coverage") or {},
+                "backtest_evidence": result.get("backtest_evidence") or {},
+                "registry": {
+                    "present": bool(registry_row),
+                    "status": registry_row.get("status"),
+                    "evidence_eligible": bool(registry_row.get("evidence_eligible")),
+                    "strategy_eligible": bool(registry_row.get("strategy_eligible")),
+                    "evidence_run_id": registry_row.get("evidence_run_id"),
+                },
+            })
+        summary = {
+            "total": len(rows),
+            "eligible": sum(row["evidence_state"] == "eligible" for row in rows),
+            "invalid": sum(row["evidence_state"] == "invalid" for row in rows),
+            "unavailable": 0,
+            "evaluable": sum(row["evaluable"] for row in rows),
+            "admitted": sum(row["admission_state"] == "admitted" for row in rows),
+            "research_only": sum(row["admission_state"] == "research_only" for row in rows),
+            "blocked": sum(row["admission_state"] == "blocked" for row in rows),
+        }
+        artifact_meta = dict(artifact["artifact"])
+        artifact_meta["integrity"] = artifact.get("integrity") or {}
+        response.update({
+            "ok": True,
+            "available": True,
+            "availability": {"state": "available", "reason_codes": []},
+            "artifact": artifact_meta,
+            "summary": summary,
+            "factors": rows,
+        })
+    except EvidenceContractError as exc:
+        response["error_codes"] = exc.reason_codes
+        response["availability"] = {"state": "unavailable", "reason_codes": exc.reason_codes}
+    except Exception as exc:
+        response["error_codes"] = ["EVIDENCE_API_ERROR"]
+        response["availability"] = {"state": "unavailable", "reason_codes": ["EVIDENCE_API_ERROR"]}
+        response["error"] = str(exc)[:120]
+    return response
+
+
+_FACTOR_SOURCE_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_FACTOR_SOURCE_CADENCES = {"trading_day", "calendar_day", "quarter"}
+
+
+def _factor_source_sql_identifier(value: object) -> str:
+    """Return a quoted SQLite identifier after a deliberately narrow check."""
+    if not isinstance(value, str) or not _FACTOR_SOURCE_IDENTIFIER.fullmatch(value):
+        raise ValueError("INVALID_HEALTH_IDENTIFIER")
+    return f'"{value}"'
+
+
+def _factor_source_base_row(source_id: object) -> dict:
+    return {
+        "id": str(source_id),
+        "state": "uninitialized",
+        "reason_codes": [],
+        "latest_partition": None,
+        "latest_observed_at": None,
+        "status_counts": {},
+        "complete_count": 0,
+        "provisional_count": 0,
+        "failed_count": 0,
+        "unknown_count": 0,
+        "coverage_rows": 0,
+        "observed_rows": 0,
+        "expected_cadence": None,
+        "lookback_partitions": 0,
+        "window_partition_count": 0,
+        "window_partitions": [],
+        "max_staleness_hours": None,
+        "freshness_age_seconds": None,
+        "db": "",
+        "db_exists": False,
+        "table": "",
+    }
+
+
+def _factor_source_probe(source_id: object, source: object) -> dict:
+    """Probe one configured coverage table without creating or migrating it."""
+    import math
+    import sqlite3
+
+    from data.content_identity import connect_readonly_sqlite
+
+    row = _factor_source_base_row(source_id)
+    health = source.get("health") if isinstance(source, dict) else None
+    if not isinstance(health, dict):
+        row.update({"state": "degraded", "reason_codes": ["HEALTH_CONFIG_MISSING"]})
+        return row
+
+    db_value = health.get("db")
+    if not isinstance(db_value, str) or not db_value.strip():
+        row.update({"state": "degraded", "reason_codes": ["HEALTH_DB_INVALID"]})
+        return row
+    db_relative = Path(db_value)
+    if db_relative.is_absolute() or ".." in db_relative.parts:
+        row.update({"state": "degraded", "reason_codes": ["HEALTH_DB_PATH_OUTSIDE_BASE"]})
+        return row
+    base_resolved = BASE.resolve()
+    db_path = (base_resolved / db_relative).resolve()
+    if not db_path.is_relative_to(base_resolved):
+        row.update({"state": "degraded", "reason_codes": ["HEALTH_DB_PATH_OUTSIDE_BASE"]})
+        return row
+    row["db"] = db_relative.as_posix()
+    row["db_exists"] = db_path.is_file()
+
+    try:
+        table = health.get("table")
+        partition_field = health.get("partition_field")
+        status_field = health.get("status_field")
+        time_field = health.get("time_field")
+        row_fields = health.get("row_fields")
+        quoted_table = _factor_source_sql_identifier(table)
+        quoted_partition = _factor_source_sql_identifier(partition_field)
+        quoted_status = _factor_source_sql_identifier(status_field)
+        quoted_time = _factor_source_sql_identifier(time_field)
+        if not isinstance(row_fields, list) or not row_fields:
+            raise ValueError("INVALID_HEALTH_IDENTIFIER")
+        quoted_rows = [_factor_source_sql_identifier(value) for value in row_fields]
+        row["table"] = str(table)
+    except ValueError:
+        row.update({"state": "degraded", "reason_codes": ["INVALID_HEALTH_IDENTIFIER"]})
+        return row
+    try:
+        expected_cadence = health.get("expected_cadence")
+        if expected_cadence not in _FACTOR_SOURCE_CADENCES:
+            raise ValueError("HEALTH_POLICY_INVALID")
+        # ``window_partition_count`` was the short-lived pre-policy spelling.
+        # Continue accepting it so local configs can migrate without crashing.
+        lookback_value = health.get(
+            "lookback_partitions", health.get("window_partition_count")
+        )
+        window_partition_count = int(lookback_value)
+        staleness_value = health.get("max_staleness_hours")
+        max_staleness_hours = float(staleness_value)
+        if isinstance(lookback_value, bool) or window_partition_count <= 0 \
+                or window_partition_count > 10_000 \
+                or isinstance(staleness_value, bool) \
+                or not math.isfinite(max_staleness_hours) \
+                or max_staleness_hours <= 0:
+            raise ValueError("HEALTH_POLICY_INVALID")
+        row["expected_cadence"] = expected_cadence
+        row["lookback_partitions"] = window_partition_count
+        row["window_partition_count"] = window_partition_count
+        row["max_staleness_hours"] = max_staleness_hours
+    except (TypeError, ValueError):
+        row.update({"state": "degraded", "reason_codes": ["HEALTH_POLICY_INVALID"]})
+        return row
+
+    status_classes = health.get("status_classes")
+    if not isinstance(status_classes, dict):
+        row.update({"state": "degraded", "reason_codes": ["STATUS_CLASSES_INVALID"]})
+        return row
+    class_values = {}
+    seen_statuses = set()
+    for class_name in ("complete", "provisional", "failed"):
+        values = status_classes.get(class_name)
+        if not isinstance(values, list) or not values \
+                or any(not isinstance(value, str) or not value for value in values):
+            row.update({"state": "degraded", "reason_codes": ["STATUS_CLASSES_INVALID"]})
+            return row
+        values_set = set(values)
+        if seen_statuses.intersection(values_set):
+            row.update({"state": "degraded", "reason_codes": ["STATUS_CLASSES_OVERLAP"]})
+            return row
+        class_values[class_name] = values_set
+        seen_statuses.update(values_set)
+
+    if not row["db_exists"]:
+        row["reason_codes"] = ["DATABASE_MISSING"]
+        return row
+
+    con = None
+    try:
+        con = connect_readonly_sqlite(db_path, timeout=2)
+        table_exists = con.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
+        ).fetchone()
+        if not table_exists:
+            row["reason_codes"] = ["COVERAGE_TABLE_MISSING"]
+            return row
+        columns = {
+            str(info[1]) for info in con.execute(f"PRAGMA table_info({quoted_table})")
+        }
+        required = {str(partition_field), str(status_field), str(time_field),
+                    *(str(value) for value in row_fields)}
+        if not required.issubset(columns):
+            row.update({
+                "state": "degraded",
+                "reason_codes": ["HEALTH_SCHEMA_INCOMPATIBLE"],
+            })
+            return row
+        observed_expression = " + ".join(
+            f"COALESCE(CAST({field} AS INTEGER),0)" for field in quoted_rows
+        )
+        partition_rows = con.execute(
+            f"SELECT DISTINCT {quoted_partition} FROM {quoted_table} "
+            f"WHERE {quoted_partition} IS NOT NULL "
+            f"ORDER BY {quoted_partition} DESC LIMIT ?",
+            (window_partition_count,),
+        ).fetchall()
+        window_partitions = [str(item[0]) for item in partition_rows]
+        row["window_partitions"] = window_partitions
+        if not window_partitions:
+            row["reason_codes"] = ["COVERAGE_NOT_QUERIED"]
+            return row
+        placeholders = ",".join("?" for _ in window_partitions)
+        groups = con.execute(
+            f"SELECT {quoted_status},COUNT(*),"
+            f"COALESCE(SUM({observed_expression}),0),"
+            f"MAX({quoted_partition}),MAX({quoted_time}) "
+            f"FROM {quoted_table} WHERE {quoted_partition} IN ({placeholders}) "
+            f"GROUP BY {quoted_status}",
+            window_partitions,
+        ).fetchall()
+        observed_time_rows = con.execute(
+            f"SELECT {quoted_time} FROM {quoted_table} "
+            f"WHERE {quoted_partition} IN ({placeholders})",
+            window_partitions,
+        ).fetchall()
+    except sqlite3.Error:
+        row.update({"state": "degraded", "reason_codes": ["DATABASE_READ_ERROR"]})
+        return row
+    finally:
+        if con is not None:
+            con.close()
+
+    if not groups:
+        row["reason_codes"] = ["COVERAGE_NOT_QUERIED"]
+        return row
+
+    latest_partitions = []
+    latest_observed = []
+    for status_value, count, observed_rows, latest_partition, observed_at in groups:
+        status = str(status_value) if status_value is not None else "<null>"
+        row["status_counts"][status] = int(count or 0)
+        row["coverage_rows"] += int(count or 0)
+        row["observed_rows"] += int(observed_rows or 0)
+        if latest_partition is not None:
+            latest_partitions.append(str(latest_partition))
+        if observed_at is not None:
+            latest_observed.append(str(observed_at))
+    row["status_counts"] = dict(sorted(row["status_counts"].items()))
+    row["latest_partition"] = max(latest_partitions, default=None)
+    row["latest_observed_at"] = max(latest_observed, default=None)
+    row["complete_count"] = sum(
+        count for status, count in row["status_counts"].items()
+        if status in class_values["complete"]
+    )
+    row["provisional_count"] = sum(
+        count for status, count in row["status_counts"].items()
+        if status in class_values["provisional"]
+    )
+    row["failed_count"] = sum(
+        count for status, count in row["status_counts"].items()
+        if status in class_values["failed"]
+    )
+    row["unknown_count"] = (
+        row["coverage_rows"] - row["complete_count"]
+        - row["provisional_count"] - row["failed_count"]
+    )
+    reasons = []
+    if row["failed_count"]:
+        reasons.append("FAILED_COVERAGE_PRESENT")
+    if row["provisional_count"]:
+        reasons.append("PROVISIONAL_COVERAGE_PRESENT")
+    if row["unknown_count"]:
+        reasons.append("UNKNOWN_COVERAGE_STATUS_PRESENT")
+    try:
+        ages = []
+        for (observed_value,) in observed_time_rows:
+            observed = str(observed_value or "")
+            parsed = datetime.fromisoformat(observed.replace("Z", "+00:00"))
+            now = datetime.now(parsed.tzinfo) if parsed.tzinfo else datetime.now()
+            age_seconds = (now - parsed).total_seconds()
+            if age_seconds < -300:
+                raise ValueError("future observation")
+            ages.append(max(0, age_seconds))
+        if not ages:
+            raise ValueError("missing observation")
+        row["freshness_age_seconds"] = int(max(ages))
+        if max(ages) > max_staleness_hours * 3600:
+            reasons.append("SOURCE_STATUS_STALE")
+    except (TypeError, ValueError):
+        reasons.append("LATEST_OBSERVED_TIME_INVALID")
+    row["state"] = "degraded" if reasons else "healthy"
+    row["reason_codes"] = reasons
+    return row
+
+
+def live_factor_sources() -> dict:
+    """Config-driven, WAL-aware read-only disclosure-source coverage status."""
+    response = {
+        "ok": False,
+        "available": False,
+        "api_schema_version": "factor-source-status-api/v1",
+        "schema_version": "factor-source-status-api/v1",
+        "health_state": "unavailable",
+        "reason_codes": [],
+        "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "summary": {
+            "total": 0, "healthy": 0, "degraded": 0, "uninitialized": 0,
+            "complete": 0, "provisional": 0, "failed": 0,
+        },
+        "sources": [],
+    }
+    try:
+        import yaml
+
+        config_path = BASE / "config" / "daily_incremental.yaml"
+        if not config_path.is_file():
+            response["reason_codes"] = ["CONFIG_MISSING"]
+            return response
+        config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+        factor_sources = config.get("factor_sources") if isinstance(config, dict) else None
+        if not isinstance(factor_sources, dict) or not factor_sources:
+            response["reason_codes"] = ["FACTOR_SOURCES_CONFIG_INVALID"]
+            return response
+        rows = [
+            _factor_source_probe(source_id, source)
+            for source_id, source in factor_sources.items()
+        ]
+        state_counts = {
+            state: sum(row["state"] == state for row in rows)
+            for state in ("healthy", "degraded", "uninitialized")
+        }
+        if state_counts["healthy"] == len(rows):
+            health_state = "healthy"
+        elif state_counts["uninitialized"] == len(rows):
+            health_state = "uninitialized"
+        else:
+            health_state = "degraded"
+        reason_codes = sorted({
+            reason for row in rows for reason in row.get("reason_codes", [])
+        })
+        response.update({
+            "ok": True,
+            "available": True,
+            "health_state": health_state,
+            "reason_codes": reason_codes,
+            "summary": {
+                "total": len(rows),
+                **state_counts,
+                "complete": sum(row["complete_count"] for row in rows),
+                "provisional": sum(row["provisional_count"] for row in rows),
+                "failed": sum(row["failed_count"] for row in rows),
+            },
+            "sources": rows,
+        })
+    except Exception:
+        response["reason_codes"] = ["FACTOR_SOURCE_STATUS_ERROR"]
+    return response
+
+
+def live_daily_incremental() -> dict:
+    """Read-only status envelope for the single daily incremental DAG."""
+    response = {
+        "ok": False, "available": False,
+        "api_schema_version": "daily-incremental-api/v1",
+        "availability": {"state": "unavailable", "reason_codes": []},
+        "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "config": {}, "bars": {}, "pipeline": {}, "tasks": [], "watermarks": [],
+    }
+    try:
+        from scripts.daily_incremental import (
+            _hash, bars_partition_quality, load_config, pipeline_code_version,
+            local_latest_complete_date, local_latest_date, state_status,
+        )
+        config, selected = load_config()
+        source_paths = {selected.resolve(), Path(__file__).resolve()}
+        state_path = Path(config["state"]["db"])
+        source_paths.add((state_path if state_path.is_absolute() else BASE / state_path).resolve())
+        bars_spec = config["datasets"]["bars_qfq"]
+        main_path = Path(bars_spec["main_db"])
+        source_paths.add((main_path if main_path.is_absolute() else BASE / main_path).resolve())
+        increment_pattern = Path(bars_spec["increment_glob"])
+        pattern = str(increment_pattern if increment_pattern.is_absolute()
+                      else BASE / increment_pattern)
+        source_paths.update(Path(value).resolve() for value in glob.glob(pattern))
+        source_paths.add((BASE / "scripts" / "daily_incremental.py").resolve())
+        for task in config["tasks"]:
+            command = task.get("command") or []
+            if command:
+                command_path = Path(command[0])
+                source_paths.add((command_path if command_path.is_absolute()
+                                  else BASE / command_path).resolve())
+        version = tuple(sorted(
+            (str(path), path.stat().st_size, path.stat().st_mtime_ns)
+            for path in source_paths if path.exists()
+        ))
+        now = time.time()
+        cached = _daily_incremental_cache
+        if cached.get("data") is not None and cached.get("ver") == version \
+                and now - float(cached.get("ts") or 0) < 60:
+            return cached["data"]
+        raw_latest = local_latest_date(config)
+        bars = bars_partition_quality(config, raw_latest) if raw_latest else {
+            "ok": False, "reason_codes": ["LOCAL_TRADE_DATE_UNAVAILABLE"]
+        }
+        if bars.get("ok"):
+            complete_latest = raw_latest
+        elif "BARS_QFQ_INTEGRITY_UNVERIFIED" in (bars.get("reason_codes") or []):
+            complete_latest = None
+        else:
+            complete_latest = local_latest_complete_date(config)
+        state = state_status(config)
+        runs = state.get("runs") or []
+        latest_run = state.get("latest_operational_run")
+        latest_tasks = state.get("latest_operational_tasks") or []
+        current_config_hash = _hash(config)
+        current_code_version = pipeline_code_version(config)
+        drift_codes = []
+        catchup_replay = state.get("catchup_replay")
+        if catchup_replay:
+            drift_codes.append("CATCHUP_REPLAY_ACTIVE")
+        if latest_run is None:
+            drift_codes.append("OPERATIONAL_RUN_MISSING")
+        else:
+            run_status = str(latest_run.get("status") or "unknown").lower()
+            if run_status != "complete":
+                drift_codes.append({
+                    "failed": "PIPELINE_LAST_RUN_FAILED",
+                    "partial": "PIPELINE_LAST_RUN_PARTIAL",
+                    "running": "PIPELINE_LAST_RUN_RUNNING",
+                }.get(run_status, "PIPELINE_LAST_RUN_NOT_COMPLETE"))
+            if latest_run.get("config_hash") != current_config_hash:
+                drift_codes.append("PIPELINE_CONFIG_DRIFT")
+            if latest_run.get("code_version") != current_code_version:
+                drift_codes.append("PIPELINE_CODE_DRIFT")
+            if len(latest_tasks) != len(config["tasks"]):
+                drift_codes.append("PIPELINE_TASK_GRAPH_DRIFT")
+        task_counts = {}
+        for row in latest_tasks:
+            status = row.get("status") or "unknown"
+            task_counts[status] = task_counts.get(status, 0) + 1
+        response.update({
+            "ok": True, "available": True,
+            "availability": {
+                "state": "degraded" if drift_codes or not bars.get("ok") else
+                         (state.get("state") or "ready"),
+                "reason_codes": [*(bars.get("reason_codes") or []), *drift_codes],
+            },
+            "config": {
+                "source": (str(selected.relative_to(BASE))
+                           if selected.is_relative_to(BASE) else selected.name),
+                "schedule": config.get("schedule") or {},
+                "task_count": len(config["tasks"]),
+                "config_hash": current_config_hash,
+                "code_version": current_code_version,
+            },
+            "bars": {
+                "latest_trade_date": raw_latest,
+                "raw_latest_trade_date": raw_latest,
+                "complete_latest_trade_date": complete_latest,
+                "stale_or_incomplete": raw_latest != complete_latest,
+                **bars,
+            },
+            "pipeline": {
+                "state": state.get("state"), "latest_run": latest_run,
+                "recent_runs": runs, "latest_task_counts": task_counts,
+                "drift_reason_codes": drift_codes,
+                "catchup_replay": catchup_replay,
+            },
+            "tasks": [{
+                "id": task["id"], "adapter": task["adapter"],
+                "depends_on": task.get("depends_on") or [],
+                "critical": bool(task.get("critical", True)),
+            } for task in config["tasks"]],
+            "latest_tasks": latest_tasks,
+            "watermarks": state.get("watermarks") or [],
+        })
+        _daily_incremental_cache.update({"ts": now, "ver": version, "data": response})
+    except Exception as exc:
+        response["availability"] = {
+            "state": "unavailable", "reason_codes": ["DAILY_INCREMENTAL_STATUS_ERROR"]
+        }
+        response["error"] = f"{type(exc).__name__}: {str(exc)[:160]}"
+    return response
+
+
 def _load_local_factor_dash(out: dict):
     """★2026-08-23 本地因子实证 fallback（外包 data/factorpool 缺失时）：
     读 scripts/evaluate_all_factors.py 的 output/factor_evaluations_full.json，
     填充 manifest（当前因子表）+ health（风控层分组）"""
     try:
-        _fp = BASE / "output" / "factor_evaluations_full.json"
-        if not _fp.exists():
+        evidence = live_factor_evidence()
+        out["evidence"] = evidence
+        if not evidence.get("available"):
             return
-        _evals = json.loads(_fp.read_text(encoding="utf-8"))
         factors, health_rows, categories = [], [], {}
-        for _name, _r in _evals.items():
-            _sc = _r.get("scorecard") or {}
-            _ic = _r.get("ic") or {}
-            _layer = _r.get("layer") or {}
-            _fam = _r.get("family", "其他") or "其他"
-            _dir = _r.get("direction", 1)
-            _status = _sc.get("verdict") or "数据不足"
+        for row in evidence["factors"]:
+            _name = row["code"]
+            _fam = row["family"]
+            _status = row["status_label"]
             factors.append({
                 "code": _name, "name_cn": _name, "category": _fam,
-                "direction": _dir, "icir_60": _ic.get("icir"),
-                "ic": _ic.get("rank_ic_mean"), "status": _status,
-                "score": _sc.get("score"),
+                "direction": row["direction"], "icir_60": None,
+                "ic": row["train_ic"], "status": _status,
+                "score": row["score"], "admission_state": row["admission_state"],
             })
             health_rows.append({
                 "factor": _name, "status": _status,
-                "icir120": _ic.get("icir"), "t120": _layer.get("ls_t"),
-                "family": _fam, "local": True,
+                "icir120": None, "t120": None, "family": _fam, "local": True,
+                "admission_state": row["admission_state"],
             })
             categories[_fam] = categories.get(_fam, 0) + 1
-        out["manifest"] = {"date": "本地实证", "n": len(factors), "factors": factors,
+        out["manifest"] = {"date": evidence["artifact"].get("generated_at_utc"), "n": len(factors), "factors": factors,
                            "health_date": "", "health_stale": False, "local": True}
         out["health"] = {"date": "本地实证", "n": len(health_rows), "rows": health_rows,
                          "local": True}
@@ -3290,7 +3866,9 @@ _ep_cache = {"ts": 0.0, "data": None, "err": None}
 # 全部探测端点（只读；排除 export_data 内部子进程导出、stock_check 个股重查询——非稳态端点）
 _ENDPOINTS = [
     "/api/live/portal_dash", "/api/live/chain", "/api/live/pools",
-    "/api/live/timing_dash", "/api/live/factor_dash", "/api/live/brief",
+    "/api/live/timing_dash", "/api/live/factor_dash", "/api/live/factor_evidence",
+    "/api/live/factor_sources",
+    "/api/live/daily_incremental", "/api/live/brief",
     "/api/live/factors", "/api/live/opp", "/api/live/tech",
     "/api/live/holdings", "/api/live/alerts", "/api/live/funnel",
     "/api/live/actions", "/api/live/calendar", "/api/live/validation",

@@ -3,13 +3,15 @@
 <plist version="1.0">
 <dict>
 	<key>Label</key>
-	<string>com.lwquant.factorarchive</string>
+	<string>com.lwquant.dailyincremental</string>
 	<key>ProgramArguments</key>
 	<array>
 		<string>__PY__</string>
 		<string>-X</string>
 		<string>utf8</string>
-		<string>__BASE__/data/factor_archive_chain.py</string>
+		<string>__BASE__/scripts/daily_incremental.py</string>
+		<string>--trigger</string>
+		<string>schedule</string>
 	</array>
 	<key>WorkingDirectory</key>
 	<string>__BASE__</string>
@@ -25,16 +27,28 @@
 	<key>RunAtLoad</key>
 	<false/>
 	<key>StandardOutPath</key>
-	<string>__BASE__/logs/launchd_factorarchive.log</string>
+	<string>__BASE__/logs/launchd_dailyincremental.log</string>
 	<key>StandardErrorPath</key>
-	<string>__BASE__/logs/launchd_factorarchive.log</string>
+	<string>__BASE__/logs/launchd_dailyincremental.log</string>
 	<key>StartCalendarInterval</key>
 	<array>
 		<dict>
 			<key>Hour</key>
-			<integer>17</integer>
+			<integer>18</integer>
 			<key>Minute</key>
-			<integer>40</integer>
+			<integer>30</integer>
+		</dict>
+		<dict>
+			<key>Hour</key>
+			<integer>19</integer>
+			<key>Minute</key>
+			<integer>30</integer>
+		</dict>
+		<dict>
+			<key>Hour</key>
+			<integer>20</integer>
+			<key>Minute</key>
+			<integer>30</integer>
 		</dict>
 	</array>
 </dict>

@@ -35,15 +35,12 @@ sys.path.insert(0, str(BASE))
 import numpy as np
 import pandas as pd
 
-# 默认因子方向表（实证驱动；params.yaml 可覆盖）
-DEFAULT_DIRECTION = {
-    "lowvol_60": -1,       # 低波正用（值越小越好）
-    "near_high_250": 1,    # 接近高点正用（唯一 120 日转正）
-    "mom_20": -1,          # 短期反转（A股反转市）
-    "mom_120": -1,         # 中期反转（小盘池；大盘池可覆盖为 +1，CS-03）
-    "rps_120": -1,         # RPS 反转（大盘池可覆盖为 +1）
-    "new_high_250": 0,     # 剔除（各口径均负）
-}
+from factors.catalog import (
+    bind_implementations,
+    default_factor_ids,
+    direction_view,
+    load_factor_catalog,
+)
 
 
 # ============================================================
@@ -76,7 +73,7 @@ def calc_momentum(close: pd.Series, window: int = 20) -> pd.Series:
     return close / close.shift(window) - 1
 
 
-FACTOR_FUNCS = {
+_ENGINE_IMPLEMENTATIONS = {
     "lowvol_60": lambda c: calc_lowvol(c, 60),
     "near_high_250": lambda c: calc_near_high(c, 250),
     "mom_20": lambda c: calc_momentum(c, 20),
@@ -84,6 +81,14 @@ FACTOR_FUNCS = {
     "rps_120": lambda c: calc_rps(c, 120),
     "new_high_250": lambda c: calc_new_high(c, 250),
 }
+
+_FACTOR_CATALOG = load_factor_catalog()
+FACTOR_FUNCS = bind_implementations(
+    "factor_engine", _ENGINE_IMPLEMENTATIONS, catalog=_FACTOR_CATALOG
+)
+DEFAULT_FACTORS = tuple(default_factor_ids("factor_engine", catalog=_FACTOR_CATALOG))
+# 实证默认方向是业务元数据，唯一来源为 config/factors.yaml。
+DEFAULT_DIRECTION = direction_view("factor_engine", catalog=_FACTOR_CATALOG)
 
 
 # ============================================================
@@ -100,7 +105,7 @@ def compute_factor_panel(closes: pd.DataFrame, direction: dict = None,
     返回: MultiIndex DataFrame (日期, 因子) × 股票
     """
     direction = direction or DEFAULT_DIRECTION
-    factors = factors or list(FACTOR_FUNCS.keys())
+    factors = factors or list(DEFAULT_FACTORS)
     panels = {}
     for name in factors:
         if name not in FACTOR_FUNCS:

@@ -10,6 +10,35 @@
   var cache = {};        // url -> {ts, data, status:'ok'|'err'}
   var inflight = {};     // url -> Promise（防并发重复请求）
 
+  function requestJson(url, fetchOpts, timeoutMs) {
+    var controller = new AbortController();
+    var timedOut = false;
+    var opts = Object.assign({}, fetchOpts || {}, { signal: controller.signal });
+    var timer = setTimeout(function () {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
+    function clearTimer(value) {
+      clearTimeout(timer);
+      return value;
+    }
+    return fetch(url, opts)
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(clearTimer, function (err) {
+        clearTimeout(timer);
+        if (timedOut) {
+          var timeoutError = new Error('REQUEST_TIMEOUT_AFTER_' + timeoutMs + 'ms');
+          timeoutError.name = 'TimeoutError';
+          timeoutError.code = 'REQUEST_TIMEOUT';
+          throw timeoutError;
+        }
+        throw err;
+      });
+  }
+
   function get(url, opts) {
     opts = opts || {};
     var timeout = opts.timeout || 8000;
@@ -23,11 +52,10 @@
     }
     if (inflight[url]) { return inflight[url]; }
 
-    var p = fetch(url, { cache: 'no-store' })
-      .then(function (r) {
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.json();
-      })
+    function attempt() {
+      return requestJson(url, { cache: 'no-store' }, timeout);
+    }
+    var p = attempt()
       .then(function (data) {
         cache[url] = { ts: Date.now(), data: data, status: 'ok' };
         return data;
@@ -36,10 +64,7 @@
         // 重试一次（网络抖动）
         if (retry > 0) {
           retry--;
-          return fetch(url, { cache: 'no-store' }).then(function (r) {
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            return r.json();
-          }).then(function (data) {
+          return attempt().then(function (data) {
             cache[url] = { ts: Date.now(), data: data, status: 'ok' };
             return data;
           });
@@ -74,15 +99,13 @@
   // POST JSON（审批/卖出/手动更新等写操作——不带缓存、不重试）
   function post(url, body, opts) {
     opts = opts || {};
-    return fetch(url, {
+    var timeout = opts.timeout || 8000;
+    return requestJson(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body || {}),
       cache: 'no-store'
-    }).then(function (r) {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.json();
-    });
+    }, timeout);
   }
 
   win.LW = win.LW || {};

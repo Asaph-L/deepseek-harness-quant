@@ -13,12 +13,16 @@ QuantDeck（本项目）
     │   ├── .credentials.yaml  ★ API Key 接入点（见下）
     │   ├── settings.yaml      模型路由（默认 deepseek-official）
     │   ├── profiles/web/      宿主组合（cordis.yml + cordis.patch.yml）
-    │   │   └── plugins/dsq-quant-bridge.js   ★ 量化桥接插件（/quant/* 路由）
+    │   │   └── plugins/       ★ 量化桥 + dshq-task/v1 派单协议
     │   └── skills/            ★ 预置空白 skill（牛散 7 位模板）
 ```
 
-- **桥接插件**由 `profiles/web/cordis.patch.yml` 挂载，提供 `/quant/sessions`、`/quant/chat2`、`/quant/niu/*` 等路由——量化控制页原生对话、牛散主观选股自动入远期池全部走它。
+- **桥接插件**由 `profiles/web/cordis.patch.yml` 挂载。旧控制台/牛散路由继续保留；
+  Codex 派单只走带本机令牌、身份核验和结构化 receipt 的 `/quant/tasks` 合同，
+  详见 [`HARNESS派单协议.md`](HARNESS派单协议.md)。
 - 量化系统与 HARNESS 独立进程、独立端口，通过 HTTP 桥接；任何一方缺失另一方照常运行。
+- 项目只允许 `<repo>/harness/home` 这一套 `DSH_HOME`；外部环境变量或桌面版 home
+  不得改变量化项目的会话/任务存储位置。
 
 ## 二、第一步：接入 DeepSeek API Key（关键）
 
@@ -33,7 +37,7 @@ QuantDeck（本项目）
    cp harness/home/.credentials.yaml.example harness/home/.credentials.yaml
    ```
 3. 用编辑器打开 `harness/home/.credentials.yaml`，把 `<your-deepseek-api-key>` 替换为你的真实 Key
-4. 启动（launcher 或 `python deck/deck_server.py` + `node harness/node_modules/@deepseek-ai/dsh/lib/bin.js web`）
+4. 从仓库根目录运行 `python launcher.py`（Windows 也可双击 `启动.cmd`）。启动器会强制注入并核验唯一的 `<repo>/harness/home`；不要绕过启动器直接执行 HARNESS 的 Node 入口。
 5. 打开 http://127.0.0.1:3080（HARNESS GUI）或量化控制页（:8787/control）——即可与 AI 对话
 
 ## 三、让 AI 帮你接入其余 API
@@ -47,9 +51,10 @@ AI 会指导/协助你完成：
 - 其他可选数据源（akshare 免费接口无需 token）
 - 系统参数调优、skill 填充等
 
-## 四、预置空白 Skill（打开即自带）
+## 四、预置 Skill（打开即自带）
 
-`harness/home/skills/` 已原生注入 7 个空白 skill 模板：
+`harness/home/skills/` 已包含 7 个牛散研究 skill；内容是研究人格与风险约束，
+不构成投资建议，其输出仍需进入远期池验证：
 
 | Skill | 主题 |
 |---|---|
@@ -61,12 +66,8 @@ AI 会指导/协助你完成：
 | `niu-san-zhaolaoge` | 赵老哥（打板/妖股） |
 | `niu-san-distillation` | 牛散蒸馏方法论（总览框架） |
 
-每个模板含骨架（人物画像/理念/风险批判/因子假设/参考）。**三种填充方式**：
-1. 让 AI 填充：对话中要求「请基于公开资料完善 niu-san-linyuan skill」
-2. 参考 `niu-san-distillation` 框架自行编辑
-3. 导入自己的研究资料（标注来源与可信度）
-
-> 牛散技能填充后，控制页「主观·牛散」分类即出现对应可对话的选股人格（其决策自动入远期池验证）。
+如需更新内容，必须标注来源与可信度，并保留风险批判；控制页输出自动进入远期池，
+不能绕过 L2 决策卡片成为第二套推荐逻辑。
 
 ## 五、故障排查
 
@@ -83,3 +84,27 @@ AI 会指导/协助你完成：
 cd harness
 npm install --no-audit --no-fund
 ```
+
+## 七、从桌面版 home 安全迁移（一次性）
+
+迁移前先退出 DeepSeek Desktop，并停止由 `launcher.py` 启动的项目 HARNESS。默认命令只生成只读计划，不会复制、删除或改写任何文件：
+
+```bash
+.venv/bin/python -B scripts/migrate_harness_home.py --json
+```
+
+确认计划后才显式执行：
+
+```bash
+.venv/bin/python -B scripts/migrate_harness_home.py --apply
+```
+
+应用模式会同时锁住源/目标 home 的迁移事务、占住本机 HARNESS 端口并检查运行进程；无法确认两侧都已停止时直接拒绝。它会先把全部结果和原文件备份到 `harness/home/migration-backups/<timestamp>/`，再逐文件原子提交；任一步失败都会逆序回滚，并在 `manifest.json` 中记录状态。源 home 永不删除，`profiles/` 永不迁移，JSON 存储采用并集合并且同一 session row 取最高 `seq`。
+
+若机器在提交过程中异常退出，可在两侧 HARNESS 仍保持停止时按失败信息给出的绝对路径恢复：
+
+```bash
+.venv/bin/python -B scripts/migrate_harness_home.py --recover /absolute/path/to/manifest.json
+```
+
+不要手工删除 `migration-backups` 中状态为 `committing`、`rollback_failed` 或 `recovery_failed` 的目录。

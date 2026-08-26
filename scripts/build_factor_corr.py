@@ -28,11 +28,32 @@ START, END = "2020-01-01", "2025-12-31"
 
 
 def main():
-    from factors.alpha_panel import load_panels, FAMILY
+    from factors.alpha_panel import (
+        load_panels,
+        read_panel_meta,
+        validate_panel_manifest,
+    )
+    from factors.catalog import factor_metadata_map
+    from factors.evidence import atomic_write_json, load_artifact, load_policy
 
     print("加载因子面板...", flush=True)
     panels = load_panels(start="2019-01-01")
-    names = sorted(panels)
+    panel_meta = read_panel_meta()
+    validate_panel_manifest(panel_meta, "2019-01-01")
+    catalog_factors = factor_metadata_map(engine="alpha_panel", enabled_only=True)
+    if set(panels) != set(catalog_factors):
+        raise RuntimeError("PANEL_FACTOR_SET_MISMATCH")
+    evidence = load_artifact(
+        BASE / "output" / "factor_evaluations_full.json",
+        expected_panel_meta=panel_meta,
+        expected_policy=load_policy(),
+    )
+    if evidence["artifact"].get("panel_run_id") != panel_meta.get("run_id"):
+        raise RuntimeError("EVIDENCE_PANEL_RUN_MISMATCH")
+    evals = evidence["factors"]
+    names = sorted(name for name in panels if (evals.get(name) or {}).get("eligible"))
+    if not names:
+        raise RuntimeError("严格证据中没有可评因子，拒绝生成相关性产物")
     n = len(names)
     first = panels[names[0]].index
     ym = first.astype(str).str[:7]
@@ -55,7 +76,6 @@ def main():
     matrix = (acc / max(cnt, 1)).round(4).tolist()
 
     # ---- lifecycle（年度 IC 时序）----
-    evals = json.loads((BASE / "output" / "factor_evaluations_full.json").read_text(encoding="utf-8"))
     lifecycle = {}
     for name in names:
         ev = evals.get(name) or {}
@@ -67,10 +87,15 @@ def main():
     # ---- usage（按族分类）----
     usage = {}
     for name in names:
-        fam = FAMILY.get(name, "其他")
+        fam = catalog_factors[name]["family"]
         usage[name] = {"category": fam, "purpose": f"本地实证因子（{fam}族）"}
 
     out = {
+        "schema_version": "factor-ui-support/v1",
+        "evidence_run_id": evidence["artifact"]["run_id"],
+        "panel_run_id": panel_meta["run_id"],
+        "factor_catalog": panel_meta["factor_catalog"],
+        "panel_builder_fingerprint": panel_meta["builder_fingerprint"],
         "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "lifecycle": {"factors": lifecycle},
         "corr": {"factors": names, "matrix": matrix},
@@ -80,7 +105,10 @@ def main():
                       "note": "本地生成（scripts/build_factor_corr.py），外包 ui_data 缺失 fallback"},
     }
     out_f = BASE / "output" / "factor_corr_local.json"
-    out_f.write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
+    validate_panel_manifest(panel_meta, "2019-01-01")
+    if read_panel_meta().get("run_id") != panel_meta.get("run_id"):
+        raise RuntimeError("PANEL_RUN_CHANGED_BEFORE_CORR_PUBLISH")
+    atomic_write_json(out_f, out)
     print(f"✅ 已生成 {out_f}（{n} 因子，相关矩阵 {cnt} 期平均）")
     return 0
 

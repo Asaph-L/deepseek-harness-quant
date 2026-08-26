@@ -180,6 +180,12 @@
     </div>
   </div>
 
+  <div class="v2-card anim-fade-in-up d1" style="margin-top:14px">
+    <h2> 每日增量证据链 <span class="tag" id="daily-inc-tag">读取中…</span></h2>
+    <div id="daily-inc-summary" class="mini" style="line-height:1.9">加载状态 API…</div>
+    <div id="daily-inc-tasks" style="margin-top:8px"></div>
+  </div>
+
   <!-- 最近自主推进 -->
   <div class="v2-card anim-fade-in-up d1" style="margin-top:14px">
     <h2> 最近自主推进 <span class="tag" id="hz-rounds-tag">…</span></h2>
@@ -418,7 +424,7 @@
         document.getElementById('hz-del-sel').textContent = '删除所选' + (Object.keys(selectedSess).length ? ' (' + Object.keys(selectedSess).length + ')' : '');
       });
     });
-    /* ★2026-08-16 删除对话：确认后 POST /quantapi/delete 归档会话并刷新列表 */
+    /* 删除对话：确认后通过同源代理调用 /quant/delete。 */
     list.querySelectorAll('.hz-sess-del').forEach(function (btn) {
       btn.addEventListener('click', function (ev) {
         ev.stopPropagation();
@@ -723,9 +729,63 @@
       document.getElementById('hz-conn').innerHTML = '<span style="color:var(--red)">读取失败：' + e + '</span>';
     });
   }
+  function loadDailyIncremental() {
+    return LW.api.get('/api/live/daily_incremental', { bypass: true }).then(function (d) {
+      var tag = document.getElementById('daily-inc-tag');
+      var summary = document.getElementById('daily-inc-summary');
+      var tasksBox = document.getElementById('daily-inc-tasks');
+      if (!d || !d.available) {
+        tag.textContent = '不可用';
+        summary.innerHTML = '<span style="color:var(--red)">状态证据不可用：' +
+          esc((((d || {}).availability || {}).reason_codes || []).join(', ') || (d && d.error) || 'UNKNOWN') + '</span>';
+        tasksBox.innerHTML = '';
+        return;
+      }
+      var bars = d.bars || {};
+      var pipeline = d.pipeline || {};
+      var run = pipeline.latest_run || null;
+      var drift = pipeline.drift_reason_codes || [];
+      var replay = pipeline.catchup_replay || null;
+      tag.textContent = drift.length ? ('待验证 · ' + drift.join(',')) :
+        (run ? (run.status + ' · ' + run.trade_date + ' · ' + run.trigger) : (pipeline.state || '未初始化'));
+      var schedule = (d.config || {}).schedule || {};
+      var scheduleText = (schedule.times || []).join(' / ') ||
+        (String(schedule.hour).padStart(2, '0') + ':' + String(schedule.minute).padStart(2, '0'));
+      summary.innerHTML =
+        '<div class="hz-kv"><span>唯一调度（就绪重试）</span><b>' + esc(scheduleText) + '</b></div>' +
+        '<div class="hz-kv"><span>行情精确分区</span><b style="color:' + (bars.ok ? '#4ade80' : 'var(--red)') + '">' +
+          esc(bars.latest_trade_date || '—') + ' · ' + esc(bars.distinct_keys || 0) + ' 只</b></div>' +
+        '<div class="hz-kv"><span>最新完整水位</span><b style="color:' + (!bars.stale_or_incomplete ? '#4ade80' : 'var(--red)') + '">' +
+          esc(bars.complete_latest_trade_date || '—') + (bars.stale_or_incomplete ? ' · 待补账' : '') + '</b></div>' +
+        '<div class="hz-kv"><span>历史回放</span><b style="color:' + (replay ? 'var(--red)' : '#4ade80') + '">' +
+          esc(replay ? ('进行中 · 下一日 ' + replay.next_date + ' / 目标 ' + replay.latest_date) : '无积压') + '</b></div>' +
+        '<div class="hz-kv"><span>换手 / ST 覆盖</span><b>' + esc(bars.turn_coverage == null ? '—' : bars.turn_coverage) +
+          ' / ' + esc(bars.st_count == null ? '—' : bars.st_count) + '</b></div>' +
+        '<div class="hz-kv" style="border-bottom:none"><span>已提交水位</span><b>' + esc((d.watermarks || []).length) + '</b></div>';
+      var latest = {};
+      (d.latest_tasks || []).forEach(function (item) { latest[item.task_id] = item.status; });
+      tasksBox.innerHTML = (d.tasks || []).map(function (task) {
+        var state = latest[task.id] || 'pending';
+        var color = state === 'complete' || state === 'reused' ? '#4ade80' :
+          (state === 'failed' || state === 'blocked' ? 'var(--red)' : 'var(--muted)');
+        return '<div class="hz-row"><span class="rn" style="color:' + color + '">●</span>' +
+          '<span class="rt">' + esc(task.id) + '</span><span class="rd">' + esc(state) +
+          ' · 依赖 ' + esc((task.depends_on || []).join(', ') || '无') + '</span></div>';
+      }).join('');
+    }).catch(function (e) {
+      document.getElementById('daily-inc-tag').textContent = '读取失败';
+      document.getElementById('daily-inc-summary').innerHTML =
+        '<span style="color:var(--red)">' + esc((e && e.message) || e) + '</span>';
+    });
+  }
   loadHarness();
-  document.getElementById('hz-refresh').onclick = loadHarness;
+  loadDailyIncremental();
+  document.getElementById('hz-refresh').onclick = function () {
+    loadHarness();
+    loadDailyIncremental();
+  };
   setInterval(loadHarness, 30000);
+  setInterval(loadDailyIncremental, 30000);
 
   /* ---------- 导入 Skill / Agent 预设 ---------- */
   var assetTab = 'skill';

@@ -128,19 +128,17 @@ def main() -> int:
     except Exception as e:
         bad.append(f"一致性异常: {str(e)[:60]}")
 
-    # 4) ★计划任务（调度层健康，2026-08-12 百轮后#113：7 个 LWQuant 任务应全部就绪——
-    #    防 dev_auto 熔断/手动禁用后静默停摆；08-11 DailyPipeline 0xC0000142 误杀事故归因后加）
-    #    ★2026-08-21 跨平台：win32 → schtasks；macOS → launchd（com.lwquant.* plist）
-    from deck.system_live import TASK_LABELS
-    SCHED_TASKS = list(TASK_LABELS.keys())
+    # 4) 计划任务：与安装器共用单一配置真源，不维护第二套 label。
     sched_ok = True
     sched_disabled = []
     try:
         import subprocess as _sp
+        from scripts.setup_launchd import task_definitions
+        sched_tasks = [str(item[0]) for item in task_definitions()]
         if sys.platform == "win32":
             _r = _sp.run(["schtasks", "/query", "/fo", "LIST", "/v"], capture_output=True, timeout=30)
             _txt = _r.stdout.decode("gbk", errors="replace") + _r.stderr.decode("gbk", errors="replace")
-            for _t in SCHED_TASKS:
+            for _t in sched_tasks:
                 _idx = _txt.find(_t)
                 _seg = _txt[_idx:_idx + 400] if _idx >= 0 else ""
                 if "禁用" in _seg or "Disabled" in _seg:
@@ -156,8 +154,7 @@ def main() -> int:
                                errors="replace", timeout=5).stdout.strip()
             except Exception:
                 _uid = ""
-            for _t in SCHED_TASKS:
-                _label = TASK_LABELS[_t]
+            for _label in sched_tasks:
                 _plist = _agents / f"{_label}.plist"
                 _loaded = False
                 if _uid:
@@ -169,9 +166,9 @@ def main() -> int:
                     except Exception:
                         pass
                 if not _plist.exists():
-                    sched_disabled.append(_t + "(缺失)")
+                    sched_disabled.append(_label + "(缺失)")
                 elif not _loaded:
-                    sched_disabled.append(_t + "(未加载)")
+                    sched_disabled.append(_label + "(未加载)")
         if sched_disabled:
             sched_ok = False
             bad.append(f"计划任务禁用/缺失: {','.join(sched_disabled)}")

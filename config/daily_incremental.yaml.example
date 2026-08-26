@@ -1,0 +1,374 @@
+# DSHQuant 单一盘后增量入口；复制为 daily_incremental.yaml 后可覆盖本地路径。
+schema_version: "dshq-daily-incremental/v1"
+timezone: "Asia/Shanghai"
+
+schedule:
+  hour: 18
+  minute: 30
+  times: ["18:30", "19:30", "20:30"]
+
+catchup:
+  start_date: "2019-01-01"
+  max_open_days_per_run: 10
+  writer_task_id: "bars_daily"
+
+launchd:
+  daily:
+    label: "com.lwquant.dailyincremental"
+    description: "单一盘后增量链（含数据就绪重试）"
+  operational_tasks:
+    - label: "com.lwquant.breakoutmon"
+      description: "每 30min 突破监控"
+      interval_seconds: 1800
+      command: ["factors/opportunities/breakout_monitor.py"]
+    - label: "com.lwquant.deckguard"
+      description: "每 30min Deck 守护"
+      interval_seconds: 1800
+      command: ["deck/ensure_deck.py"]
+
+state:
+  db: "data/state/daily_incremental.db"
+  lock: "data/state/daily_incremental.lock"
+
+datasets:
+  bars_qfq:
+    main_db: "data/cache/bars.db"
+    increment_glob: "data/cache/bars_incr*.db"
+    min_distinct_codes: 5000
+    min_distinct_codes_by_date:
+      - {from: "2019-01-01", min: 3400}
+      - {from: "2020-01-01", min: 3600}
+      - {from: "2021-01-01", min: 4000}
+      - {from: "2022-01-01", min: 4500}
+      - {from: "2023-01-01", min: 4800}
+      - {from: "2024-01-01", min: 5000}
+    required_columns: [open, high, low, close, preclose, volume, amount, pct_chg]
+    max_pct_chg_error_pct_points: 0.05
+    max_qfq_continuity_relative_gap: 0.000001
+    max_qfq_continuity_breaks: 0
+    require_qfq_integrity_meta: true
+    qfq_integrity_schema: "dshq-qfq-rebuild/v1"
+    turn_available_from: "2019-01-01"
+    min_turn_coverage: 0.95
+    min_st_codes: 50
+    st_strict_from: "2019-01-01"
+
+# 披露源的接口名、字段、参数名、分页和批量边界全部配置化。
+# 凭据仍只从本地 params.yaml 读取，不进入本模板或开源仓库。
+factor_sources:
+  lhb:
+    db: "data/cache/lhb.db"
+    health:
+      db: "data/cache/lhb.db"
+      table: "lhb_coverage"
+      partition_field: "trade_date"
+      status_field: "status"
+      time_field: "fetched_at"
+      row_fields: ["top_list_rows", "top_inst_rows"]
+      # 健康度只评估最近窗口；cadence 描述该分区的业务节奏，时效按 fetched_at 判断。
+      expected_cadence: "trading_day"
+      lookback_partitions: 5
+      max_staleness_hours: 240
+      status_classes:
+        complete: ["complete_rows", "complete_empty"]
+        provisional: ["provisional_rows", "provisional_empty"]
+        failed: ["failed"]
+    api_url: "https://api.tushare.pro"
+    retries: 3
+    retry_backoff_seconds: 2
+    timeout_seconds: 30
+    # Tushare 龙虎榜通常晚间更新；较早调度只记 provisional，20:15 后复查才封账。
+    ready_after_local_time: "20:15"
+    endpoints:
+      top_list:
+        api_name: "top_list"
+        fields: [trade_date, ts_code, name, close, pct_change, amount, l_buy, l_sell, l_amount, net_amount, net_rate, amount_rate, reason]
+        params: {trade_date: "trade_date"}
+      top_inst:
+        api_name: "top_inst"
+        fields: [trade_date, ts_code, exalter, side, buy, buy_rate, sell, sell_rate, net_buy, reason]
+        field_map: {exalterate: "exalter"}
+        params: {trade_date: "trade_date"}
+      trade_calendar:
+        api_name: "trade_cal"
+        fields: [exchange, cal_date, is_open, pretrade_date]
+        params: {exchange: "exchange", start_date: "start_date", end_date: "end_date", is_open: "is_open"}
+        exchange: "SSE"
+        open_value: "1"
+        date_field: "cal_date"
+        open_field: "is_open"
+
+  gdhs:
+    db: "data/cache/gdhs_full.db"
+    health:
+      db: "data/cache/gdhs_full.db"
+      table: "gdhs_coverage"
+      partition_field: "ann_date"
+      status_field: "status"
+      time_field: "fetched_at"
+      row_fields: ["row_count"]
+      expected_cadence: "calendar_day"
+      lookback_partitions: 14
+      max_staleness_hours: 400
+      status_classes:
+        complete: ["complete_rows", "complete_empty"]
+        provisional: ["provisional_rows", "provisional_empty"]
+        failed: ["failed"]
+    api_url: "https://api.tushare.pro"
+    retries: 3
+    retry_backoff_seconds: 2
+    timeout_seconds: 30
+    page_size: 1000
+    max_pages: 20
+    stop_on_short_page: true
+    daily_lookback_calendar_days: 14
+    max_catchup_calendar_days_per_run: 31
+    finalize_lag_calendar_days: 1
+    refetch_recent_calendar_days: 3
+    endpoint:
+      api_name: "stk_holdernumber"
+      fields: [ts_code, ann_date, end_date, holder_num]
+      params: {ann_date: "ann_date", offset: "offset", limit: "limit"}
+
+  shebao:
+    db: "data/cache/shebao.db"
+    health:
+      db: "data/cache/shebao.db"
+      table: "shebao_coverage"
+      partition_field: "end_date"
+      status_field: "status"
+      time_field: "fetched_at"
+      row_fields: ["row_count"]
+      expected_cadence: "quarter"
+      lookback_partitions: 2
+      max_staleness_hours: 960
+      status_classes:
+        complete: ["complete_rows", "complete_empty"]
+        provisional: ["provisional_rows", "provisional_empty"]
+        failed: ["failed"]
+    api_url: "https://api.tushare.pro"
+    retries: 3
+    retry_backoff_seconds: 2
+    timeout_seconds: 30
+    universe_db: "data/cache/hist_mv.db"
+    universe_query: "SELECT DISTINCT code FROM hist_mv ORDER BY code"
+    holder_keywords: ["全国社保基金", "社保基金"]
+    max_codes_per_daily_run: 500
+    recent_periods_per_daily_run: 2
+    refresh_until_calendar_days_after_period: 150
+    request_interval_seconds: 0.35
+    endpoint:
+      api_name: "top10_holders"
+      fields: [ts_code, ann_date, end_date, holder_name, hold_amount, hold_ratio, hold_float_ratio, hold_change]
+      params: {ts_code: "ts_code", period: "period"}
+
+# 任务只引用脚本/适配器，业务列表不写死在 Python。
+# 相同 trade_date + input_fingerprint 自动复用；--force-task 会使该节点及后代重跑。
+tasks:
+  - id: "bars_daily"
+    scope: "partition"
+    reusable: false
+    adapter: "command"
+    command: ["data/incremental_daily_tushare.py", "--date", "{date_compact}"]
+    force_argument: "--force"
+    depends_on: []
+    critical: true
+    timeout_seconds: 420
+
+  - id: "bars_quality"
+    scope: "partition"
+    adapter: "bars_quality"
+    depends_on: ["bars_daily"]
+    critical: true
+    timeout_seconds: 60
+
+  - id: "lhb_incremental"
+    scope: "final"
+    reusable: false
+    adapter: "command"
+    command: ["data/fetcher_lhb.py", "--config", "config/daily_incremental.yaml", "--date", "{date_compact}"]
+    force_argument: "--force-refresh"
+    depends_on: ["bars_quality"]
+    critical: false
+    timeout_seconds: 300
+
+  - id: "gdhs_incremental"
+    scope: "final"
+    reusable: false
+    adapter: "command"
+    command: ["data/fetcher_gdhs.py", "--config", "config/daily_incremental.yaml", "--as-of", "{date_compact}"]
+    force_argument: "--force-refresh"
+    depends_on: ["bars_quality"]
+    critical: false
+    timeout_seconds: 900
+
+  - id: "shebao_incremental"
+    scope: "final"
+    reusable: false
+    adapter: "command"
+    command: ["data/fetcher_shebao.py", "--config", "config/daily_incremental.yaml", "--as-of", "{date_compact}"]
+    force_argument: "--force-refresh"
+    depends_on: ["bars_quality"]
+    critical: false
+    timeout_seconds: 3600
+
+  - id: "factor_evidence"
+    scope: "final"
+    reusable: false
+    adapter: "command"
+    command: ["scripts/evaluate_all_factors.py"]
+    artifact_path: "output/factor_evaluations_full.json"
+    depends_on: ["bars_quality"]
+    soft_depends_on: ["lhb_incremental", "gdhs_incremental", "shebao_incremental"]
+    critical: true
+    timeout_seconds: 3600
+
+  - id: "factor_evidence_quality"
+    scope: "final"
+    adapter: "factor_evidence_quality"
+    depends_on: ["factor_evidence"]
+    critical: true
+    timeout_seconds: 60
+
+  - id: "factor_registry_sync"
+    scope: "final"
+    adapter: "factor_registry_sync"
+    depends_on: ["factor_evidence_quality"]
+    critical: true
+    timeout_seconds: 60
+
+  - id: "factor_support_reports"
+    scope: "final"
+    reusable: false
+    adapter: "command"
+    command: ["scripts/rebuild_factor_reports.py"]
+    depends_on: ["factor_registry_sync"]
+    critical: false
+    timeout_seconds: 900
+
+  - id: "daily_signal"
+    scope: "final"
+    reusable: false
+    adapter: "command"
+    command: ["data/daily_signal.py"]
+    artifact_path: "output/daily_signal.json"
+    artifact_format: "json"
+    artifact_date_field: "date"
+    depends_on: ["factor_registry_sync"]
+    critical: true
+    timeout_seconds: 900
+
+  - id: "decision_layers"
+    scope: "final"
+    reusable: false
+    adapter: "command"
+    command: ["strategy/pool_layers.py"]
+    artifact_glob: "output/pool_layers_*.json"
+    artifact_format: "json"
+    artifact_date_field: "date"
+    depends_on: ["daily_signal"]
+    critical: true
+    timeout_seconds: 1200
+
+  - id: "opportunity_scan"
+    scope: "final"
+    reusable: false
+    adapter: "command"
+    command: ["factors/opportunities/scan.py", "--pitch", "--date", "{date}"]
+    artifact_glob: "logs/opp_pool_*.json"
+    artifact_format: "json"
+    artifact_date_field: "date"
+    depends_on: ["factor_registry_sync"]
+    critical: true
+    timeout_seconds: 1800
+
+  - id: "pitch_long"
+    scope: "final"
+    reusable: false
+    adapter: "command"
+    command: ["factors/opportunities/pitch_v2.py"]
+    artifact_glob: "logs/pitch_v2_*.json"
+    artifact_format: "json"
+    artifact_date_field: "date"
+    depends_on: ["opportunity_scan"]
+    critical: true
+    timeout_seconds: 1800
+
+  - id: "pitch_tech"
+    scope: "final"
+    reusable: false
+    adapter: "command"
+    command: ["factors/opportunities/tech_pitch_v3.py"]
+    artifact_glob: "logs/tech_pitch_*.json"
+    artifact_format: "json"
+    artifact_date_field: "pool_date"
+    depends_on: ["opportunity_scan"]
+    critical: true
+    timeout_seconds: 900
+
+  - id: "risk_flags"
+    scope: "final"
+    reusable: false
+    adapter: "command"
+    command: ["risk/fake_signal_flags.py"]
+    artifact_glob: "logs/fake_signal_flags_*.json"
+    artifact_format: "json"
+    artifact_date_field: "date"
+    depends_on: ["opportunity_scan"]
+    critical: true
+    timeout_seconds: 900
+
+  - id: "rank_live"
+    scope: "final"
+    reusable: false
+    adapter: "command"
+    command: ["data/rank_live.py"]
+    artifact_glob: "logs/rank_live_*.json"
+    artifact_format: "json"
+    artifact_date_field: "date"
+    depends_on: ["risk_flags"]
+    critical: true
+    timeout_seconds: 900
+
+  - id: "pitch_tracking"
+    scope: "final"
+    reusable: false
+    adapter: "command"
+    command: ["factors/opportunities/pitch_track.py", "--append-latest", "--update"]
+    artifact_glob: "logs/pitch_track_pool_*.json"
+    artifact_format: "json"
+    artifact_date_field: "data_date"
+    depends_on: ["pitch_long"]
+    critical: false
+    timeout_seconds: 900
+
+  - id: "stop_monitor"
+    scope: "final"
+    reusable: false
+    adapter: "command"
+    command: ["risk/stop_monitor.py"]
+    artifact_glob: "logs/stop_alerts_*.json"
+    artifact_format: "json"
+    artifact_date_field: "data_date"
+    depends_on: ["pitch_tracking"]
+    critical: false
+    timeout_seconds: 900
+
+  - id: "paper_tracker"
+    scope: "final"
+    reusable: false
+    adapter: "command"
+    command: ["strategy/paper_tracker.py"]
+    depends_on: ["daily_signal"]
+    critical: false
+    timeout_seconds: 900
+
+  - id: "daily_report"
+    scope: "final"
+    reusable: false
+    adapter: "command"
+    command: ["data/daily_report_auto.py"]
+    artifact_path: "report/daily_report_{date}.md"
+    depends_on: ["decision_layers", "pitch_long", "pitch_tech", "rank_live"]
+    critical: true
+    timeout_seconds: 900

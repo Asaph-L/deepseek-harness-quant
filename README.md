@@ -62,31 +62,19 @@ python launcher.py
 
 ## 因子
 
-123+ 因子，全部 A 股本地实证（PIT / T+1 / 分年度）。九步入池，17+ 项证伪留档。
+业务因子目录由 `config/factors.yaml` 动态定义；数量、依赖、可用起点、方向先验和当前
+准入状态不在 README 中写死。面板构建、证据评估、正式回测和 registry 逐级绑定各自的
+run identity、源码指纹与输入数据指纹，任何一层变化都会使旧证据失效。
 
-> **本地实证引擎（2026-08-23）**：外包因子池（`data/factorpool/`）不在开源包内。本仓库自建
-> `factors/alpha_panel.py`（32 因子，11 类全覆盖，本地 bars/finance/hist_mv 向量化）
-> + `scripts/evaluate_all_factors.py`（8 维体检）批量实证：**27/32 因子 ≥50 分弱有效以上**，
-> 强有效代表：sue 95.1 / accruals 92.6 / amihud 90.8 / o2c_sum_20 80.5 / open_prem_20 76.2；
-> 换手/低波/涨停族为反向强有效（A 股反转市实证方向）。另含 `factors/alphagpt/`（AlphaGPT
-> 公式语言 A 股蒸馏版：词表 + StackVM + 随机/LLM 生成器 + ICIR 奖励挖掘循环）。
+> **当前证据状态（2026-08-24）**：旧报告是在本轮 QFQ/PIT 合同加固前生成，不能作为
+> 当前收益或准入结论。新的 canonical panel、T+1 正式回测和 evaluator archive 全部完成
+> 且身份一致前，所有候选保持 research-only；本仓库不再展示或沿用旧报告中的分数、IC、
+> ICIR、年化收益或“强有效”标签。
 
-| 维度 | 代表 | 本地实证（2020-2025，可复现） |
-|---|---|---|
-| 换手率 | turn_mid_prox / turnover / turn_std20 | 反向强有效（IC ≈ -0.09，ICIR ≈ -0.5） |
-| 低波动 | lowvol / std20 / downside_vol | 反向强有效（低波=好） |
-| 反转 | reversal20 / o2c 日内反转族 | o2c_sum_20 正向强有效 80.5 |
-| 流动性 | amihud | 正向强有效 90.8（ICIR 0.54） |
-| 彩票/偏度 | max_ret20 / skew20 / rmax | 反向有效（IC ≈ -0.09） |
-| 振幅/动量 | amp20 / open_prem_20 | open_prem_20 正向强有效 76.2 |
-| 基本面低频 | f_score / sue / accruals / asset_growth / bp | sue 95.1 / accruals 92.6 强有效 |
-| 短线涨跌停 | limit_up_* / consec_limit_down | limit_up_cnt_20 反向强有效 74.4 |
-| 机构行为 | lhb_jg_cnt_20 / shebao_chg | 需龙虎榜/社保数据源（未接入） |
-| 行业层 | ind_crowd_60 / ind_rs_20 | 边缘（40-44 分） |
-| Alpha101 | alpha015 / alpha050 / alpha006 / alpha003 / alpha044 | alpha003/006/015 强有效（71-78） |
-
-来源：学术复现 · 开源策略库复刻 · 事件驱动实证 · 牛散蒸馏 · AI 自动挖掘 · 机构资金行为。
-完整评分卡：`report/因子评估报告_全量.md`（每次 `python scripts/evaluate_all_factors.py` 重跑）。
+数据源覆盖采用显式状态：`complete`、`provisional`、`failed` 与未查询互不混淆；龙虎榜、
+股东户数和社保持仓均由每日增量 DAG 更新。完整准入和重算顺序见
+[因子接入策略与每日增量验收](docs/因子接入策略与每日增量验收.md)，运行后的当前状态由
+因子页 API 展示，而不是由本文静态声明。
 
 ## Skill
 
@@ -111,6 +99,20 @@ QuantDeck.exe                        # 双击即用，自动开浏览器
 DSHQuant-v1.0.9-Release.zip          # 解压即用，含 HARNESS 运行时
 ```
 
+## 快速回归
+
+提交前运行一条离线、无持久副作用的回归命令：
+
+```bash
+.venv/bin/python -B scripts/quick_regression.py
+```
+
+它覆盖 PIT 披露时点、共享市场生命周期、T+1 开盘撮合/一字板/成本、QFQ 重建/发布恢复、动态因子目录、
+不可变面板与 WAL-aware 内容身份、三类披露增量/状态、页面与 API 200、HARNESS 唯一 home/派单
+合同，以及 Python/JS/配置语法；子进程禁止 Python/Node 联网并拒绝外部 provider/shell，
+执行前后会对依赖目录外全部工作区和运行文件做内容核对，确认没有遗留改写。
+若 8787 与 3080 已经启动，可加 `--live` 做额外只读身份检查；命令不会代为启动服务。
+
 > **下载注意**：从 Release 页 **Assets 区**下载 `DSHQuant-v1.0.9-Release.zip`（完整包，含 HARNESS 运行时）。
 > **不要**下载页面底部的 "Source code (zip)" —— 那是源码包，harness/node_modules 被排除，没有 AI 控制台。
 > 判断：解压后 `harness\node_modules` 文件夹存在 = 完整包；不存在 = 下错了。
@@ -129,9 +131,9 @@ DSHQuant-v1.0.9-Release.zip          # 解压即用，含 HARNESS 运行时
 
 原 Windows 版用 `schtasks` 注册 8 个任务（TushareInc 17:30 / 盘后扫描 17:35 / 因子档案 17:40 / 每日全链 18:30 / 因子池 19:15 / dev_auto 每 4h / 突破监控与守护每 30min）。
 
-- **macOS**：`python scripts/setup_launchd.py` 一键安装为 LaunchAgent（`~/Library/LaunchAgents/com.lwquant.*.plist`，模板见 `scripts/launchd/`）；`--status` 查看、`--uninstall` 卸载。
-- **Windows**：保持原 schtasks 方式（任务名 `LWQuant-*`）。
-- 状态看板：量化门户「系统实时」页展示各任务下次运行与加载状态（`deck/system_live.py` 跨平台读取）。
+- **macOS**：`.venv/bin/python -B scripts/setup_launchd.py` 一键安装为 LaunchAgent（`~/Library/LaunchAgents/com.lwquant.*.plist`，模板见 `scripts/launchd/`）；`--status` 查看、`--uninstall` 卸载。
+- **Windows**：旧 `LWQuant-*` schtasks 仅属历史版本；本轮单一 DAG 尚未提供 Windows 安装/迁移器，禁止与旧多写入任务并行启用。
+- 状态看板：当前单一 DAG 的安装与加载状态以 macOS launchd 为已验收平台；Windows 迁移完成前不宣称同等支持。
 
 ## 许可
 

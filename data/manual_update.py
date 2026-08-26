@@ -6,11 +6,13 @@
 
 ★安全设计（不误伤自动程序）：
   1. 双重忙检查：① 最近手动更新状态 running 且 pid 存活 → 拒绝重复触发
-                  ② psutil 扫描进程命令行含 dev_auto.py / daily_pipeline.py → 拒绝（自动程序运行中）
-  2. 状态文件时间戳命名（写保护免疫，每次唯一）：
+                  ② psutil 扫描每日增量管道进程 → 拒绝（自动程序运行中）
+  2. logs/manual_update.trigger.lock 是全局固定互斥锁；随机 token 保证旧 worker
+     只能清理自己的锁，不会误删新任务。
+  3. 状态文件时间戳命名（写保护免疫，每次唯一）：
      logs/manual_update_{ts}.json       = running（worker 写）
      logs/manual_update_{ts}_done.json  = done/failed（worker 完成时写）
-  3. 日志 logs/manual_update_{ts}.log   = 管道实时输出（每次唯一）
+  4. 日志 logs/manual_update_{ts}.log   = 管道实时输出（每次唯一）
 
 用法（Deck 路由调用）：
   POST /api/manual_update → start() → {"ok": true/false, ...}
@@ -22,15 +24,22 @@ import os
 import subprocess
 import sys
 import time
+import uuid
 from datetime import datetime
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent.parent
 LOGS = BASE / "logs"
 PY = sys.executable
+TRIGGER_LOCK_NAME = "manual_update.trigger.lock"
+TRIGGER_STARTUP_GRACE_SECONDS = 300
 
 # 自动程序标识（命中即拒绝手动更新）
-AUTO_SCRIPTS = ("dev_auto.py", "daily_pipeline.py")
+AUTO_SCRIPTS = (
+    "daily_incremental.py",
+    "daily_pipeline.py",
+    "incremental_daily_tushare.py",
+)
 
 
 def _pid_alive(pid: int) -> bool:
@@ -40,11 +49,75 @@ def _pid_alive(pid: int) -> bool:
         import psutil
         return psutil.pid_exists(int(pid))
     except Exception:
+        try:
+            os.kill(int(pid), 0)
+            return True
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True
+        except (OSError, TypeError, ValueError):
+            return False
+
+
+def _trigger_lock_path() -> Path:
+    return LOGS / TRIGGER_LOCK_NAME
+
+
+def _read_trigger_lock(lock_path: Path) -> dict:
+    try:
+        payload = json.loads(lock_path.read_text(encoding="utf-8"))
+        return payload if isinstance(payload, dict) else {}
+    except (OSError, ValueError, TypeError):
+        return {}
+
+
+def _release_trigger_lock(lock_path: Path, token: str) -> bool:
+    """Delete only the fixed lock owned by ``token``.
+
+    A completed/old worker must never unlink a newer invocation's lock.  The
+    fixed pathname provides global mutual exclusion; the random token makes
+    cleanup conditional on ownership.
+    """
+    if not token:
+        return False
+    payload = _read_trigger_lock(lock_path)
+    if payload.get("token") != token:
+        return False
+    try:
+        lock_path.unlink()
+        return True
+    except OSError:
+        return False
+
+
+def _bind_trigger_lock(lock_path: Path, token: str, worker_pid: int) -> bool:
+    """Bind an existing launcher lock to its worker without changing its token."""
+    payload = _read_trigger_lock(lock_path)
+    if not token or payload.get("token") != token:
+        return False
+    payload["worker_pid"] = int(worker_pid)
+    payload["worker_bound_at"] = datetime.now().isoformat(timespec="seconds")
+    try:
+        # Keep the fixed pathname present throughout the update.  A transient
+        # partial read is fail-closed by check_busy(), so it cannot admit a
+        # second trigger.
+        with lock_path.open("r+", encoding="utf-8") as handle:
+            current = json.load(handle)
+            if not isinstance(current, dict) or current.get("token") != token:
+                return False
+            handle.seek(0)
+            json.dump(payload, handle, ensure_ascii=False)
+            handle.truncate()
+            handle.flush()
+            os.fsync(handle.fileno())
+        return True
+    except (OSError, ValueError, TypeError):
         return False
 
 
 def _auto_running() -> bool:
-    """自动程序（dev_auto / daily_pipeline）是否在运行（psutil 命令行扫描）
+    """每日 DAG 或其受控 bars writer 是否在运行（psutil 命令行扫描）
 
     ★2026-08-10 误伤防护：① 排除自身 pid ② 排除 python -c 调试进程
       （-c 命令行的字符串里可能包含关键词，不是真实管道）——只认脚本文件方式运行的管道
@@ -87,47 +160,76 @@ def _latest_state() -> dict:
 
 def check_busy():
     """→ (busy: bool, reason: str, detail: dict)"""
-    # 0) 最近触发锁（5 分钟内存在 → 有任务刚启动或 worker 初始化中）
-    trig = sorted(glob.glob(str(LOGS / "mu_trigger_*.lock")), key=os.path.getmtime)
-    if trig:
-        age = time.time() - Path(trig[-1]).stat().st_mtime
-        if age < 300:
-            return True, "手动更新刚触发（初始化中）", {}
+    # 0) 全局固定触发锁：跨秒、跨 Web 实例也只能有一个 worker。
+    lock_path = _trigger_lock_path()
+    if lock_path.exists():
+        payload = _read_trigger_lock(lock_path)
+        token = payload.get("token")
+        if not token:
+            return True, "手动更新触发锁损坏（已拒绝新任务）", {}
+        try:
+            age = max(0.0, time.time() - lock_path.stat().st_mtime)
+        except FileNotFoundError:
+            age = 0.0
+        worker_pid = payload.get("worker_pid")
+        if worker_pid and _pid_alive(worker_pid):
+            return True, "手动更新运行中", payload
+        if age < TRIGGER_STARTUP_GRACE_SECONDS:
+            return True, "手动更新刚触发（初始化中）", payload
+        # Launcher/worker 非正常消失后，只回收仍由该 token 拥有的旧锁。
+        if not _release_trigger_lock(lock_path, token):
+            return True, "手动更新触发锁已变更（已拒绝新任务）", {}
     # 1) 手动更新运行中（状态 running + pid 存活）
     st = _latest_state()
     if st.get("status") == "running" and _pid_alive(st.get("pid")):
         return True, f"手动更新运行中（{st.get('started_at', '')} 启动）", st
     # 2) 自动程序在跑
     if _auto_running():
-        return True, "自动程序运行中（dev_auto / daily_pipeline），手动更新已自动禁用", {}
+        return True, "每日增量管道运行中，手动更新已自动禁用", {}
     return False, "", {}
 
 
 def start() -> dict:
     """触发手动全域更新（busy 则拒绝；★O_EXCL 原子触发锁防并发双击/双实例）"""
+    LOGS.mkdir(parents=True, exist_ok=True)
     busy, reason, _ = check_busy()
     if busy:
         return {"ok": False, "reason": reason}
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    # ★2026-08-10 加固：O_EXCL 原子创建触发锁——并发调用只有一个能成功（双实例/双击防护）
-    lock = LOGS / f"mu_trigger_{ts}.lock"
+    token = uuid.uuid4().hex
+    lock = _trigger_lock_path()
+    lock_created = False
     try:
         fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        os.write(fd, json.dumps({"ts": ts, "pid": os.getpid()}).encode())
-        os.close(fd)
+        lock_created = True
+        try:
+            os.write(fd, json.dumps({
+                "token": token,
+                "ts": ts,
+                "launcher_pid": os.getpid(),
+                "created_at": datetime.now().isoformat(timespec="seconds"),
+            }).encode("utf-8"))
+        finally:
+            os.close(fd)
     except FileExistsError:
         return {"ok": False, "reason": "触发冲突：另一触发锁已存在（防并发双实例）"}
     except Exception as e:
+        if lock_created:
+            try:
+                lock.unlink()
+            except OSError:
+                pass
         return {"ok": False, "reason": f"触发锁创建失败: {str(e)[:60]}"}
     try:
         p = subprocess.Popen(
-            [PY, "-X", "utf8", str(BASE / "data" / "manual_update_worker.py"), ts],
+            [PY, "-X", "utf8", str(BASE / "data" / "manual_update_worker.py"), ts, token],
             cwd=str(BASE),
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return {"ok": True, "ts": ts, "pid": p.pid,
-                "note": "手动全域更新已启动（后台完整管道：7z→parquet→日线→巡检→竞价信号→扫描→Pitch）"}
+                "note": "手动增量已启动；与定时任务共用同一状态化 DAG 和质量门禁"}
     except Exception as e:
+        _release_trigger_lock(lock, token)
         return {"ok": False, "reason": f"启动失败: {str(e)[:80]}"}
 
 

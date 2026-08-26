@@ -25,6 +25,18 @@
   .tag-usage-dis { background:rgba(235,87,87,.12); color:#eb5757; }
   .fresh-bar { background:#131316; border:1px solid #2a2a30; border-left:3px solid #f2c94c; border-radius:8px; padding:8px 12px; margin-top:10px; font-size:12px; color:#a1a1aa; }
   .fresh-bar b { color:#f2c94c; }
+  .evidence-bar { border:1px solid #2a2a30; border-left:4px solid #5e6ad2; border-radius:10px; padding:11px 14px; background:#131316; display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; }
+  .evidence-bar.is-ready { border-left-color:#4ade80; }
+  .evidence-bar.is-blocked { border-left-color:#eb5757; }
+  .evidence-kpi { font-size:12px; color:#a1a1aa; }
+  .evidence-kpi b { color:#f4f4f5; font-size:14px; }
+  .source-status-wrap { border:1px solid #2a2a30; border-radius:10px; padding:12px 14px; background:#131316; }
+  .source-status-head { display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; margin-bottom:10px; }
+  .source-status-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:10px; }
+  .source-status-card { border:1px solid #2a2a30; border-radius:8px; padding:10px 12px; background:#101013; min-width:0; }
+  .source-status-card h3 { font-size:13px; margin:0 0 8px; overflow-wrap:anywhere; }
+  .source-status-line { color:#a1a1aa; font-size:12px; line-height:1.75; overflow-wrap:anywhere; }
+  .source-status-counts { display:flex; flex-wrap:wrap; gap:5px; margin-top:7px; }
   /* ★#330 生命周期筛选器 + 分钟因子小标 + 相关性热力图 */
   .life-filter { display:flex; gap:6px; margin:10px 0; }
   .lf-btn { border:1px solid #2a2a30; background:#131316; color:#a1a1aa; font-size:12px; padding:4px 14px; border-radius:14px; cursor:pointer; font-weight:600; transition:all .15s; }
@@ -55,6 +67,14 @@
 <div id="sidebar"></div>
 <div class="v2-wrap">
   <div class="v2-h"><span class="bar"></span><h1>因子</h1><span class="sub">当前因子 · 风控层 · 推荐质量 · 综合排名</span></div>
+
+  <div class="evidence-bar anim-fade-in-up" id="evidence-box" style="margin-top:14px">
+    <span class="mini" style="opacity:.6">加载严格证据契约…</span>
+  </div>
+
+  <div class="source-status-wrap anim-fade-in-up" id="factor-source-box" style="margin-top:10px">
+    <span class="mini" style="opacity:.6">加载披露源覆盖状态…</span>
+  </div>
 
   <!-- 拥挤度仪表 -->
   <div class="v2-summary anim-fade-in-up" id="crowd-box" style="margin-top:14px">
@@ -90,13 +110,106 @@
 <script>
 (function () {
   LW.sidebar.render('sidebar', {active: 'factors'});
-  var R = LW.render;
+  /* 本页大量使用 innerHTML；局部覆盖字段兜底为真正的 HTML 转义，
+     不改变共享 render 引擎，也不允许 API/SQLite 文本成为 DOM。 */
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, function (character) {
+      return ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      })[character];
+    });
+  }
+  var R = Object.create(LW.render);
+  R._f = function (value, fallback) {
+    var rendered = LW.render._f(value, fallback);
+    return escapeHtml(rendered);
+  };
   R.loadEnums();   // ★#348 预热 enums（因子族中文名/族色动态下发）
 
   /* 去 emoji（API status 带 ✅❌🟡⚠️） */
   function stripEmoji(s) {
     return String(s == null ? '' : s).replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE00}-\u{FE0F}\u{2190}-\u{21FF}\u{2300}-\u{23FF}]/gu, '').trim();
   }
+
+  /* 唯一资格数据源：旧 manifest/health 只做辅助展示，不能决定因子是否可用。 */
+  var evidencePromise = LW.api.get('/api/live/factor_evidence');
+  evidencePromise.then(function (d) {
+    var box = document.getElementById('evidence-box');
+    if (!d || !d.available) {
+      var codes = (d && d.error_codes) || ['EVIDENCE_UNAVAILABLE'];
+      box.classList.add('is-blocked');
+      box.innerHTML = '<span class="tag-st tag-bad">证据不可用 · 已关闭接入</span>' +
+        '<span class="mini">' + R._f(codes.join(' · ')) + '</span>' +
+        '<span class="mini" style="opacity:.65">旧结果不会回退展示；请重建 PIT 面板并重跑严格评估。</span>';
+      return;
+    }
+    var s = d.summary || {};
+    var a = d.artifact || {};
+    box.classList.add('is-ready');
+    box.innerHTML = '<span class="tag-st tag-ok">factor-evidence-v1</span>' +
+      '<span class="evidence-kpi">可评 <b>' + R._f(s.evaluable) + '</b> / ' + R._f(s.total) + '</span>' +
+      '<span class="evidence-kpi">可接策略 <b>' + R._f(s.admitted) + '</b></span>' +
+      '<span class="evidence-kpi">仅研究 <b>' + R._f(s.research_only) + '</b></span>' +
+      '<span class="mini">训练 ' + R._f((a.train || {}).start) + '—' + R._f((a.train || {}).end) +
+      ' · 留出 ' + R._f((a.holdout || {}).start) + '—' + R._f((a.holdout || {}).end) +
+      ' · run ' + R._f(a.run_id) + '</span>';
+  }).catch(function (e) {
+    var box = document.getElementById('evidence-box');
+    box.classList.add('is-blocked');
+    box.innerHTML = '<span class="tag-st tag-bad">证据 API 不可用 · 已关闭接入</span><span class="mini">' + R._f(e) + '</span>';
+  });
+
+  /* 披露源列表和探针字段完全由后端配置生成；该块失败不影响证据契约。 */
+  function factorSourceBadge(state) {
+    var style = state === 'healthy' ? 'tag-ok' : (state === 'degraded' ? 'tag-warn' : 'tag-bad');
+    return '<span class="tag-st ' + style + '">' + R._f(state || 'unknown') + '</span>';
+  }
+
+  LW.api.get('/api/live/factor_sources').then(function (d) {
+    var box = document.getElementById('factor-source-box');
+    if (!d || !d.ok) {
+      var unavailableReasons = d && Array.isArray(d.reason_codes) ? d.reason_codes : [];
+      box.innerHTML = '<div class="source-status-head"><b>披露源覆盖状态</b>' +
+        '<span class="tag-st tag-bad">状态接口不可用</span></div>' +
+        '<div class="mini">' + R._f(unavailableReasons.join(' · ') || '接口未返回可用契约') + '</div>';
+      return;
+    }
+    var summary = d.summary || {};
+    var sources = Array.isArray(d.sources) ? d.sources : [];
+    var cards = sources.map(function (source) {
+      var statusCounts = source.status_counts && typeof source.status_counts === 'object' ? source.status_counts : {};
+      var countTags = Object.keys(statusCounts).sort().map(function (status) {
+        return '<span class="tag-st tag-dim">' + R._f(status) + ' ' + R._f(statusCounts[status]) + '</span>';
+      }).join('');
+      var reasons = Array.isArray(source.reason_codes) ? source.reason_codes : [];
+      return '<div class="source-status-card"><h3>' + R._f(source.id) + ' ' + factorSourceBadge(source.state) + '</h3>' +
+        '<div class="source-status-line">分区 ' + R._f(source.latest_partition || '—') +
+        ' · 观测 ' + R._f(source.latest_observed_at || '—') + '</div>' +
+        '<div class="source-status-line">覆盖 ' + R._f(source.coverage_rows) +
+        ' · 完成 ' + R._f(source.complete_count) + ' · 暂定 ' + R._f(source.provisional_count) +
+        ' · 失败 ' + R._f(source.failed_count) + ' · 数据行 ' + R._f(source.observed_rows) + '</div>' +
+        '<div class="source-status-line">节奏 ' + R._f(source.expected_cadence || '—') +
+        ' · 最近 ' + R._f(source.lookback_partitions) + ' 分区 · 最大滞后 ' +
+        R._f(source.max_staleness_hours) + ' 小时</div>' +
+        '<div class="source-status-line">库 ' + R._f(source.db || '—') +
+        ' · 表 ' + R._f(source.table || '—') + ' · ' + R._f(source.db_exists ? '已发现' : '未发现') + '</div>' +
+        '<div class="source-status-counts">' + (countTags || '<span class="tag-st tag-dim">尚无覆盖记录</span>') + '</div>' +
+        (reasons.length ? '<div class="source-status-line" style="margin-top:6px;color:#f2c94c">' + R._f(reasons.join(' · ')) + '</div>' : '') +
+        '</div>';
+    }).join('');
+    box.innerHTML = '<div class="source-status-head"><b>披露源覆盖状态</b>' + factorSourceBadge(d.health_state) +
+      '<span class="mini">源 ' + R._f(summary.total) + ' · 完成 ' + R._f(summary.complete) +
+      ' · 暂定 ' + R._f(summary.provisional) + ' · 失败 ' + R._f(summary.failed) +
+      ' · ' + R._f(d.api_schema_version) + '</span></div>' +
+      '<div class="source-status-grid">' +
+      (cards || '<div class="mini">配置中尚无披露源</div>') + '</div>';
+  }).catch(function (e) {
+    var box = document.getElementById('factor-source-box');
+    box.innerHTML = '<div class="source-status-head"><b>披露源覆盖状态</b>' +
+      '<span class="tag-st tag-bad">已降级</span></div>' +
+      '<div class="mini">状态接口缺失、超时或不可达；证据卡与因子资格仍按独立契约工作。 ' +
+      R._f(e && e.message ? e.message : e) + '</div>';
+  });
 
   // ★#323 因子池 UI 数据包（外包 output/ui_data/ 5 文件：用途分层/生命周期/相关性/FRC规则/时效）
   var UI = { usage: {}, lifecycle: {}, corr: {}, frc_rules: {}, freshness: {}, style_rotation: {}, alert_rules: {} };
@@ -116,8 +229,8 @@
     // ★#348 风格颜色从 enums 动态下发（不写死 styleColors）
     var cc = R.styleColor(cur);
     var w = (sr.weights || {})[cur] || {};
-    var boost = (w.boost || []).map(function (f) { return '<span class="tag-st tag-ok" style="margin:0 2px">' + f + '</span>'; }).join('');
-    var trim = (w.trim || []).map(function (f) { return '<span class="tag-st tag-dim" style="margin:0 2px">' + f + '</span>'; }).join('');
+    var boost = (w.boost || []).map(function (f) { return '<span class="tag-st tag-ok" style="margin:0 2px">' + R._f(f) + '</span>'; }).join('');
+    var trim = (w.trim || []).map(function (f) { return '<span class="tag-st tag-dim" style="margin:0 2px">' + R._f(f) + '</span>'; }).join('');
     box.style.display = 'block';
     box.innerHTML =
       '<span class="tm"> 风格轮动 · <span style="color:' + cc + '">' + R._f(cur) + ' 期</span></span>' +
@@ -160,7 +273,7 @@
     var pct = c.pctile != null ? (c.pctile * 100).toFixed(1) + '%' : '—';
     box.innerHTML =
       '<span class="tm"> 市场拥挤度 ' + pct + '</span>' +
-      '<span class="mini">' + stripEmoji(c.zone || '—') + ' · 拥挤 ' + R._f(c.n_crowded) + ' 只 · ' + R._f(c.date) + '</span>' +
+      '<span class="mini">' + R._f(stripEmoji(c.zone || '—')) + ' · 拥挤 ' + R._f(c.n_crowded) + ' 只 · ' + R._f(c.date) + '</span>' +
       '<span class="mini" style="opacity:.6">252 日分位（越低越冷清，>80% 警惕泡沫）</span>';
   }).catch(function () {});
 
@@ -168,10 +281,10 @@
   function badge(status) {
     var s = stripEmoji(status);
     if (!s) return '<span class="tag-st tag-dim">—</span>';
-    if (s.indexOf('有效') >= 0 || s.indexOf('正常') >= 0) return '<span class="tag-st tag-ok">' + s + '</span>';
-    if (s.indexOf('弱') >= 0 || s.indexOf('衰减') >= 0 || s.indexOf('漂移') >= 0 || s.indexOf('数据不足') >= 0) return '<span class="tag-st tag-warn">' + s + '</span>';
-    if (s.indexOf('失效') >= 0 || s.indexOf('反向') >= 0) return '<span class="tag-st tag-bad">' + s + '</span>';
-    return '<span class="tag-st tag-new">' + s + '</span>';
+    if (s.indexOf('有效') >= 0 || s.indexOf('正常') >= 0) return '<span class="tag-st tag-ok">' + R._f(s) + '</span>';
+    if (s.indexOf('弱') >= 0 || s.indexOf('衰减') >= 0 || s.indexOf('漂移') >= 0 || s.indexOf('数据不足') >= 0) return '<span class="tag-st tag-warn">' + R._f(s) + '</span>';
+    if (s.indexOf('失效') >= 0 || s.indexOf('反向') >= 0) return '<span class="tag-st tag-bad">' + R._f(s) + '</span>';
+    return '<span class="tag-st tag-new">' + R._f(s) + '</span>';
   }
 
   /* 方向显示（+1 正向 / -1 反向 / null 未定） */
@@ -196,7 +309,7 @@
       var fs = mf.factors || [];
       var cats = d.categories || {};
       var catHtml = Object.keys(cats).map(function (k) {
-        return '<span class="tag-st tag-dim" style="margin:0 4px 4px 0;display:inline-block">' + k + ' ' + cats[k] + '</span>';
+        return '<span class="tag-st tag-dim" style="margin:0 4px 4px 0;display:inline-block">' + R._f(k) + ' ' + R._f(cats[k]) + '</span>';
       }).join('');
       var rows = fs.map(function (f) {
         var ic = f.icir_60 != null ? Number(f.icir_60).toFixed(2) : null;
@@ -220,7 +333,7 @@
         '<div class="mini" style="margin:6px 0 10px">' + catHtml + '</div>' +
         '<table><thead><tr><th>因子</th><th>代码</th><th>分类</th><th>方向</th><th style="text-align:right">ICIR60</th><th>状态</th><th>用途</th></tr></thead><tbody>' +
         (rows || '<tr><td colspan="7" class="mini" style="text-align:center;opacity:.6">暂无</td></tr>') + '</tbody></table></div>';
-    }).catch(function (e) { box.innerHTML = ' ' + e; });
+    }).catch(function (e) { box.innerHTML = ' ' + R._f(e); });
   }
 
   /* Tab 2：风控层（health 按 status 分组——没过风控的失效/弱有效/反向/衰减全展示） */
@@ -264,7 +377,7 @@
       var frc = UI.frc_rules || {};
       var frcRules = (frc.rules || []).map(function (r) {
         return '<div class="dt-line"><span class="db">' + R._f(r.factor) + '</span>' +
-          '<span class="mini" style="color:#f2c94c;font-weight:600">' + (r.deduct != null ? '减 ' + r.deduct + ' 分' : '') + '</span>' +
+          '<span class="mini" style="color:#f2c94c;font-weight:600">' + (r.deduct != null ? '减 ' + R._f(r.deduct) + ' 分' : '') + '</span>' +
           '<span class="cs">' + R._f(r.ex60) + ' · ' + R._f(r.stability) + '</span></div>';
       }).join('');
       var frcHtml = frcRules
@@ -283,7 +396,7 @@
           var trs = list.map(function (a) {
             return '<tr><td><b>' + R._f(a.factor) + '</b></td>' +
               '<td class="td-num">' + (a.icir120 != null ? Number(a.icir120).toFixed(3) : '—') + '</td>' +
-              '<td>' + stripEmoji(a.status || '') + '</td></tr>';
+              '<td>' + R._f(stripEmoji(a.status || '')) + '</td></tr>';
           }).join('');
           return '<div class="v2-card" style="margin-top:0;border-color:' + (lv === 'red' ? '#C0392B33' : '#b7791f33') + '"><h2> ' + alertBadge(lv) + ' <span class="tag">' + list.length + ' 个 · ' + arLevels[lv] + '</span></h2>' +
             '<table><thead><tr><th>因子</th><th style="text-align:right">ICIR120</th><th>状态</th></tr></thead><tbody>' + trs + '</tbody></table></div>';
@@ -297,7 +410,7 @@
         '<div class="v2-summary" style="margin-top:0"><span class="tm"> 风控层 · 通过 ' + pass + ' / 弱有效 ' + weak + ' / 共 ' + total + '</span>' +
         '<span class="mini">反向/失效/衰减因子一律不得用于选股（FRC 排雷）</span></div>' +
         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">' + cards + '</div>' + frcHtml + arHtml;
-    }).catch(function (e) { box.innerHTML = ' ' + e; });
+    }).catch(function (e) { box.innerHTML = ' ' + R._f(e); });
   }
 
   /* Tab 3：推荐质量（factor_perf 实盘 pitch 业绩） */
@@ -308,35 +421,35 @@
       LW.api.get('/api/live/calendar').catch(function () { return {}; })
     ]).then(function (res) {
       var d = res[0];
-      if (!d.ok) { box.innerHTML = ' ' + d.err; return; }
+      if (!d.ok) { box.innerHTML = ' ' + R._f(d.err); return; }
       var hz = (res[1] && res[1].horizons) || {};
       var t5due = (hz.t5 && hz.t5.next_due) || '';
       var rows = (d.factors || []).map(function (f) {
         var t1 = (f.t1_avg != null && !isNaN(f.t1_avg)) ? '<b style="color:' + R.color(f.t1_avg) + '">' + (f.t1_avg * 100).toFixed(2) + '%</b>' : '—';
         var t5 = (f.t5_avg != null && !isNaN(f.t5_avg)) ? '<b style="color:' + R.color(f.t5_avg) + '">' + (f.t5_avg * 100).toFixed(2) + '%</b>' : '<span style="opacity:.4">—</span>';
         return '<tr><td><b>' + R._f(f.factor) + '</b></td>' +
-          '<td class="td-num">' + f.n_pitch + '</td>' +
+          '<td class="td-num">' + R._f(f.n_pitch) + '</td>' +
           '<td class="td-num">' + t1 + '</td>' +
           '<td class="td-num">' + t5 + '</td></tr>';
       }).join('');
-      box.innerHTML = '<div class="v2-card" style="margin-top:0"><h2> 因子推荐质量 <span class="tag">实盘 pitch 业绩' + (t5due ? ' · T+5 下一批 ' + t5due + ' 到期' : '') + '</span></h2>' +
+      box.innerHTML = '<div class="v2-card" style="margin-top:0"><h2> 因子推荐质量 <span class="tag">实盘 pitch 业绩' + (t5due ? ' · T+5 下一批 ' + R._f(t5due) + ' 到期' : '') + '</span></h2>' +
         '<table><thead><tr><th>因子</th><th style="text-align:right">pitch 次数</th><th style="text-align:right">T+1 平均</th><th style="text-align:right">T+5 平均</th></tr></thead><tbody>' +
         (rows || '<tr><td colspan="4" class="mini" style="text-align:center;opacity:.6">暂无</td></tr>') + '</tbody></table></div>';
-    }).catch(function (e) { box.innerHTML = ' ' + e; });
+    }).catch(function (e) { box.innerHTML = ' ' + R._f(e); });
   }
 
   /* Tab 4：综合排名（Pitch v3——算法说明移到说明页） */
   function loadRanking(box) {
     LW.api.get('/api/live/factor_ranking').then(function (d) {
-      if (!d.ok) { box.innerHTML = ' ' + (d.err || '排名不可用'); return; }
+      if (!d.ok) { box.innerHTML = ' ' + R._f(d.err || '排名不可用'); return; }
       var rows = (d.ranking || []).slice(0, 60).map(function (r) {
         var live = (r.live_metric != null && !isNaN(r.live_metric)) ? '<b style="color:' + R.color(r.live_metric) + '">' + (r.live_metric * 100).toFixed(2) + '%</b>' : '<span style="opacity:.4">—</span>';
         var eff = r.live_eff > 0 ? '<span class="tag-st tag-new">实测 ' + Math.round(r.live_eff * 100) + '%</span>' : '<span style="opacity:.35">—</span>';
-        return '<tr><td class="td-num"><b>' + r.rank + '</b></td>' +
+        return '<tr><td class="td-num"><b>' + R._f(r.rank) + '</b></td>' +
           '<td><b>' + R._f(r.factor) + '</b></td>' +
           '<td class="td-num">' + (r.icir120 != null ? r.icir120.toFixed(2) : '—') + '</td>' +
-          '<td class="td-num" style="opacity:.6">#' + r.bt_rank + '</td>' +
-          '<td class="td-num">' + r.n_pitch + '</td>' +
+          '<td class="td-num" style="opacity:.6">#' + R._f(r.bt_rank) + '</td>' +
+          '<td class="td-num">' + R._f(r.n_pitch) + '</td>' +
           '<td class="td-num">' + live + '</td>' +
           '<td class="td-num" style="opacity:.6">' + (r.live_rank ? '#' + r.live_rank : '—') + '</td>' +
           '<td class="td-num"><b>' + (r.composite != null ? r.composite.toFixed(1) : '—') + '</b></td>' +
@@ -346,7 +459,7 @@
         '<div class="v2-card" style="margin-top:0"><h2> 因子综合排名 <span class="tag">' + (d.ranking || []).length + ' 因子 · Pitch v3 实测加权</span></h2>' +
         '<div class="mini" style="margin:6px 0 10px;color:var(--muted)">实测强（正收益）因子排名加权增强，实战优先于回测 · <a href="/help#factor-rank" style="color:var(--navy2)">算法说明见说明页</a></div>' +
         '<table><thead><tr><th>排名</th><th>因子</th><th style="text-align:right">回测ICIR120</th><th style="text-align:right">回测排名</th><th style="text-align:right">pitch样本</th><th style="text-align:right">实战业绩</th><th style="text-align:right">实战排名</th><th style="text-align:right">综合分</th><th>实测权重</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
-    }).catch(function (e) { box.innerHTML = ' ' + e; });
+    }).catch(function (e) { box.innerHTML = ' ' + R._f(e); });
   }
 
   /* ★#323 Tab 5：因子生命周期（外包 factor_lifecycle——滚动 120 日 ICIR 月度时序）
@@ -433,14 +546,14 @@
       return c > 0 ? 'rgba(235,87,87,' + (a * 0.85).toFixed(2) + ')' : 'rgba(39,174,96,' + (a * 0.85).toFixed(2) + ')';
     }
     function heatModalHtml() {
-      var topRow = '<div class="corr-full-corner"></div>' + factors.map(function (f) { return '<div class="corr-full-tl" title="' + f + '">' + f + '</div>'; }).join('');
+      var topRow = '<div class="corr-full-corner"></div>' + factors.map(function (f) { return '<div class="corr-full-tl" title="' + R._f(f) + '">' + R._f(f) + '</div>'; }).join('');
       var rows = factors.map(function (f, ri) {
         var cells = factors.map(function (g, ci) {
           var c = matrix[ri] ? matrix[ri][ci] : null;
-          if (ri === ci) return '<div class="corr-full-cell" style="background:#111114" title="' + f + '"></div>';
-          return '<div class="corr-full-cell" style="background:' + heatColor(c) + '" title="' + f + ' × ' + g + ' = ' + (c != null ? c.toFixed(3) : '—') + '"></div>';
+          if (ri === ci) return '<div class="corr-full-cell" style="background:#111114" title="' + R._f(f) + '"></div>';
+          return '<div class="corr-full-cell" style="background:' + heatColor(c) + '" title="' + R._f(f) + ' × ' + R._f(g) + ' = ' + (c != null ? c.toFixed(3) : '—') + '"></div>';
         }).join('');
-        return '<div class="corr-full-lbl" title="' + f + '">' + f + '</div>' + cells;
+        return '<div class="corr-full-lbl" title="' + R._f(f) + '">' + R._f(f) + '</div>' + cells;
       }).join('');
       return '<div class="corr-full-grid" style="grid-template-columns:140px repeat(' + n + ',24px)">' + topRow + rows + '</div>' +
         '<div class="corr-legend-row"><span><span style="display:inline-block;width:10px;height:10px;background:rgba(235,87,87,.85);border-radius:1px"></span> 正相关</span>' +
@@ -494,8 +607,8 @@
       var gy = (PT + g * (H - PT - PB) / 4).toFixed(1);
       grid += '<line x1="' + PL + '" y1="' + gy + '" x2="' + (W - PR) + '" y2="' + gy + '" stroke="#d4d4d8" stroke-width="1"/>';
     }
-    var lbl = '<text x="' + PL + '" y="' + (H - 8) + '" font-size="10" fill="#a1a1aa">' + (dates[0] || '') + '</text>' +
-      '<text x="' + (W - PR) + '" y="' + (H - 8) + '" font-size="10" fill="#a1a1aa" text-anchor="end">' + (dates[dates.length - 1] || '') + '</text>' +
+    var lbl = '<text x="' + PL + '" y="' + (H - 8) + '" font-size="10" fill="#a1a1aa">' + R._f(dates[0] || '') + '</text>' +
+      '<text x="' + (W - PR) + '" y="' + (H - 8) + '" font-size="10" fill="#a1a1aa" text-anchor="end">' + R._f(dates[dates.length - 1] || '') + '</text>' +
       '<text x="' + (W - PR) + '" y="' + (PT + 8) + '" font-size="10" fill="#a1a1aa" text-anchor="end">高 ' + hi.toFixed(2) + '</text>';
     return '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto">' + grid + lbl +
       (benchNav && benchNav.length ? line(benchNav, '#f2c94c', 1.4, true) : '') + line(nav, '#5e6ad2', 2) + '</svg>';
@@ -534,13 +647,13 @@
         '<div class="mini">夏普 <b style="font-size:18px">' + shp + '</b></div>' +
         '<div class="mini">期末净值 <b style="font-size:18px">' + (d.metrics.final_nav != null ? d.metrics.final_nav.toFixed(2) : '—') + '</b></div>' +
         '<div class="mini">月胜率 <b style="font-size:18px">' + pct(d.metrics.monthly_win_rate) + '</b></div>' +
-        '<div class="mini">耗时 <b style="font-size:18px">' + d.elapsed_s + 's</b></div>' +
+        '<div class="mini">耗时 <b style="font-size:18px">' + R._f(d.elapsed_s) + 's</b></div>' +
       '</div>';
       document.getElementById('bt-result').innerHTML =
         kpi + svgNav(d.dates, d.nav, d.bench_nav) +
         '<div class="mini" style="opacity:.6;margin-top:6px">蓝=策略净值 · 金虚线=全池等权基准 · ' +
-        (d.params.strategy === 'script1' ? '脚本1三因子' : '技术三因子') + ' · Top' + d.params.topn +
-        ' · ' + d.params.stocks + ' 只 · ' + d.params.start + '~' + d.params.end + '</div>';
+        (d.params.strategy === 'script1' ? '脚本1三因子' : '技术三因子') + ' · Top' + R._f(d.params.topn) +
+        ' · ' + R._f(d.params.stocks) + ' 只 · ' + R._f(d.params.start) + '~' + R._f(d.params.end) + '</div>';
     }
     document.getElementById('bt-run').onclick = function () {
       var q = 'strategy=' + encodeURIComponent(document.getElementById('bt-strategy').value) +
@@ -551,10 +664,10 @@
       document.getElementById('bt-result').innerHTML =
         '<div class="mini" style="opacity:.7;padding:14px 0">回测运行中…（首次加载数据约 5-15s，勿重复点击）</div>';
       LW.api.get('/api/live/backtest_run?' + q, { timeout: 180000 }).then(function (d) {
-        if (!d.ok) { document.getElementById('bt-result').innerHTML = '<div class="mini" style="color:var(--red)">失败：' + (d.error || '未知') + '</div>'; return; }
+        if (!d.ok) { document.getElementById('bt-result').innerHTML = '<div class="mini" style="color:var(--red)">失败：' + R._f(d.error || '未知') + '</div>'; return; }
         renderResult(d);
       }).catch(function (e) {
-        document.getElementById('bt-result').innerHTML = '<div class="mini" style="color:var(--red)">失败：' + e + '</div>';
+        document.getElementById('bt-result').innerHTML = '<div class="mini" style="color:var(--red)">失败：' + R._f(e) + '</div>';
       });
     };
     // 档案列表（★筛选：类型下拉 + 关键词搜索）
@@ -563,7 +676,7 @@
       return c === '复刻' ? '#8b5cf6' : c === '因子' ? '#2d9cdb' : c === '策略' ? '#27ae60' : '#a1a1aa';
     }
     function catBadge(c) {
-      return '<span class="tag-st" style="background:' + catColor(c) + '1a;color:' + catColor(c) + ';margin-left:6px">' + c + '</span>';
+      return '<span class="tag-st" style="background:' + catColor(c) + '1a;color:' + catColor(c) + ';margin-left:6px">' + R._f(c) + '</span>';
     }
     function renderArchive() {
       var kw = afKw.trim().toLowerCase();
@@ -605,7 +718,7 @@
         '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;align-items:center">' +
           '<span class="mini">筛选：</span>' +
           '<select id="bt-cat" class="lf-btn" style="cursor:pointer">' +
-            cats.map(function (c) { return '<option value="' + c + '">' + c + '</option>'; }).join('') +
+            cats.map(function (c) { return '<option value="' + R._f(c) + '">' + R._f(c) + '</option>'; }).join('') +
           '</select>' +
           '<input id="bt-kw" placeholder="搜索名称/标题/因子" style="flex:1;min-width:160px;padding:6px 10px;border:1px solid #2a2a30;border-radius:8px;font-size:12px;outline:none">' +
           '<span class="mini" style="opacity:.6">' + archives.length + ' 份</span>' +
@@ -639,7 +752,7 @@
         return '<div class="sq-factor" style="padding:7px 10px;margin-bottom:4px">' +
           '<span class="tag-st ' + clsCls + '" style="min-width:52px;text-align:center">' + label.split(' ')[0] + '</span>' +
           '<b style="font-size:13px">' + R._f(r.factor) + '</b>' +
-          '<span class="mini" style="color:#a1a1aa">' + note + '</span>' +
+          '<span class="mini" style="color:#a1a1aa">' + R._f(note) + '</span>' +
           (cls === 'B' ? '<span class="mini" style="color:#f2c94c">可反向利用（需模型识别方向）</span>' : '') +
           (cls === 'A' ? '<span class="mini" style="color:#4ade80">可正常入选股</span>' : '') +
           (cls === 'C' ? '<span class="mini" style="color:#a1a1aa">不进入决策链</span>' : '') + '</div>';
@@ -653,13 +766,99 @@
         '<span class="tag-st tag-usage-frc">B 反转/漂移 ' + (nB ? nB.length : 0) + '</span> 动态符号（不固定权重）· ' +
         '<span class="tag-st tag-usage-def">C 噪声/弱 ' + (nC ? nC.length : 0) + '</span> 剔除不出决策链' +
         '</div>' + (rows || '<div class="mini">无数据</div>') + '</div>';
-    }).catch(function (e) { box.innerHTML = ' ' + e; });
+    }).catch(function (e) { box.innerHTML = ' ' + R._f(e); });
+  }
+
+  function evidenceBlocked(box, d) {
+    var codes = (d && d.error_codes) || ['EVIDENCE_UNAVAILABLE'];
+    box.innerHTML = '<div class="v2-card" style="margin-top:0;border-color:#eb575744">' +
+      '<h2>严格证据不可用 <span class="tag-st tag-bad">Fail closed</span></h2>' +
+      '<div class="mini">' + R._f(codes.join(' · ')) + '</div>' +
+      '<div class="mini" style="margin-top:6px;opacity:.65">本区域不会回退到旧 manifest、旧 health CSV 或无 provenance 的 JSON。</div></div>';
+  }
+
+  function evidenceStateBadge(row) {
+    if (row.admission_state === 'admitted') return '<span class="tag-st tag-ok">' + R._f(row.status_label) + '</span>';
+    if (row.admission_state === 'research_only') return '<span class="tag-st tag-warn">' + R._f(row.status_label) + '</span>';
+    return '<span class="tag-st tag-bad">' + R._f(row.status_label) + '</span>';
+  }
+
+  function loadEvidenceCurrent(box) {
+    evidencePromise.then(function (d) {
+      if (!d || !d.available) { evidenceBlocked(box, d); return; }
+      var rows = (d.factors || []).map(function (f) {
+        var train = f.train_ic != null ? Number(f.train_ic).toFixed(3) : '—';
+        var hold = f.holdout_ic != null ? Number(f.holdout_ic).toFixed(3) : '—';
+        return '<tr><td><b>' + R._f(f.name || f.code) + '</b></td>' +
+          '<td style="color:#a1a1aa">' + R._f(f.family) + '</td>' +
+          '<td>' + dirCell(f.direction) + '</td>' +
+          '<td class="td-num">' + (f.score != null ? Number(f.score).toFixed(1) : '—') + '</td>' +
+          '<td class="td-num">' + train + '</td><td class="td-num">' + hold + '</td>' +
+          '<td>' + evidenceStateBadge(f) + '</td></tr>';
+      }).join('');
+      var a = d.artifact || {};
+      box.innerHTML = '<div class="v2-card" style="margin-top:0"><h2>当前因子 <span class="tag">' +
+        R._f((d.factors || []).length) + ' 个 · 唯一证据 run ' + R._f(a.run_id) + '</span></h2>' +
+        '<div class="mini" style="margin:6px 0 10px">方向和评分仅来自训练期；留出期不参与调参。可接策略还必须通过 T+1 开盘正式回测。</div>' +
+        '<table><thead><tr><th>因子</th><th>族</th><th>冻结方向</th><th style="text-align:right">训练分</th>' +
+        '<th style="text-align:right">训练 IC</th><th style="text-align:right">留出 IC</th><th>资格</th></tr></thead><tbody>' +
+        (rows || '<tr><td colspan="7" class="mini">无因子证据</td></tr>') + '</tbody></table></div>';
+    }).catch(function () { evidenceBlocked(box, null); });
+  }
+
+  function loadEvidenceRisk(box) {
+    evidencePromise.then(function (d) {
+      if (!d || !d.available) { evidenceBlocked(box, d); return; }
+      var definitions = [
+        { key: 'admitted', title: '可接策略', desc: '训练、留出与正式执行回测全部达标', cls: 'tag-ok' },
+        { key: 'research_only', title: '仅研究', desc: '可计算，但尚未完成接入证据链', cls: 'tag-warn' },
+        { key: 'blocked', title: '隔离', desc: '数据或样本门禁未通过', cls: 'tag-bad' }
+      ];
+      var cards = definitions.map(function (def) {
+        var list = (d.factors || []).filter(function (f) { return f.admission_state === def.key; });
+        var rows = list.map(function (f) {
+          var reasons = (f.reason_codes || []).join(' · ') || '—';
+          return '<tr><td><b>' + R._f(f.name) + '</b></td><td class="td-num">' +
+            (f.score != null ? Number(f.score).toFixed(1) : '—') + '</td><td class="mini">' + R._f(reasons) + '</td></tr>';
+        }).join('');
+        return '<div class="v2-card" style="margin-top:0"><h2>' + R._f(def.title) +
+          ' <span class="tag-st ' + def.cls + '">' + list.length + '</span></h2><div class="mini" style="margin:4px 0 8px">' +
+          R._f(def.desc) + '</div><div style="max-height:360px;overflow:auto"><table><thead><tr><th>因子</th>' +
+          '<th style="text-align:right">训练分</th><th>机器原因码</th></tr></thead><tbody>' +
+          (rows || '<tr><td colspan="3" class="mini">无</td></tr>') + '</tbody></table></div></div>';
+      }).join('');
+      box.innerHTML = '<div class="v2-summary" style="margin-top:0"><span class="tm">结构化风控门禁</span>' +
+        '<span class="mini">不再按中文状态子串或前端阈值自行裁决</span></div>' +
+        '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:start">' + cards + '</div>';
+    }).catch(function () { evidenceBlocked(box, null); });
+  }
+
+  function loadEvidenceGate(box) {
+    evidencePromise.then(function (d) {
+      if (!d || !d.available) { evidenceBlocked(box, d); return; }
+      var counts = {};
+      (d.factors || []).forEach(function (f) {
+        (f.reason_codes || []).forEach(function (code) { counts[code] = (counts[code] || 0) + 1; });
+      });
+      var reasonRows = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; }).map(function (code) {
+        return '<div class="dt-line"><span class="db">' + R._f(code) + '</span><b>' + counts[code] + '</b></div>';
+      }).join('');
+      var s = d.summary || {};
+      box.innerHTML = '<div class="v2-summary" style="margin-top:0"><span class="tm">证据门禁</span>' +
+        '<span class="mini">可评 ' + R._f(s.evaluable) + ' · 可接策略 ' + R._f(s.admitted) + ' · 仅研究 ' +
+        R._f(s.research_only) + ' · 隔离 ' + R._f(s.blocked) + '</span></div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px"><div class="v2-card" style="margin-top:0">' +
+        '<h2>硬约束</h2><div class="mini" style="line-height:2">PIT 面板 run 必须一致<br>训练期 2020—2024 冻结方向<br>' +
+        '2025 只做留出确认<br>换手因子排除 2019 年前<br>全空、常数与低覆盖不评分<br>T+1 开盘正式回测达标才可接策略</div></div>' +
+        '<div class="v2-card" style="margin-top:0"><h2>当前阻断原因</h2>' +
+        (reasonRows || '<div class="mini">无阻断</div>') + '</div></div>';
+    }).catch(function () { evidenceBlocked(box, null); });
   }
 
   var fTabs = LW.tabs.init('tabs-demo', [
-    { id: 'purify', label: '净化', load: loadPurify },
-    { id: 'cur', label: '当前因子', load: loadCurrent },
-    { id: 'risk', label: '风控层', load: loadRisk },
+    { id: 'purify', label: '证据门禁', load: loadEvidenceGate },
+    { id: 'cur', label: '当前因子', load: loadEvidenceCurrent },
+    { id: 'risk', label: '风控层', load: loadEvidenceRisk },
     { id: 'life', label: '生命周期', load: loadLifecycle },
     { id: 'corr', label: '相关性', load: loadCorr },
     { id: 'perf', label: '推荐质量', load: loadPerf },

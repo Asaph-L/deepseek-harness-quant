@@ -1,0 +1,49 @@
+schema_version: "dshq-system-live/v1"
+
+cache:
+  collect_ttl_seconds: 10
+  database_ttl_seconds: 30
+  task_ttl_seconds: 300
+
+database_probe:
+  connect_timeout_seconds: 0.2
+  result_timeout_seconds: 1.5
+  max_workers: 5
+
+database_probes:
+  - {id: "bars", path: "data/cache/bars.db"}
+  - {id: "finance", path: "data/cache/finance.db"}
+  - {id: "finance_quality", path: "data/cache/finance_quality.db"}
+  - {id: "minute", path: "data/cache/minute.db"}
+  - {id: "hist_mv", path: "data/cache/hist_mv.db"}
+
+api_probes:
+  - id: "deck_build_mode"
+    url: "http://127.0.0.1:8787/api/build_mode"
+    timeout_seconds: 1.0
+    expected_status: 200
+
+artifact_probes:
+  - {id: "pitch_v2", pattern: "logs/pitch_v2_*.json", stale_hours: 48}
+  - {id: "opp_pool", pattern: "logs/opp_pool_*.json", stale_hours: 48}
+  - {id: "beneish", pattern: "logs/beneish_report*.json", stale_hours: 168}
+  - {id: "sim_tracks", pattern: "logs/sim_tracks*.json", stale_hours: 168}
+  - {id: "pitch_track", pattern: "logs/pitch_track_pool_*.json", stale_hours: 48}
+  - {id: "regime", pattern: "output/dynamic_regime.json", stale_hours: 72}
+  - {id: "traffic_light", pattern: "output/traffic_light.json", stale_hours: 72}
+  - {id: "signal", pattern: "output/daily_signal_*.json", stale_hours: 48}
+  - {id: "audit", pattern: "report/data_audit_report_*.json", stale_hours: 72}
+  - {id: "factor_pool", pattern: "report/factor_pool_report.json", stale_hours: 72}
+  - {id: "pool_layers", pattern: "output/pool_layers_*.json", stale_hours: 48}
+
+dev_auto:
+  log_paths: ["logs/dev_auto.log", "logs/dev_auto_console.log"]
+  tail_lines: 8
+
+activity_feed:
+  patterns: ["logs/*.json", "logs/*.md", "logs/*.csv", "output/*.json", "report/*.json"]
+  window_minutes: 60
+  max_items: 15
+
+deck:
+  port: 8787

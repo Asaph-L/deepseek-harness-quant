@@ -1,11 +1,55 @@
-# 回测策略外部注册表（★动态化铁律：新增/调整策略 = 改本文件，不改代码）
-# 加载：backtest/bt_runner.py 启动时合并进内置注册表（同名覆盖内置）。
-# 策略类型：
-#   instant: true  → 即时回测（评分方式二选一）
-#       factor_list: 声明式因子组合（factors/factor_engine.py FACTOR_FUNCS 动态合成，sign=+1 正向 / -1 反转）
-#       scorer: 内置评分函数名（tech3 / script1 / turn_low）
-#   instant: false → 批处理（如 factor_all），运行按钮禁用
-extra:
+# 回测策略唯一业务注册表。新增/调整策略只改本文件，并同步 strategies.yaml.example。
+# scorer / batch_runner 只能使用 backtest.bt_runner 明确支持的实现标识；未知标识会 fail-closed。
+schema_version: dshq-backtest-strategies/v1
+strategies:
+  tech3:
+    name: 技术三因子
+    category: 策略
+    instant: true
+    desc: "rps_120 反转 + lowvol_60 反转 + near_high_250 正向，月频 TopN 等权，T+1 开盘执行"
+    factors: [rps_120, lowvol_60, near_high_250]
+    scorer: tech3
+    defaults:
+      topn: 5
+      stocks: 300
+    rebalance: M
+
+  script1:
+    name: 大市值三因子
+    category: 复刻
+    instant: true
+    desc: "营收增长率 + 市值 + Beta（高增长大市值高Beta），月频 TopN 等权，T+1 开盘执行"
+    factors: [营收增长率, 市值, Beta]
+    scorer: script1
+    defaults:
+      topn: 5
+      stocks: 300
+    rebalance: M
+
+  turn_low:
+    name: 低换手防御
+    category: 策略
+    instant: true
+    desc: "20 日均换手截面最低 TopN 等权，40 交易日调仓，T+1 执行，无止损无择时（防守主方案）"
+    factors: [turn_20d]
+    scorer: turn_low
+    defaults:
+      topn: 20
+      stocks: 300
+    rebalance: 40
+
+  factor_all:
+    name: 因子全量回测
+    category: 因子
+    instant: false
+    desc: "外包因子池技术面因子逐个 top10% 季度调仓全量回测（批处理 ~1-3 分钟，结果入归档）"
+    factors: [tech 因子族]
+    batch_runner: factor_all
+    defaults:
+      topn: 10
+      stocks: 300
+    rebalance: Q
+
   lowvol_defense:
     name: 低波防守单因子
     category: 策略

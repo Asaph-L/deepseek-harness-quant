@@ -9,6 +9,9 @@ __pycache__/
 config/params.yaml
 config/strategies.yaml
 config/etf_pool.yaml
+config/harness.yaml
+config/niu_personas.yaml
+config/daily_incremental.yaml
 harness/home/.credentials.yaml
 
 # ---- HARNESS 运行时与用户数据 ----
@@ -16,11 +19,17 @@ harness/node_modules/
 harness/home/sessions/
 harness/home/storages/
 harness/home/profiles/web/node_modules/
+harness/home/profiles/headless/
 harness/home/.anonymous-user-id
 harness/home/.credentials.yaml
+harness/home/quant-bridge/
+harness/home/migration-backups/
+harness/home/task-board/
+harness/home/pet.json
 
 # ---- 数据（Tushare 协议：不得再分发；请自行获取） ----
 data/cache/
+data/state/
 data/factorpool/
 data/trash/
 *.db
@@ -58,3 +67,7 @@ harness/home/profiles/node_modules/
 # ---- 内部维护文档（含本机路径，不进公开仓库） ----
 docs/上传GitHub.md
 docs/发布清单_v1.0.9.md
+
+# ---- 本机协作恢复/旧自动待办（不进入开源提交） ----
+/docs/CODEX_RESUME_*.md
+/待办队列.md

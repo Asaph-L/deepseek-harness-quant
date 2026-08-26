@@ -53,9 +53,31 @@ def load_latest() -> dict:
     return {"ts": "", "entries": []}
 
 
+def _pool_data_date(pool: dict) -> str | None:
+    """Latest canonical market date represented by this snapshot."""
+    try:
+        from data.cache import DailyCache
+        latest = DailyCache().latest_trade_date()
+        if latest:
+            return str(latest)[:10]
+    except Exception:
+        pass
+    candidates = []
+    for entry in pool.get("entries") or []:
+        if entry.get("entry_date"):
+            candidates.append(str(entry["entry_date"])[:10])
+        latest = (entry.get("fwd") or {}).get("latest") or {}
+        if latest.get("date"):
+            candidates.append(str(latest["date"])[:10])
+    return max(candidates) if candidates else None
+
+
 def _write(pool: dict):
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     pool["ts"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    data_date = _pool_data_date(pool)
+    if data_date:
+        pool["data_date"] = data_date
     p = BASE / "logs" / f"pitch_track_pool_{ts}.json"
     p.write_text(json.dumps(pool, ensure_ascii=False), encoding="utf-8")
     return p
@@ -764,6 +786,7 @@ if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser(description="历史 Pitch 远期收益池")
     ap.add_argument("--append", type=str, default=None, help="pitch_v2 输出 json 路径（入池）")
+    ap.add_argument("--append-latest", action="store_true", help="将最新 pitch_v2_*.json 入池")
     ap.add_argument("--update", action="store_true", help="更新远期收益")
     ap.add_argument("--summary", action="store_true", help="汇总统计")
     ap.add_argument("--dedupe", action="store_true", help="清理同 code 重复（保留最早）")
@@ -775,6 +798,12 @@ if __name__ == "__main__":
     args = ap.parse_args()
     if args.append:
         append_pitch(Path(args.append))
+    if args.append_latest:
+        latest_pitch = sorted((BASE / "logs").glob("pitch_v2_*.json"),
+                              key=lambda path: path.stat().st_mtime_ns)
+        if not latest_pitch:
+            raise SystemExit("无 pitch_v2 产物")
+        append_pitch(latest_pitch[-1])
     if args.machine:
         append_machine_top01(args.machine)
     if args.human:
@@ -796,7 +825,11 @@ if __name__ == "__main__":
         print(json.dumps(summary_by_pool(), ensure_ascii=False, indent=1))
     if args.dedupe:
         dedupe()
-    if not (args.append or args.update or args.summary):
+    # The daily DAG requires proof that this invocation produced a fresh,
+    # date-bound snapshot even when no entry or forward return changed.
+    if args.append_latest or args.update:
+        _write(load_latest())
+    if not (args.append or args.append_latest or args.update or args.summary):
         # 默认：更新 + 汇总
         update_fwd()
         print(json.dumps(summary(), ensure_ascii=False, indent=1))

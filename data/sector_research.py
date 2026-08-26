@@ -443,7 +443,7 @@ def sector_pitch(sector, topn=20, strong_factors=None):
     # ★2026-08-22 降级：gdhs_full.db（股东户数，外包数据）缺失 → 空表，跳过排雷不报错
     try:
         con = sqlite3.connect(str(CACHE / "gdhs_full.db"))
-        gd = pd.read_sql("SELECT code, chg_pct, ann_date FROM gdhs", con)
+        gd = pd.read_sql("SELECT ts_code AS code, chg_pct, ann_date FROM gdhs", con)
         con.close()
         gd["code"] = gd["code"].astype(str).str[:6]
         gd = gd.sort_values("ann_date").drop_duplicates(subset="code", keep="last").set_index("code")
@@ -525,7 +525,7 @@ def sector_retail(sector, topn=20):
     # ★2026-08-22 降级：gdhs_full.db（外包数据）缺失 → 空表，跳过散户因子不报错
     try:
         con = sqlite3.connect(str(CACHE / "gdhs_full.db"))
-        gd = pd.read_sql("SELECT code, chg_pct, ann_date FROM gdhs", con)
+        gd = pd.read_sql("SELECT ts_code AS code, chg_pct, ann_date FROM gdhs", con)
         con.close()
         gd["code"] = gd["code"].astype(str).str[:6]
         gd = gd.sort_values("ann_date").drop_duplicates(subset="code", keep="last").set_index("code")

@@ -203,8 +203,15 @@ def run() -> Path:
 
     n_trig = sum(1 for r in results if r["status"] == "TRIGGERED")
     n_near = sum(1 for r in results if r["status"] == "NEAR")
+    try:
+        from data.cache import DailyCache
+        data_date = DailyCache().latest_trade_date()
+    except Exception:
+        data_date = None
+    data_date = data_date or pt.get("data_date")
     out = {
         "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "data_date": data_date,
         "monitored": len(results),
         "triggered": n_trig,
         "near": n_near,

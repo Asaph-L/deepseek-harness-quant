@@ -25,9 +25,61 @@ data:
   tushare_backup:                                  # 备用服务器（HTTP API 封装，见 data/fetcher_tushare_backup.py）
     url: "<your-config>"
     api_key: "<your-config>"
+  institution_disclosures:
+    shebao:
+      api_name: "top10_holders"
+      fields: ["ts_code", "ann_date", "end_date", "holder_name", "hold_amount", "hold_ratio", "hold_float_ratio", "hold_change"]
+      holder_keywords: ["全国社保基金", "社保基金"]
   jqdata_user: "<your-config>" # 聚宽 JQData 账号（2026-08-14 用户申请）
   jqdata_password: "<your-config>" # 聚宽 JQData 密码
   jqdata_note: "试用/免费版：数据窗口 2025-05-06~2026-05-13（约1年，含 1m/30m/60m 分钟线+申万行业+valuation；无当前实时数据，分钟线仅可用于回测验证周期因子）"
+
+# ---------- 市场生命周期（正式回测与历史状态修复的唯一真源）----------
+market_lifecycle:
+  contract_version: "dshq-market-lifecycle/v1"
+  rules:
+    - id: "beijing_stock_exchange"
+      code_suffixes: [".BJ"]
+      effective_from: "2021-11-15"
+      pre_effective_policy: "not_applicable_preserve_source"
+
+# ---------- 历史 qfq 完整性重建（scripts/rebuild_qfq_history.py）----------
+# 生产调用缺少本段即 fail-closed；第三方数据只落 state/real，不写入 Git 跟踪数据。
+qfq_integrity:
+  source_db: "data/cache/bars.db"
+  listing_db: "data/cache/stock_basic.db" # 首观测参考价缺口必须动态证明早于 IPO
+  state_dir: "data/state/qfq_rebuild"
+  real_dir: "data/real"
+  snapshot_db: "data/state/qfq_rebuild/bars_source_snapshot.db"
+  snapshot_manifest: "data/state/qfq_rebuild/source_snapshot.json"
+  staging_db: "data/state/qfq_rebuild/adj_factors.db"
+  st_repair_db: "data/state/qfq_rebuild/st_repair.db" # exact provider evidence + market-lifecycle preserve-source evidence
+  candidate_db: "data/real/bars_qfq_candidate.db"
+  publish_link: "data/cache/bars.db"
+  publish_manifest: "data/state/qfq_rebuild/publish_history.json"
+  pipeline_lock: "data/state/daily_incremental.lock"  # 与单一盘后管道共用
+  run_lock: "data/state/qfq_rebuild/qfq_run.lock"     # qfq 非 dry-run 全程互斥；锁序 run→pipeline
+  increment_glob: "data/cache/bars_incr*.db"
+  start_date: "2019-01-01"
+  end_date: null                 # null = 冻结快照内最近股票交易日
+  adjust: "qfq"
+  calendar_exchange: "SSE"
+  provider_source: "tushare"
+  boundary_gap:
+    contract_version: "qfq-first-observation-null-preclose-pct/v1"
+    resolution: "preserve_null_fail_closed" # 保留 NULL；禁止合成昨收/涨跌幅
+    require_before_ipo: true
+    allowed_code_suffixes: [".BJ"] # 当前证据仅覆盖北交所/新三板映射历史
+  continuity_tolerance: 0.000001
+  max_continuity_breaks: 0
+  max_continuity_break_rate: 0.0
+  audit_issue_limit: 200
+  min_factor_codes: 1           # exact expected set 仍为硬门禁；这里只拒绝空/异常小分区
+  min_factor_coverage_ratio: 1.0
+  min_daily_codes: 1
+  min_daily_coverage_ratio: 1.0
+  min_final_row_ratio: 1.0
+  min_st_codes: 50              # 官方 stock_st 每日快照的 expected-universe 最少命中数
 
 # ---------- CANSLIM 主引擎（修正版）----------
 factors:
@@ -205,6 +257,23 @@ backtest:
   stamp_tax: 0.0005                  # 卖出印花税 0.05%
   slippage: 0.001                    # 滑点 0.1%
   out_of_sample_start: "<your-config>" # 样本外起点
+  verdict_thresholds:
+    min_days: 252
+    min_sharpe: 0.5
+    min_annual_return: 0.0
+  execution:
+    contract_version: "dshq-execution/v1"
+    default_limit_pct: 0.10
+    limit_trigger_ratio: 0.95
+    price_tolerance: 1.0e-8
+    stamp_duty_cutover: "2023-08-28"
+    stamp_duty_before_bps: 10.0
+    stamp_duty_after_bps: 5.0
+    limit_rules:
+      - {id: "star", code_prefixes: ["688", "689"], limit_pct: 0.20, effective_from: "2019-07-22"}
+      - {id: "chinext-registration", code_prefixes: ["300", "301"], limit_pct: 0.20, effective_from: "2020-08-24"}
+      - {id: "beijing", code_prefixes: ["4", "8", "920"], limit_pct: 0.30, effective_from: "2021-11-15"}
+      - {id: "st", is_st: true, limit_pct: 0.05}
 
 # ---------- 个股状态分类（v2.9，用户新方向）----------
 # 先分类再配策略：right 突破（欧奈尔止损）/ left 超跌反转（无止损）/ neutral 低波防守
@@ -264,6 +333,44 @@ factor_pool:
   thresholds:                     # 与 factors/pool/eval_ts.py THRESHOLDS 一致（改此优先）
     active: 65                    # ≥65 分 → active（可接入策略）
     candidate: 40                 # 40-65 分 → candidate（观察）
+  evidence:                       # 横截面因子证据门禁（训练期与留出期严格隔离）
+    schema_version: "factor-evidence-v1"
+    panel_schema_version: "pit-contract-v3-canonical-units"
+    evaluator_contract_version: "factor-evaluator-v2-outcome-window-purged"
+    train_start: "2020-01-01"
+    train_end: "2024-12-31"
+    holdout_start: "2025-01-01"
+    holdout_end: "2025-12-31"
+    forward_days: 20
+    winsor_lower: 0.01            # 每个交易日横截面缩尾，禁止沿时间轴缩尾
+    winsor_upper: 0.99
+    min_cross_section: 50
+    min_overall_coverage: 0.50
+    min_date_coverage: 0.20
+    min_eligible_month_ratio: 0.80
+    min_months_per_year: 6
+    min_train_months: 24
+    min_holdout_months: 6
+    admission:
+      min_score: 50.0
+      require_holdout_confirmation: true
+      require_execution_backtest: true
+      execution_contract_version: "dshq-execution/v1"
+      accepted_backtest_verdicts: ["有效"]
+      factor_backtest_artifacts: {} # 因子名 → dshq-backtest-archive/v2 相对路径；无正式回测不得接入
+    reason_catalog:                # API 动态下发；前端只渲染，不按中文字符串裁决
+      NO_FINITE_VALUES: {label: "没有有限数值", severity: "blocker"}
+      LOW_OVERALL_COVERAGE: {label: "总体覆盖不足", severity: "blocker"}
+      NO_CROSS_SECTION_VARIATION: {label: "横截面无差异", severity: "blocker"}
+      INSUFFICIENT_MONTHS: {label: "训练月份不足", severity: "blocker"}
+      LOW_YEAR_COVERAGE: {label: "年度覆盖不足", severity: "blocker"}
+      INSUFFICIENT_HOLDOUT: {label: "留出月份不足", severity: "blocker"}
+      TURN_PRE_2019: {label: "已排除 2019 年前换手数据", severity: "info"}
+      UNCONFIRMED_ZERO_SEMANTICS: {label: "训练期无法冻结方向", severity: "blocker"}
+      HOLDOUT_NOT_CONFIRMED: {label: "留出期未确认", severity: "blocker"}
+      TRAIN_SCORE_BELOW_ADMISSION: {label: "训练分低于接入线", severity: "blocker"}
+      STRATEGY_BACKTEST_REQUIRED: {label: "缺少正式执行回测", severity: "blocker"}
+      STRATEGY_BACKTEST_NOT_ACCEPTED: {label: "正式回测尚未判有效", severity: "blocker"}
   evaluate_on_sched: true         # dev_auto 每轮评估候选+巡检 active
   fetch_on_sched: true            # 每轮刷新政策数据（EPU FRED 全量重下，量小）
   ts_eval_start: "<your-config>" # 时序因子评估起点（覆盖 2020-2025 回测 + 前段滚动窗口）

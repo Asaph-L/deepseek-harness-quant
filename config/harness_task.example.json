@@ -1,0 +1,40 @@
+{
+  "protocol": "dshq-task/v1",
+  "task_id": "example-readme-fix-001",
+  "title": "修正文档中的回归命令",
+  "objective": "让 README 中的快速回归示例与仓库实际脚本一致，并通过文档验收。",
+  "ordered_steps": [
+    "只读检查 README 与 scripts/quick_regression.py 的当前内容",
+    "仅修改 README 中对应命令与说明",
+    "运行无副作用快速回归并记录结果",
+    "按协议输出结构化 receipt"
+  ],
+  "allowed_paths": [
+    "README.md",
+    "scripts/quick_regression.py"
+  ],
+  "forbidden_paths": [
+    ".git",
+    "config/params.yaml",
+    "data/cache",
+    "harness/home"
+  ],
+  "constraints": [
+    "禁止访问网络",
+    "禁止修改数据与运行配置",
+    "不得扩大任务范围"
+  ],
+  "acceptance": [
+    "README 命令与脚本入口完全一致",
+    "快速回归退出码为 0",
+    "除 README.md 外没有业务文件变化"
+  ],
+  "git": {
+    "branch": null,
+    "commit": false,
+    "push": false
+  },
+  "authorization": {
+    "external_model_context": false
+  }
+}

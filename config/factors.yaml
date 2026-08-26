@@ -1,0 +1,46 @@
+# DSHQuant 横截面因子唯一业务目录。实现函数仍由 Python allowlist 提供；
+# 默认计算集合、因子族、方向、数据依赖和可用起点全部由本文件驱动。
+schema_version: dshq-factor-catalog/v2
+factors:
+  - {id: turnover, enabled: true, family: "换手率", default_direction: -1, kind: alpha_panel, frequency: daily, required_datasets: [bars_qfq, daily_basic_turn], available_from: "2019-01-01", implementation: turnover}
+  - {id: turn_mean20, enabled: true, family: "换手率", default_direction: -1, kind: alpha_panel, frequency: daily, required_datasets: [bars_qfq, daily_basic_turn], available_from: "2019-01-01", implementation: turn_mean20}
+  - {id: turn_std20, enabled: true, family: "换手率", default_direction: -1, kind: alpha_panel, frequency: daily, required_datasets: [bars_qfq, daily_basic_turn], available_from: "2019-01-01", implementation: turn_std20}
+  - {id: turn_mid_prox, enabled: true, family: "换手率", default_direction: -1, kind: alpha_panel, frequency: daily, required_datasets: [bars_qfq, daily_basic_turn], available_from: "2019-01-01", implementation: turn_mid_prox}
+  - {id: lowvol_60, enabled: true, family: "低波动", default_direction: -1, kind: alpha_panel+factor_engine, frequency: daily, required_datasets: [bars_qfq], available_from: "2019-01-01", implementation: lowvol_60}
+  - {id: std20, enabled: true, family: "低波动", default_direction: -1, kind: alpha_panel, frequency: daily, required_datasets: [bars_qfq], available_from: "2019-01-01", implementation: std20}
+  - {id: downside_vol, enabled: true, family: "低波动", default_direction: -1, kind: alpha_panel, frequency: daily, required_datasets: [bars_qfq], available_from: "2019-01-01", implementation: downside_vol}
+  - {id: reversal20, enabled: true, family: "反转", default_direction: -1, kind: alpha_panel, frequency: daily, required_datasets: [bars_qfq], available_from: "2019-01-01", implementation: reversal20}
+  - {id: o2c_sum_20, enabled: true, family: "反转", default_direction: 1, kind: alpha_panel, frequency: daily, required_datasets: [bars_qfq], available_from: "2019-01-01", implementation: o2c_sum_20}
+  - {id: amihud, enabled: true, family: "流动性", default_direction: 1, kind: alpha_panel, frequency: daily, required_datasets: [bars_qfq], available_from: "2019-01-01", implementation: amihud}
+  - {id: max_ret20, enabled: true, family: "彩票/偏度", default_direction: -1, kind: alpha_panel, frequency: daily, required_datasets: [bars_qfq], available_from: "2019-01-01", implementation: max_ret20}
+  - {id: skew20, enabled: true, family: "彩票/偏度", default_direction: -1, kind: alpha_panel, frequency: daily, required_datasets: [bars_qfq], available_from: "2019-01-01", implementation: skew20}
+  - {id: rmax_20, enabled: true, family: "彩票/偏度", default_direction: -1, kind: alpha_panel, frequency: daily, required_datasets: [bars_qfq], available_from: "2019-01-01", implementation: rmax_20}
+  - {id: amp20, enabled: true, family: "振幅/动量", default_direction: -1, kind: alpha_panel, frequency: daily, required_datasets: [bars_qfq], available_from: "2019-01-01", implementation: amp20}
+  - {id: open_prem_20, enabled: true, family: "振幅/动量", default_direction: 1, kind: alpha_panel, frequency: daily, required_datasets: [bars_qfq], available_from: "2019-01-01", implementation: open_prem_20}
+  - {id: bp, enabled: true, family: "基本面低频", default_direction: -1, kind: alpha_panel, frequency: event, required_datasets: [bars_qfq, finance_ts_pit], available_from: "2019-01-01", implementation: bp}
+  - {id: asset_growth, enabled: true, family: "基本面低频", default_direction: 1, kind: alpha_panel, frequency: event, required_datasets: [bars_qfq, finance_ts_pit], available_from: "2019-01-01", implementation: asset_growth}
+  - {id: sue, enabled: true, family: "基本面低频", default_direction: 1, kind: alpha_panel, frequency: event, required_datasets: [bars_qfq, finance_ts_pit], available_from: "2019-01-01", implementation: sue}
+  - {id: roe, enabled: true, family: "基本面低频", default_direction: 1, kind: alpha_panel, frequency: event, required_datasets: [bars_qfq, finance_ts_pit], available_from: "2019-01-01", implementation: roe}
+  - {id: accruals, enabled: true, family: "基本面低频", default_direction: -1, kind: alpha_panel, frequency: event, required_datasets: [bars_qfq, finance_ts_pit], available_from: "2019-01-01", implementation: accruals}
+  - {id: fscore, enabled: true, family: "基本面低频", default_direction: 1, kind: alpha_panel, frequency: event, required_datasets: [bars_qfq, finance_ts_pit], available_from: "2019-01-01", implementation: fscore}
+  - {id: limit_up_cnt_20, enabled: true, family: "短线涨跌停", default_direction: 1, kind: alpha_panel, frequency: daily, required_datasets: [bars_qfq], available_from: "2019-01-01", implementation: limit_up_cnt_20}
+  - {id: consec_limit_up, enabled: true, family: "短线涨跌停", default_direction: 1, kind: alpha_panel, frequency: daily, required_datasets: [bars_qfq], available_from: "2019-01-01", implementation: consec_limit_up}
+  - {id: limit_down_cnt_20, enabled: true, family: "短线涨跌停", default_direction: -1, kind: alpha_panel, frequency: daily, required_datasets: [bars_qfq], available_from: "2019-01-01", implementation: limit_down_cnt_20}
+  - {id: consec_limit_down, enabled: true, family: "短线涨跌停", default_direction: -1, kind: alpha_panel, frequency: daily, required_datasets: [bars_qfq], available_from: "2019-01-01", implementation: consec_limit_down}
+  - {id: ind_crowd_60, enabled: true, family: "行业层", default_direction: -1, kind: alpha_panel, frequency: daily, required_datasets: [bars_qfq, stock_basic_industry], available_from: "2019-01-01", implementation: ind_crowd_60}
+  - {id: ind_rs_20, enabled: true, family: "行业层", default_direction: 1, kind: alpha_panel, frequency: daily, required_datasets: [bars_qfq, stock_basic_industry], available_from: "2019-01-01", implementation: ind_rs_20}
+  - {id: lhb_cnt_20, enabled: true, family: "机构行为", default_direction: -1, kind: alpha_panel, frequency: daily, required_datasets: [bars_qfq, lhb], available_from: "2020-01-01", implementation: lhb_cnt_20}
+  - {id: lhb_jg_cnt_20, enabled: true, family: "机构行为", default_direction: -1, kind: alpha_panel, frequency: daily, required_datasets: [bars_qfq, lhb], available_from: "2020-01-01", implementation: lhb_jg_cnt_20}
+  - {id: shebao_hold, enabled: true, family: "机构行为", default_direction: 1, kind: alpha_panel, frequency: event, required_datasets: [bars_qfq, shebao], available_from: "2026-06-30", implementation: shebao_hold}
+  - {id: shebao_chg, enabled: true, family: "机构行为", default_direction: 1, kind: alpha_panel, frequency: event, required_datasets: [bars_qfq, shebao], available_from: "2026-06-30", implementation: shebao_chg}
+  - {id: gdhs_chg_pct, enabled: true, family: "机构行为", default_direction: -1, kind: alpha_panel, frequency: event, required_datasets: [bars_qfq, gdhs], available_from: "2020-01-01", implementation: gdhs_chg_pct}
+  - {id: alpha003, enabled: true, family: Alpha101, default_direction: 1, kind: alpha_panel, frequency: daily, required_datasets: [bars_qfq], available_from: "2019-01-01", implementation: alpha003}
+  - {id: alpha006, enabled: true, family: Alpha101, default_direction: 1, kind: alpha_panel, frequency: daily, required_datasets: [bars_qfq], available_from: "2019-01-01", implementation: alpha006}
+  - {id: alpha015, enabled: true, family: Alpha101, default_direction: 1, kind: alpha_panel, frequency: daily, required_datasets: [bars_qfq], available_from: "2019-01-01", implementation: alpha015}
+  - {id: alpha044, enabled: true, family: Alpha101, default_direction: 1, kind: alpha_panel, frequency: daily, required_datasets: [bars_qfq], available_from: "2019-01-01", implementation: alpha044}
+  - {id: alpha050, enabled: true, family: Alpha101, default_direction: 1, kind: alpha_panel, frequency: daily, required_datasets: [bars_qfq], available_from: "2019-01-01", implementation: alpha050}
+  - {id: near_high_250, enabled: true, family: "动量/高点", default_direction: 1, kind: factor_engine, frequency: daily, required_datasets: [bars_qfq], available_from: "2019-01-01", implementation: near_high_250}
+  - {id: mom_20, enabled: true, family: "动量/高点", default_direction: -1, kind: factor_engine, frequency: daily, required_datasets: [bars_qfq], available_from: "2019-01-01", implementation: mom_20}
+  - {id: mom_120, enabled: true, family: "动量/高点", default_direction: -1, kind: factor_engine, frequency: daily, required_datasets: [bars_qfq], available_from: "2019-01-01", implementation: mom_120}
+  - {id: rps_120, enabled: true, family: "动量/高点", default_direction: -1, kind: factor_engine, frequency: daily, required_datasets: [bars_qfq], available_from: "2019-01-01", implementation: rps_120}
+  - {id: new_high_250, enabled: true, family: "动量/高点", default_direction: 0, kind: factor_engine, frequency: daily, required_datasets: [bars_qfq], available_from: "2019-01-01", implementation: new_high_250}

@@ -1,5 +1,12 @@
 # DSHQuant · 项目交接对齐文档
 
+> **2026-08-24 Codex 修订提示**：本文第 6 节的旧分数/收益、第 9 节优先级和
+> 第 11 节部分抓取命令属于上一轮历史快照，不能作为当前准入证据或操作手册。
+> 当前唯一执行基线见 [`因子接入策略与每日增量验收.md`](因子接入策略与每日增量验收.md)，
+> 当前代码回归入口为 `python -B scripts/quick_regression.py`。新的 canonical QFQ、
+> PIT 面板、T+1 正式回测和 evaluator archive 完成并相互绑定前，旧因子结论全部
+> research-only。
+
 > 版本：v2.0 ｜ 更新：2026-08-23 ｜ 本文件只陈述事实（现状/资产/规则/踩坑），不含任务分工。
 > 阅读顺序：本文 → `AGENTS.md`（铁律）→ `config/params.yaml`（全参数）→ `README.md`
 > 事实基线：**README 中的外包声称数值（ICIR 0.9x、123+ 因子等）不存在于本仓库**；一切结论以本地实证脚本输出为准。
@@ -10,10 +17,10 @@
 
 | 项 | 事实 |
 |---|---|
-| 工作区 | `/Users/asaphliang/Documents/Codex/projects/github.com/Asaph-L/deepseek-harness-quant` |
+| 工作区 | 仓库根目录（下文命令均从此处执行） |
 | Python | `.venv/bin/python`（3.12.13，pandas 3.0.5 / numpy 2.5.2） |
 | 服务 | 量化门户 deck **:8787**（http.server 单进程）｜ HARNESS :3080 |
-| 调度 | macOS launchd 9 任务（`scripts/setup_launchd.py` 管理） |
+| 调度 | macOS launchd 配置驱动任务（当前 3 个，由 `scripts/setup_launchd.py` 管理） |
 | 数据 | `data/cache/`（SQLite）+ `data/real/bars.db`（主库 1.7GB，cache/bars.db 是 symlink） |
 | Git | origin=Asaph-L/deepseek-harness-quant；提交身份 Asaph-L \<liangjunshen0@gmail.com\>；GitHub 网络间歇不稳定（push 需重试） |
 
@@ -61,7 +68,7 @@ curl -s http://127.0.0.1:8787/api/system_live | python -m json.tool
 | finance.db | finance_report（ROE/单季同比，小数口径） | 17.7 万行 | `build_finance_report.py` |
 | finance_ts.db | financials_ts（equity/income，ann_date PIT） | 5788 只/17.8 万行 | `build_finance_ts.py` |
 | hist_mv.db | 月度流通市值（亿元，code 带后缀） | 39.3 万行 | `fetcher_hist_mv.py` |
-| lhb.db | 龙虎榜 top_list+top_inst | 10.4 万+86.4 万行 | `fetcher_lhb.py`（2020 起已全量） |
+| lhb.db | 龙虎榜 top_list+top_inst 遗留数据；新 coverage 尚未查询，完整性待合同复核 | 10.4 万+86.4 万行 | `fetcher_lhb.py`（不得据此声称 2020 起全量） |
 | shebao.db | 社保组合持仓（单期 2026-06-30） | 191 只/243 行 | `fetcher_shebao.py` |
 | gdhs_full.db | 股东户数+chg_pct（2020 起多期） | 5541 只/25.7 万行 | `fetcher_gdhs.py` |
 | minute.db | 5min 线 | 空（限频，见 §7） | `fetcher_minute.py` |
@@ -89,9 +96,9 @@ curl -s http://127.0.0.1:8787/api/system_live | python -m json.tool
 7. `待办队列.md` 是 dev_auto 产物（未跟踪，勿提交）。
 8. GitHub 网络不稳定：push 间歇失败/超时，重试可通；token 用完即撤销。
 9. bars.db 有 1 行 baostock 混源（2026-08-20），按 amount 的因子需注意 source。
-10. launchd 任务 9 个已加载；改任务用 `scripts/setup_launchd.py`（--uninstall/--status）。
+10. launchd 当前 3 个配置驱动任务已加载；改任务用 `scripts/setup_launchd.py`（--uninstall/--status）。
 
-## 8. 踩坑速查（完整版见 `docs/PITFALLS.md`，42 项）
+## 8. 踩坑速查（完整版见 `docs/PITFALLS.md`，50 项）
 
 **数据/口径**：turn 2019 前缺失；amount 千元/元双轨（2019+ 主库 99.99% tushare）；finance_report 无 ann_date；sq_net_yoy ±10 截断；ROE 单季年化 vs 小数双口径差 4 倍；hist_mv 单位亿元且 drop_duplicates 会毁 merge_asof；top10_holders 的 holder_name 在列 3；stk_mins 限频 1 次/分钟且重试耗尽额度；trade_cal is_open 是 int；新浪快照 code 格式 sh600519、涨停需按板块上限算价；industry 纯中文不能 [:3] 切分。
 **回测/评估**：组合层双重年化（×12 再 ×12 → +331% 假象）；市值中性缺失（Top10% 全微盘 → +283% 假象）；build_forward_returns/decay_curve 逐股查库卡死数小时（改面板 shift 向量化）；月末锚点字符串 vs Timestamp 键不匹配；VM nan_to_num 填 0 使覆盖率审计失真；2026 数据不足致 holdout 全失败；corr=nan 误判淘汰。

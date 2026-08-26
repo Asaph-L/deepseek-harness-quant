@@ -14,6 +14,7 @@ quantstats>=0.0.81         # 绩效指标（实测通过）
 # ---- 数据处理 ----
 numpy>=1.26
 pandas>=2.2
+tzdata>=2024.1
 pyyaml>=6.0                # 读取 config/params.yaml
 
 # ---- 可选 ----

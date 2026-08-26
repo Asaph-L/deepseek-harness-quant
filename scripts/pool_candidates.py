@@ -34,12 +34,6 @@ CORR_WARN = 0.3       # 0.3-0.5 警示
 HOLDOUT_YEARS = (2025, 2026)
 MIN_COVERAGE = 0.5    # P3：分年非空率下限
 
-# 去重闸门锚点（池内代表性因子，与 skill 定稿锚点一致 + 本池强因子）
-ANCHORS = ["turnover", "turn_mid_prox", "turn_std20", "amihud", "lowvol_60",
-           "std20", "o2c_sum_20", "reversal20", "max_ret20", "open_prem_20",
-           "limit_up_cnt_20", "sue", "fscore", "alpha015", "bp"]
-
-
 def _fwd_labels(close_panel, month_ends, h):
     return (close_panel.shift(-h) / close_panel - 1).reindex(month_ends)
 
@@ -132,9 +126,10 @@ def main():
     ap.add_argument("--out", default=str(BASE / "report" / "候选入池报告.md"))
     args = ap.parse_args()
 
-    from factors.alpha_panel import _load_price_panels, load_panels, FAMILY
+    from factors.alpha_panel import _load_price_panels, load_panels
     from factors.alphagpt.vm import StackVM
     from factors.alphagpt.vocab import FORMULA_VOCAB, build_features
+    from factors.catalog import factor_id_for_implementation, factor_metadata_map
 
     cands = json.loads(Path(args.cand).read_text(encoding="utf-8"))["top"][:args.top]
     print(f"候选 {len(cands)} 条", flush=True)
@@ -149,8 +144,14 @@ def main():
     labels20 = _fwd_labels(P["close"], month_ends, HORIZON)
     mv_month = _load_month_mv(month_ends)
 
-    # 锚点因子面板（去重闸门）
-    anchors = load_panels(start=DATA_START, names=ANCHORS)
+    # 锚点因子面板（去重闸门）：从唯一目录取全部已启用面板实现，
+    # 新增/停用因子无需再维护第二份业务列表。
+    catalog_factors = factor_metadata_map(engine="alpha_panel", enabled_only=True)
+    turn_anchor_id = factor_id_for_implementation(
+        "alpha_panel", "turnover", enabled_only=True
+    )
+    anchor_names = list(catalog_factors)
+    anchors = load_panels(start=DATA_START, names=anchor_names)
     print(f"锚点 {len(anchors)} 个加载完毕", flush=True)
 
     results = []
@@ -222,7 +223,7 @@ def main():
         print(f"  P7 分年度: {years} | holdout {HOLDOUT_YEARS}: {'✅保持' if hold_ok else '❌转负/不足'}")
 
         # P9 正交性 vs turn_low + 容量
-        tl = anchors.get("turnover")
+        tl = anchors[turn_anchor_id]
         turn_corr = None
         if tl is not None:
             tlm = tl.reindex(month_ends)
@@ -249,6 +250,7 @@ def main():
             "icir": round(icir, 3), "direction": direction,
             "coverage": round(float(cov.mean()), 3), "low_cov_years": low_cov,
             "dedup": {"worst_anchor": worst, "corr": round(maxc, 3) if maxc is not None else None,
+                      "anchor_family": catalog_factors[worst]["family"] if worst else None,
                       "verdict": dedup},
             "combo": combo, "holdout_ok": hold_ok,
             "turn_corr": round(turn_corr, 3) if turn_corr is not None else None,
@@ -262,14 +264,14 @@ def main():
         f"\n> 生成时间：{datetime.now():%Y-%m-%d %H:%M:%S} ｜ 区间 {START}~{END} ｜ 成本 {COST:.1%}/期 ｜ Top{int(TOP_PCT * 100)}%",
         f"> 候选源：output/alphagpt_candidates.json（{cands[0]['n_months']} 月末样本）",
         "",
-        "| 因子 | 公式 | ICIR | 方向 | 覆盖率 | 去重(最差锚点/相关) | 年化超额 | 夏普 | holdout | turn_low相关 | 决策 |",
+        "| 因子 | 公式 | ICIR | 方向 | 覆盖率 | 去重(锚点族/最差锚点/相关) | 年化超额 | 夏普 | holdout | turn_low相关 | 决策 |",
         "|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for r in results:
         d = r["dedup"]
         lines.append(
             f"| {r['name']} | {r['formula']} | {r['icir']:+.3f} | {r['direction']:+d} | "
-            f"{r['coverage']:.0%} | {d['worst_anchor']}/{d['corr']} | "
+            f"{r['coverage']:.0%} | {d['anchor_family']}/{d['worst_anchor']}/{d['corr']} | "
             f"{r['combo']['annual_excess']:+.1%} | {r['combo']['sharpe']} | "
             f"{'✅' if r['holdout_ok'] else '❌'} | {r['turn_corr']} | {r['verdict']} |")
     lines += ["", "## 判定标准", "- 去重：与池内锚点相关 >0.5 淘汰 / 0.3-0.5 警示", 

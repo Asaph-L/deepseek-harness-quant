@@ -12,6 +12,7 @@
 写入：DailyCache.put_daily（主库被锁自动路由 bars_incr_*.db，增量覆盖）；幂等（已有日期跳过）。
 """
 import argparse
+import contextlib
 
 # ★2026-08-13 黑框隐藏（总指挥要求：计划任务/常驻进程不弹黑框，运行完自动关闭不留窗）
 try:
@@ -23,10 +24,12 @@ except Exception:
     pass
 
 import json
+import math
+import os
 import sqlite3
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 # ★2026-08-10 计划任务 GBK 崩溃防护（F3 链同款教训：脚本打印 ⚠️✅ emoji，
@@ -41,9 +44,131 @@ BASE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE))
 
 from data.fetcher_tushare import _pro, _call
-from data.cache import DailyCache
+from data.cache import DailyCache, material_bar_paths
+from data.content_identity import connect_readonly_sqlite
 
 BARS_DB = r"data/cache/bars.db"
+EXIT_NOT_READY = 2
+EXIT_QUALITY_FAILED = 3
+EXIT_BUSY = 4
+
+
+def _material_bar_paths() -> list[Path]:
+    """Canonical local bar stores in merge-precedence order."""
+    main = BASE / BARS_DB
+    return material_bar_paths(main, main.with_name("bars_incr*.db"))
+
+
+def _previous_cached_date(trade_date: str) -> str | None:
+    """Latest cached date strictly before target across all material partitions."""
+    target = f"{trade_date[:4]}-{trade_date[4:6]}-{trade_date[6:]}"
+    dates = []
+    read_errors = []
+    for path in _material_bar_paths():
+        if not path.exists():
+            continue
+        try:
+            with contextlib.closing(connect_readonly_sqlite(path, timeout=3)) as con:
+                row = con.execute(
+                    "SELECT MAX(date) FROM daily_bar WHERE adjust='qfq' AND date<?", (target,)
+                ).fetchone()
+            if row and row[0]:
+                dates.append(row[0])
+        except sqlite3.Error as exc:
+            read_errors.append(f"{path.name}:{str(exc)[:80]}")
+    if read_errors:
+        raise RuntimeError(f"CACHED_DATE_HISTORY_READ_FAILED: {','.join(read_errors)}")
+    return max(dates) if dates else None
+
+
+def _previous_stored_closes(cutoff: str, target_codes: set[str]) -> dict[str, tuple[str, float]]:
+    """Latest stored qfq close before ``cutoff`` for every requested code.
+
+    A stable adjusted series has ``stored_close[t-1] == stored_preclose[t]``.
+    The target day's raw ``pre_close`` therefore supplies the exact scale for
+    the new row, including corporate-action days, without dynamically rebasing
+    old rows or applying a one-day-only factor ratio.
+    """
+    normalized_codes = sorted({str(code).upper() for code in target_codes})
+    latest: dict[str, tuple[str, float, int]] = {}
+    read_errors = []
+    cutoff_iso = str(cutoff)[:10]
+    for source_order, path in enumerate(_material_bar_paths()):
+        if not path.exists():
+            continue
+        try:
+            with contextlib.closing(connect_readonly_sqlite(path, timeout=3)) as con:
+                for offset in range(0, len(normalized_codes), 400):
+                    chunk = normalized_codes[offset:offset + 400]
+                    if not chunk:
+                        continue
+                    requested = ",".join("(?)" for _ in chunk)
+                    rows = con.execute(
+                        f"WITH requested(code) AS (VALUES {requested}) "
+                        "SELECT requested.code,d.date,d.close FROM requested "
+                        "JOIN daily_bar d ON d.rowid=(SELECT x.rowid FROM daily_bar x "
+                        "WHERE x.code=requested.code AND x.adjust='qfq' AND x.date<? "
+                        "ORDER BY x.date DESC LIMIT 1)",
+                        (*chunk, cutoff_iso),
+                    ).fetchall()
+                    for code, date, close in rows:
+                        normalized = str(code).upper()
+                        try:
+                            value = float(close)
+                        except (TypeError, ValueError):
+                            continue
+                        if not math.isfinite(value) or value <= 0:
+                            continue
+                        old = latest.get(normalized)
+                        candidate = (str(date), value, source_order)
+                        if old is None or (candidate[0], candidate[2]) > (old[0], old[2]):
+                            latest[normalized] = candidate
+        except sqlite3.Error as exc:
+            read_errors.append(f"{path.name}:{str(exc)[:80]}")
+    if read_errors:
+        raise RuntimeError(f"QFQ_ANCHOR_HISTORY_READ_FAILED: {','.join(read_errors)}")
+    return {code: (date, close) for code, (date, close, _order) in latest.items()}
+
+
+def _prior_history_codes(cutoff: str, target_codes: set[str]) -> set[str]:
+    """Requested codes with any prior qfq row, independent of ``bar_meta``."""
+    normalized_codes = sorted({str(code).upper() for code in target_codes})
+    cutoff_iso = str(cutoff)[:10]
+    found: set[str] = set()
+    read_errors = []
+    for path in _material_bar_paths():
+        if not path.exists():
+            continue
+        try:
+            with contextlib.closing(connect_readonly_sqlite(path, timeout=3)) as con:
+                for offset in range(0, len(normalized_codes), 400):
+                    chunk = normalized_codes[offset:offset + 400]
+                    placeholders = ",".join("?" for _ in chunk)
+                    rows = con.execute(
+                        "SELECT DISTINCT code FROM daily_bar WHERE adjust='qfq' AND date<? "
+                        f"AND code IN ({placeholders})",
+                        (cutoff_iso, *chunk),
+                    ).fetchall()
+                    found.update(str(row[0]).upper() for row in rows if row and row[0])
+        except sqlite3.Error as exc:
+            read_errors.append(f"{path.name}:{str(exc)[:80]}")
+    if read_errors:
+        raise RuntimeError(f"QFQ_PRIOR_HISTORY_READ_FAILED: {','.join(read_errors)}")
+    return found
+
+
+def _positive_factor_map(frame) -> dict[str, float]:
+    if frame is None or "ts_code" not in frame.columns or "adj_factor" not in frame.columns:
+        raise RuntimeError("ADJ_FACTOR_SCHEMA_INVALID")
+    out = {}
+    for code, value in zip(frame["ts_code"], frame["adj_factor"]):
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(number) and number > 0:
+            out[str(code).upper()] = number
+    return out
 
 
 def latest_trade_date(pro=None) -> str:
@@ -52,49 +177,43 @@ def latest_trade_date(pro=None) -> str:
       原全市场查询在 代理服务器 间歇超时下被误判为"盘后数据未出"→ 整链跳过 → 走 baostock 慢兜底。"""
     pro = pro or _pro()
     try:
-        df = _call(pro.trade_cal, exchange="SSE", start_date="20260701",
+        start = (datetime.now() - timedelta(days=45)).strftime("%Y%m%d")
+        df = _call(pro.trade_cal, exchange="SSE", start_date=start,
                    end_date=time.strftime("%Y%m%d"), is_open="1")
         if df is None or df.empty:
             return ""
         dates = sorted(df["cal_date"].astype(str).tolist())
         if not dates:
             return ""
-        # 从最近往回找：单只股票轻量探测（000001.SZ 平安银行，1 行即代表该日已就绪）
+        # 只探测日历上的最新开市日。最新日未就绪必须返回 NOT_READY，
+        # 不能回退前一日并把旧分区误报为本轮成功。
         latest = dates[-1]
-        for d in reversed(dates):
-            try:
-                _one = _call(pro.daily, ts_code="000001.SZ", trade_date=d)
-                if _one is not None and len(_one) > 0:
-                    return d
-            except Exception:
-                continue
-        return ""
+        _one = _call(pro.daily, ts_code="000001.SZ", trade_date=latest)
+        return latest if _one is not None and len(_one) > 0 else ""
     except Exception:
         return ""
 
 
 def fetch_day(pro, trade_date: str):
     """拉单日全市场 → 标准 bars DataFrame（★复权处理：Tushare daily 为未复权价，
-    bars 主库为 qfq 前复权价——用 adj_factor 换算到上一交易日基准，保证价格口径连续；
-    无除权（复权因子不变）时未复权价==前复权价，直接使用）
-    ★2026-08-14 并行化：daily/adj_factor×2/daily_basic 4 路并行拉取（代理服务器 单调用 ~9s，
+    bars 主库为固定基准 qfq 前复权价。新行以该股最后一条已存 qfq close
+    与目标日 raw pre_close 的比值续接，保证除权日及次日都连续；adj_factor
+    仍作为严格的公司行动覆盖/来源完整性门禁。）
+    ★2026-08-14 并行化：daily/adj_factor×2/daily_basic/stock_st 5 路并行拉取（代理服务器 单调用 ~9s，
       串行 ~40-114s → 并行 ~12-20s）"""
     # 先取 prev（本地快，供 adj_factor 基准 + 并行拉取用）
-    try:
-        import sqlite3 as _s
-        con = _s.connect(f"file:{BARS_DB}?mode=ro&immutable=1", uri=True, timeout=3)
-        prev = con.execute("SELECT MAX(date) FROM daily_bar WHERE adjust='qfq'").fetchone()[0]
-        con.close()
-    except Exception:
-        prev = None
+    prev = _previous_cached_date(trade_date)
     prev8 = str(prev).replace("-", "") if prev else None
-    # 4 路并行：daily + adj_factor(t) + adj_factor(prev) + daily_basic(is_st)
+    # 5 路并行：daily + adj_factor(t) + adj_factor(prev) + daily_basic(turn) + stock_st
     from concurrent.futures import ThreadPoolExecutor
-    with ThreadPoolExecutor(max_workers=4) as _ex:
+    with ThreadPoolExecutor(max_workers=5) as _ex:
         f_d = _ex.submit(lambda: _call(pro.daily, trade_date=trade_date))
         f_aft = _ex.submit(lambda: _call(pro.adj_factor, trade_date=trade_date)) if prev8 else None
         f_afp = _ex.submit(lambda: _call(pro.adj_factor, trade_date=prev8)) if prev8 else None
-        f_basic = _ex.submit(lambda: _call(pro.daily_basic, trade_date=trade_date, fields="ts_code,is_st,turnover_rate"))
+        f_basic = _ex.submit(lambda: _call(
+            pro.daily_basic, trade_date=trade_date, fields="ts_code,turnover_rate"
+        ))
+        f_st = _ex.submit(lambda: _call(pro.stock_st, trade_date=trade_date))
         try:
             df = f_d.result()
         except Exception:
@@ -108,30 +227,85 @@ def fetch_day(pro, trade_date: str):
             _db = f_basic.result()
         except Exception:
             _db = None
+        try:
+            _st = f_st.result()
+        except Exception:
+            _st = None
     if df is None or df.empty:
         return None
-    # 复权换算：qfq 价 = 未复权价 × adj[t] / adj[prev]（prev = bars 已有最近交易日）
+    if prev and (af_t is None or af_p is None or len(af_t) == 0 or len(af_p) == 0):
+        raise RuntimeError("ADJ_FACTOR_REQUIRED_FOR_QFQ")
+    if _db is None or _db.empty or "turnover_rate" not in _db.columns:
+        raise RuntimeError("DAILY_BASIC_REQUIRED_FOR_TURN")
+    if _st is None or "ts_code" not in _st.columns:
+        raise RuntimeError("STOCK_ST_REQUIRED_FOR_ST_FLAGS")
+    # 固定基准 qfq 续接。不能使用 raw[t] * adj[t] / adj[prev]：该公式只抬高
+    # 除权当天，次日因子比恢复 1 后又掉回 raw，制造一日跳变/反跳。
     if prev:
+        m_t = _positive_factor_map(af_t)
+        m_p = _positive_factor_map(af_p)
+        target_codes = {str(code).upper() for code in df["ts_code"]}
+        anchors = _previous_stored_closes(trade_date, target_codes)
+        prior_codes = _prior_history_codes(trade_date, target_codes)
+        missing_anchors = prior_codes - set(anchors)
+        if missing_anchors:
+            raise RuntimeError(f"QFQ_ANCHOR_COVERAGE_FAILED: missing={len(missing_anchors)}")
+        existing_codes = target_codes & prior_codes
+        missing_current = target_codes - set(m_t)
+        missing_previous = existing_codes - set(m_p)
+        if missing_current or missing_previous:
+            raise RuntimeError(
+                f"ADJ_FACTOR_COVERAGE_FAILED: current={len(missing_current)},"
+                f" previous={len(missing_previous)}"
+            )
         try:
-            if af_t is not None and af_p is not None and len(af_t) and len(af_p):
-                m_t = dict(zip(af_t["ts_code"], af_t["adj_factor"]))
-                m_p = dict(zip(af_p["ts_code"], af_p["adj_factor"]))
-                def _adj(code, row):
-                    a_t, a_p = m_t.get(code), m_p.get(code)
-                    if a_t and a_p and abs(a_t - a_p) > 1e-9:   # 除权除息日 → 换算
-                        return row * a_t / a_p
+            raw_preclose = {}
+            for code, value in zip(df["ts_code"], df["pre_close"]):
+                normalized = str(code).upper()
+                try:
+                    number = float(value)
+                except (TypeError, ValueError):
+                    number = float("nan")
+                raw_preclose[normalized] = number
+            invalid_anchors = [
+                code for code in existing_codes
+                if not math.isfinite(raw_preclose.get(code, float("nan")))
+                or raw_preclose[code] <= 0
+                or not math.isfinite(anchors[code][1])
+                or anchors[code][1] <= 0
+            ]
+            if invalid_anchors:
+                raise RuntimeError(f"QFQ_ANCHOR_INVALID: {len(invalid_anchors)}")
+            scales = {
+                code: anchors[code][1] / raw_preclose[code]
+                for code in existing_codes
+            }
+
+            def _adj(code, row):
+                normalized = str(code).upper()
+                if normalized not in existing_codes:  # target-date new listing: raw price is its qfq anchor
                     return row
-                df["open"] = [round(_adj(c, v), 4) for c, v in zip(df["ts_code"], df["open"])]
-                df["high"] = [round(_adj(c, v), 4) for c, v in zip(df["ts_code"], df["high"])]
-                df["low"] = [round(_adj(c, v), 4) for c, v in zip(df["ts_code"], df["low"])]
-                df["close"] = [round(_adj(c, v), 4) for c, v in zip(df["ts_code"], df["close"])]
-                # ★列名在 rename 前是 pre_close（勿写 preclose，会与 rename 后重复）
-                df["pre_close"] = [round(_adj(c, v), 4) for c, v in zip(df["ts_code"], df["pre_close"])]
-                n_adj = sum(1 for c in df["ts_code"] if abs(m_t.get(c, 0) - m_p.get(c, 0)) > 1e-9)
-                if n_adj:
-                    print(f"  ⚠ {n_adj} 只除权除息，已按复权因子换算（基准 {prev}）")
-        except Exception as e:
-            print(f"  ⚠ adj_factor 拉取失败（按未复权写入）: {str(e)[:60]}")
+                return float(row) * scales[normalized]
+            df["open"] = [round(_adj(c, v), 4) for c, v in zip(df["ts_code"], df["open"])]
+            df["high"] = [round(_adj(c, v), 4) for c, v in zip(df["ts_code"], df["high"])]
+            df["low"] = [round(_adj(c, v), 4) for c, v in zip(df["ts_code"], df["low"])]
+            df["close"] = [round(_adj(c, v), 4) for c, v in zip(df["ts_code"], df["close"])]
+            df["pre_close"] = [round(_adj(c, v), 4) for c, v in zip(df["ts_code"], df["pre_close"])]
+            continuity_failures = sum(
+                1 for code, value in zip(df["ts_code"], df["pre_close"])
+                if str(code).upper() in existing_codes
+                and abs(float(value) - anchors[str(code).upper()][1])
+                > max(0.0001, anchors[str(code).upper()][1] * 1e-5)
+            )
+            if continuity_failures:
+                raise RuntimeError(f"QFQ_CONTINUITY_FAILED: {continuity_failures}")
+            n_adj = sum(1 for code in existing_codes if abs(m_t[code] - m_p[code]) > 1e-9)
+            if n_adj:
+                print(f"  ⚠ {n_adj} 只除权除息，已按固定 qfq 基准连续续接（前水位 {prev}）")
+        except Exception as exc:
+            if isinstance(exc, RuntimeError) and str(exc).startswith(("QFQ_", "ADJ_")):
+                raise
+            raise RuntimeError("QFQ_ANCHOR_CONVERSION_FAILED") from exc
     out = df.rename(columns={
         "ts_code": "code", "trade_date": "date", "pre_close": "preclose",
         "vol": "volume", "pct_chg": "pct_chg"})
@@ -144,66 +318,85 @@ def fetch_day(pro, trade_date: str):
             _tr_map = dict(zip(_db["ts_code"], _db["turnover_rate"]))
             out["turn"] = out["code"].map(lambda c: _tr_map.get(c)).astype("float64")
         else:
-            out["turn"] = None
-    except Exception:
-        out["turn"] = None
-    # ★2026-08-12 #136 治本修复：Tushare daily 无 is_st 字段（原硬编码 0 → 增量全丢 ST 标记，
-    #   ST 过滤静默失效）。优先用并行拉到的 daily_basic is_st；失败回退继承 bars 该股最近一条。
+            raise RuntimeError("DAILY_BASIC_TURN_EMPTY")
+    except Exception as exc:
+        raise RuntimeError("DAILY_BASIC_TURN_INVALID") from exc
+    # Tushare daily_basic 官方无 is_st；必须用当日 stock_st 快照。
+    # 调用失败与“当日没有 ST”不可混同，因此上面要求返回带 ts_code schema 的 DataFrame。
     try:
-        if _db is not None and len(_db):
-            _st_map = dict(zip(_db["ts_code"], _db["is_st"].astype(int)))
-            out["is_st"] = out["code"].map(lambda c: _st_map.get(c, 0)).astype(int)
-        else:
-            raise RuntimeError("daily_basic 空")
-    except Exception as _e:
-        _prev_st = {}
-        try:
-            import sqlite3 as _s2
-            _cs = [_s2.connect(f"file:{BARS_DB}?mode=ro&immutable=1", uri=True, timeout=3)]
-            try:
-                from data.cache import CACHE_DIR as _CD
-                from pathlib import Path as _P2
-                for _p in sorted(_P2(_CD).glob("bars_incr_*.db"))[-3:]:
-                    try:
-                        _cs.append(_s2.connect(f"file:{_p}?mode=ro&immutable=1", uri=True, timeout=3))
-                    except Exception:
-                        pass
-            except Exception:
-                pass
-            for _c in _cs:
-                try:
-                    for _code, _mxd, _stv in _c.execute(
-                            "SELECT code, MAX(date), MAX(is_st) FROM daily_bar WHERE is_st=1 GROUP BY code"):
-                        if _stv == 1 and (_code not in _prev_st or _mxd > _prev_st[_code]):
-                            _prev_st[_code] = _mxd
-                except Exception:
-                    pass
-                finally:
-                    try:
-                        _c.close()
-                    except Exception:
-                        pass
-        except Exception:
-            pass
-        # 继承前值：该股最后 ST 日期 ≤30 天 → 视为当前 ST（增量丢列一般 1-3 天，30 天窗口防御足够；
-        #   摘帽 >30 天的不误拦）
-        _cut = set()
-        if _prev_st:
-            from datetime import date as _D8
-            _t0 = _D8.today()
-            for _code, _mxd in _prev_st.items():
-                try:
-                    _lag = (_t0 - _D8.fromisoformat(str(_mxd))).days
-                except Exception:
-                    _lag = 999
-                if _lag <= 30:
-                    _cut.add(_code)
-        out["is_st"] = out["code"].map(lambda c: 1 if c in _cut else 0).astype(int)
-        print(f"  ⚠ daily_basic is_st 拉取失败（{str(_e)[:40]}），回退继承 {len(_cut)} 只当前 ST（前值 30 天窗）")
+        _st_codes = set(_st["ts_code"].dropna().astype(str).str.upper())
+        out["is_st"] = out["code"].astype(str).str.upper().isin(_st_codes).astype(int)
+    except Exception as exc:
+        raise RuntimeError("STOCK_ST_INVALID") from exc
     out["adjust"] = "qfq"
     out["source"] = "tushare"
     return out[["code", "date", "open", "high", "low", "close", "preclose",
                 "volume", "amount", "turn", "pct_chg", "is_st", "adjust", "source"]]
+
+
+def validate_fetched_frame(df, config: dict, trade_date: str) -> dict:
+    """Validate a fetched partition before any database write occurs."""
+    spec = config["datasets"]["bars_qfq"]
+    required = list(dict.fromkeys(["code", "date", *list(spec["required_columns"]), "turn", "is_st"]))
+    missing_columns = [column for column in required if column not in df.columns]
+    failures = []
+    if missing_columns:
+        failures.append("FETCHED_BARS_COLUMNS_MISSING")
+        return {"ok": False, "reason_codes": failures, "missing_columns": missing_columns}
+    exact = df[df["date"].astype(str) == trade_date].copy()
+    distinct = int(exact["code"].astype(str).nunique())
+    numeric_required = [column for column in required if column not in {"code", "date", "is_st"}]
+    invalid_rows = set()
+    finite_turn = 0
+    invalid_st = 0
+    for index, row in exact.iterrows():
+        if any(row[column] is None or (isinstance(row[column], float) and math.isnan(row[column]))
+               for column in ("code", "date")):
+            invalid_rows.add(index)
+        for column in numeric_required:
+            try:
+                valid = math.isfinite(float(row[column]))
+            except (TypeError, ValueError):
+                valid = False
+            if not valid:
+                invalid_rows.add(index)
+            elif column == "turn":
+                finite_turn += 1
+        if row["is_st"] not in (0, 1):
+            invalid_st += 1
+            invalid_rows.add(index)
+    required_missing = len(invalid_rows)
+    turn_coverage = finite_turn / len(exact) if len(exact) else 0.0
+    st_count = int((exact["is_st"] == 1).sum())
+    if len(exact) != len(df):
+        failures.append("FETCHED_BARS_DATE_MISMATCH")
+    if distinct != len(exact):
+        failures.append("FETCHED_BARS_DUPLICATE_CODES")
+    from scripts.daily_incremental import _min_codes_for_date
+    min_distinct_codes = _min_codes_for_date(spec, trade_date)
+    if distinct < min_distinct_codes:
+        failures.append("BARS_DISTINCT_CODES_LOW")
+    if required_missing:
+        failures.append("BARS_REQUIRED_VALUES_MISSING")
+    if invalid_st:
+        failures.append("BARS_ST_VALUES_INVALID")
+    if trade_date >= str(spec.get("turn_available_from", "2019-01-01")) \
+            and turn_coverage < float(spec.get("min_turn_coverage", 0.95)):
+        failures.append("BARS_TURN_COVERAGE_LOW")
+    if trade_date >= str(spec.get("st_strict_from", "0000-01-01")) \
+            and st_count < int(spec.get("min_st_codes", 0)):
+        failures.append("BARS_ST_COVERAGE_LOW")
+    return {
+        "ok": not failures,
+        "reason_codes": failures,
+        "row_count": len(exact),
+        "distinct_keys": distinct,
+        "min_distinct_codes": min_distinct_codes,
+        "required_missing_rows": required_missing,
+        "invalid_st_rows": invalid_st,
+        "turn_coverage": round(turn_coverage, 6),
+        "st_count": st_count,
+    }
 
 
 def fetch_basic_snapshot(pro, trade_date: str):
@@ -227,57 +420,123 @@ def fetch_basic_snapshot(pro, trade_date: str):
         return False
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--date", default=None, help="指定交易日 YYYYMMDD（默认自动探测）")
-    ap.add_argument("--basic", action="store_true", help="附带拉 daily_basic 估值快照")
-    args = ap.parse_args()
+def _delegated_pipeline_lock(config: dict) -> bool:
+    """Accept a lock delegation only from the direct lock-owning parent."""
+    lock_path = (BASE / config["state"]["lock"]).resolve() \
+        if not Path(config["state"]["lock"]).is_absolute() \
+        else Path(config["state"]["lock"]).resolve()
+    declared_path = os.environ.get("DSHQ_PIPELINE_LOCK_PATH", "")
+    declared_pid = os.environ.get("DSHQ_PIPELINE_LOCK_OWNER_PID", "")
+    try:
+        parent_pid = os.getppid()
+        if Path(declared_path).resolve() != lock_path or int(declared_pid) != parent_pid:
+            return False
+        payload = json.loads(lock_path.read_text(encoding="utf-8"))
+        return int(payload.get("pid") or 0) == parent_pid
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return False
 
-    pro = _pro()
-    date = args.date
+
+def _run_locked(args, pipeline_config: dict, *, delegated: bool) -> int:
+    date = str(args.date).strip().replace("-", "") if args.date else None
+    if date and (len(date) != 8 or not date.isdigit()):
+        print("[tushare] --date 必须为 YYYYMMDD", file=sys.stderr)
+        return EXIT_QUALITY_FAILED
+
+    # Historical partition repair is valid only inside the orchestrator,
+    # which persists and replays every successor through latest.  A standalone
+    # historical write would otherwise be able to break the qfq chain.
+    pro = None
+    if date and not delegated:
+        pro = _pro()
+        latest = latest_trade_date(pro)
+        if not latest or date != latest:
+            print(
+                "[tushare] STANDALONE_HISTORICAL_WRITE_FORBIDDEN: "
+                "请运行 scripts/daily_incremental.py --trigger recovery",
+                file=sys.stderr,
+            )
+            return EXIT_QUALITY_FAILED
+
     if not date:
+        pro = _pro()
         date = latest_trade_date(pro)
         if not date:
             print(f"[tushare] 服务器最新交易日盘后数据未出（现在 {datetime.now():%H:%M}）→ 跳过（等 18:30 链自动重试）")
-            return 0
-    cache = DailyCache()
-
-    # 幂等：bars 已覆盖该日 → 跳过（★#143 双库合并探测——主库写保护后增量库含新数据）
-    # ★2026-08-12 协同修复：MAX(date) 只有 183 只占位也判"已有" → 加覆盖率门槛（<4000 只视为残缺需重拉）
+            return EXIT_NOT_READY
+    # 幂等只看目标分区；更晚 MAX(date) 不能掩盖目标日缺口。
+    from scripts.daily_incremental import bars_partition_quality
     try:
-        con = sqlite3.connect(f"file:{BARS_DB}?mode=ro&immutable=1", uri=True, timeout=3)
-        cur = con.execute("SELECT MAX(date) FROM daily_bar WHERE adjust='qfq'").fetchone()
-        has = cur[0] if cur else None
-        if has:
-            _n = con.execute("SELECT COUNT(DISTINCT code) FROM daily_bar WHERE date=? AND adjust='qfq'",
-                             (has,)).fetchone()[0]
-            if _n < 4000:
-                print(f"[tushare] {has} 仅 {_n} 只（残缺占位）→ 强制重拉 {date}")
-                has = None
-        con.close()
-        # ★2026-08-12 协同修复：残缺（has=None）时不再用 latest_trade_date 覆盖（双库探测会拉回占位日）
-        if has is not None:
-            _mx = cache.latest_trade_date()
-            if _mx and _mx > has:
-                has = _mx
-        covered = has is not None and str(has) >= f"{date[:4]}-{date[4:6]}-{date[6:]}"
-    except Exception:
-        covered = False
-    if covered:
-        print(f"[tushare] {date} 已在库（最新 {has}）→ 跳过")
+        quality_before = bars_partition_quality(
+            pipeline_config, f"{date[:4]}-{date[4:6]}-{date[6:]}"
+        )
+        covered = quality_before["ok"]
+    except Exception as exc:
+        print(f"[tushare] 目标分区检查失败: {str(exc)[:100]}", file=sys.stderr)
+        return EXIT_QUALITY_FAILED
+    if covered and not args.force:
+        print(f"[tushare] {date} 目标分区已完整（{quality_before['distinct_keys']} 只）→ 幂等复用")
         return 0
 
     t0 = time.time()
+    pro = pro or _pro()
     df = fetch_day(pro, date)
     if df is None or df.empty:
-        print(f"[tushare] {date} 服务器无数据（盘后未出）→ 跳过")
-        return 0
+        print(f"[tushare] {date} 服务器无数据（盘后未出）", file=sys.stderr)
+        return EXIT_NOT_READY
+    normalized_date = f"{date[:4]}-{date[4:6]}-{date[6:]}"
+    prewrite = validate_fetched_frame(df, pipeline_config, normalized_date)
+    if not prewrite["ok"]:
+        print(f"[tushare] 写入前质量失败: {prewrite['reason_codes']}", file=sys.stderr)
+        return EXIT_QUALITY_FAILED
+    cache = DailyCache()
     n = cache.put_daily_batch(df, adjust="qfq", source="tushare")
     el = time.time() - t0
     print(f"[tushare] ✅ {date} 全市场 {len(df)} 只已入库（{n} 行，{el:.1f}s）→ bars 最新 {date}")
     if args.basic:
         fetch_basic_snapshot(pro, date)
+    try:
+        quality_after = bars_partition_quality(
+            pipeline_config, f"{date[:4]}-{date[4:6]}-{date[6:]}"
+        )
+    except Exception as exc:
+        print(f"[tushare] 入库后质量检查异常: {exc}", file=sys.stderr)
+        return EXIT_QUALITY_FAILED
+    if not quality_after["ok"]:
+        print(f"[tushare] 入库后质量失败: {quality_after['reason_codes']}", file=sys.stderr)
+        return EXIT_QUALITY_FAILED
     return 0
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--date", default=None, help="指定交易日 YYYYMMDD（默认自动探测）")
+    ap.add_argument("--basic", action="store_true", help="附带拉 daily_basic 估值快照")
+    ap.add_argument("--force", action="store_true", help="强制重放目标分区（用于历史缺口后续 qfq 续接）")
+    args = ap.parse_args()
+    from scripts.daily_incremental import PipelineBusyError, PipelineLock, load_config
+    try:
+        pipeline_config, _ = load_config()
+    except Exception as exc:
+        print(f"[tushare] 管道配置失败: {str(exc)[:100]}", file=sys.stderr)
+        return EXIT_QUALITY_FAILED
+    delegated = _delegated_pipeline_lock(pipeline_config)
+    guard = None
+    if not delegated:
+        lock_path = Path(pipeline_config["state"]["lock"])
+        if not lock_path.is_absolute():
+            lock_path = BASE / lock_path
+        guard = PipelineLock(lock_path)
+        try:
+            guard.acquire(f"standalone-bars-{os.getpid()}")
+        except PipelineBusyError as exc:
+            print(f"[tushare] {exc}", file=sys.stderr)
+            return EXIT_BUSY
+    try:
+        return _run_locked(args, pipeline_config, delegated=delegated)
+    finally:
+        if guard is not None:
+            guard.release()
 
 
 if __name__ == "__main__":

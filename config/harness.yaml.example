@@ -1,0 +1,19 @@
+# DSHQuant 内嵌 DeepSeek HARNESS 配置模板。
+#
+# `home` 是项目唯一允许的 DSH_HOME。运行代码会校验它必须解析到
+# <repo>/harness/home，避免桌面版与项目版再次产生双写会话。
+harness:
+  home: harness/home
+  host: 127.0.0.1
+  port: 3080
+  startup_timeout_seconds: 30
+  bridge:
+    protocol: dshq-task/v1
+    receipt_protocol: dshq-task-receipt/v1
+    max_body_bytes: 262144
+    max_active_tasks: 1
+    allowed_origins:
+      - http://127.0.0.1:8787
+      - http://localhost:8787
+    task_log: quant-bridge/tasks.jsonl
+    token_file: quant-bridge/token

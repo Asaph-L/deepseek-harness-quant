@@ -76,34 +76,47 @@ def evaluate_factor(reg: FactorRegistry, f: dict) -> dict:
         status = res["status"]  # active/candidate/retired
         reg.update_score(f["name"], res["score"], status=status, detail=res)
         return res
-    # cross_sectional：调 factor_evaluator（8 维体检）——通过子进程避免污染主进程
-    import re
-    import subprocess
-    r = subprocess.run(
-        [sys.executable, "-X", "utf8", str(BASE / "validation" / "factor_evaluator.py"),
-         "--factors", f["name"]],
-        capture_output=True, text=True, timeout=1800, encoding="utf-8", errors="replace")
-    out = (r.stdout or "")[-1500:]
-    # 从输出解析评分（★2026-08-18 修复：输出为 "评分 71.9 ｜ 反向强有效 ｜ ..."，
-    #   原 split(":") 解析失败 → score=None → 全部误判 retired；改用正则取 "评分" 后数字）
-    score = None
-    for line in out.splitlines():
-        if "评分" in line or "score" in line.lower():
-            m = re.search(r"评分\s*([\d.]+)", line) or re.search(r"score[:\s]*([\d.]+)", line, re.I)
-            if m:
-                try:
-                    score = float(m.group(1))
-                    break
-                except ValueError:
-                    continue
-    status = "active" if score and score >= 65 else ("candidate" if score and score >= 40 else "retired")
-    detail = {"stdout_tail": out, "score_parsed": score}
-    reg.update_score(f["name"], score, status=status, detail=detail)
-    return detail
+    # cross_sectional 的评估在 scripts/evaluate_all_factors.py 一次性完成；此处只读
+    # 已经严格校验并同步进注册表的同一份证据，禁止再启第二套评分逻辑。
+    current = reg.get(f["name"]) or f
+    return {
+        "factor": f["name"],
+        "score": current.get("score"),
+        "status": current.get("status"),
+        "strategy_eligible": current.get("strategy_eligible", False),
+        "evidence_run_id": current.get("evidence_run_id"),
+        "reason_codes": current.get("evidence_reason_codes") or ["STRICT_EVIDENCE_REQUIRED"],
+    }
+
+
+def sync_cross_sectional_evidence(reg: FactorRegistry) -> dict:
+    """Fail-closed sync of the one canonical cross-sectional evidence artifact."""
+    from factors.alpha_panel import read_panel_meta
+    from factors.evidence import EvidenceContractError, load_artifact, load_policy
+
+    path = BASE / "output" / "factor_evaluations_full.json"
+    try:
+        artifact = load_artifact(
+            path,
+            expected_panel_meta=read_panel_meta(),
+            expected_policy=load_policy(),
+        )
+        return {"ok": True, **reg.sync_evidence(artifact)}
+    except EvidenceContractError as exc:
+        revoked = reg.revoke_cross_sectional_evidence(exc.reason_codes)
+        return {"ok": False, "reason_codes": exc.reason_codes, "artifact": str(path),
+                "revoked": revoked}
 
 
 def evaluate_pool(reg: FactorRegistry, only_candidate=False) -> list:
     """测评全部 候选 + active（巡检）因子；★locked 因子（人工裁决）跳过自动评估"""
+    evidence_sync = sync_cross_sectional_evidence(reg)
+    if evidence_sync.get("ok"):
+        print(f"横截面证据同步: run={evidence_sync.get('run_id')} "
+              f"evaluable={evidence_sync.get('evaluable')}/{evidence_sync.get('total')} "
+              f"admitted={evidence_sync.get('admitted')}")
+    else:
+        print(f"横截面证据不可用（fail-closed）: {evidence_sync.get('reason_codes')}")
     todo = reg.list_factors(status="candidate") if only_candidate else \
         [f for f in reg.list_factors() if f["status"] in ("candidate", "active", "monitoring")]
     skipped = [f["name"] for f in todo if f.get("locked")]
@@ -128,11 +141,13 @@ def write_report(reg: FactorRegistry, evaluate_results: list = None):
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     factors = reg.list_factors()
     stats = reg.stats()
+    strategy_factors = reg.list_strategy_factors()
     lines = [f"# 因子池报告 · {datetime.now():%Y-%m-%d %H:%M:%S}", "",
              f"**池规模**：{stats['total']} 个因子（{stats['by_kind']}）",
-             f"**状态分布**：{stats['by_status']}", "",
+             f"**状态分布**：{stats['by_status']}；严格证据可评 {stats['eligible']} 个，"
+             f"可接策略 {stats['admitted']} 个", "",
              "## 活跃因子（active，可接入策略）", ""]
-    for f in [x for x in factors if x["status"] == "active"]:
+    for f in strategy_factors:
         lines.append(f"- **{f['name']}** [{f['kind']}] {f['source']} — score {f['score']}")
     lines += ["", "## 候选因子（candidate，观察中）", ""]
     for f in [x for x in factors if x["status"] == "candidate"]:
@@ -146,7 +161,10 @@ def write_report(reg: FactorRegistry, evaluate_results: list = None):
     json_path = OUT_DIR / "factor_pool_report.json"
     json_path.write_text(json.dumps(
         {"ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "stats": stats,
-         "factors": [{k: f[k] for k in ("name", "family", "kind", "status", "score", "source", "note")} for f in factors]},
+         "active_strategy_factors": [f["name"] for f in strategy_factors],
+         "factors": [{k: f.get(k) for k in ("name", "family", "kind", "status", "score", "source", "note",
+                                                   "strategy_eligible", "evidence_schema_version",
+                                                   "evidence_run_id", "evidence_reason_codes")} for f in factors]},
         ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"报告: {md_path}\n      {json_path}")
 

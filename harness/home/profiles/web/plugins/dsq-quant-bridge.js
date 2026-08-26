@@ -1,22 +1,64 @@
-// 量化系统 ↔ DeepSeek HARNESS 桥接插件（开源版静态化）
-// 来源：dsqq-1 动态插件 v13（牛散 persona 接入 + 会话/聊天桥接）
+// DSHQuant ↔ DeepSeek HARNESS 唯一桥接插件。
+// /quant/* 同时承载受控派单（含 task 子路由）、会话与配置驱动的牛散 persona API。
 // 部署：由 DSH_HOME/profiles/web/cordis.patch.yml 挂载为宿主组合插件行
 // inject：声明硬依赖，cordis 在 webServer 等服务就绪后才 apply（避免提前 return 导致路由不注册）
 module.exports = {
-  inject: ['webServer', 'sessions', 'agents', 'subagents', 'sessionTitle', 'sessionPersistence'],
+  inject: ['webServer', 'sessions', 'agents', 'subagents', 'sessionTitle', 'sessionPersistence', 'apiProxy'],
   apply(ctx) {
+    const crypto = require('crypto')
+    const fs = require('fs')
+    const path = require('path')
+    const yaml = require('yaml')
+    // The host HMR watches this composition plugin, while Node otherwise keeps
+    // its protocol child in require.cache. Reload the child on every apply so
+    // protocol fixes become live without restarting the QuantDeck launcher.
+    const taskProtocolPath = require.resolve('./dshq-task-protocol.js')
+    delete require.cache[taskProtocolPath]
+    const taskProtocol = require(taskProtocolPath)
     const webServer = ctx.get('webServer')
     const sessions = ctx.get('sessions')
     const agents = ctx.get('agents')
     const sessionTitle = ctx.get('sessionTitle')
     const subagents = ctx.get('subagents')
     const sessionPersistence = ctx.get('sessionPersistence')
+    const apiProxy = ctx.get('apiProxy')
     if (webServer === undefined) return
 
+    const projectRootEnv = String(process.env.DSHQ_PROJECT_ROOT || '').trim()
+    const dshHomeEnv = String(process.env.DSH_HOME || '').trim()
+    const projectRoot = path.resolve(projectRootEnv || process.cwd())
+    const dshHome = path.resolve(dshHomeEnv || path.join(projectRoot, 'harness', 'home'))
+    let identityOk = false
+    let identityError = ''
+    try {
+      if (!projectRootEnv) throw new Error('DSHQ_PROJECT_ROOT is required')
+      if (!dshHomeEnv) throw new Error('DSH_HOME is required')
+      const realpath = fs.realpathSync.native || fs.realpathSync
+      const realProjectRoot = realpath(projectRoot)
+      const realDshHome = realpath(dshHome)
+      const expectedHome = realpath(path.join(realProjectRoot, 'harness', 'home'))
+      if (realDshHome !== expectedHome) throw new Error('DSH_HOME must equal <DSHQ_PROJECT_ROOT>/harness/home')
+      identityOk = true
+    } catch (error) {
+      identityError = String((error && error.message) || error).slice(0, 500)
+    }
+    const protocol = process.env.DSHQ_BRIDGE_PROTOCOL || 'dshq-task/v1'
+    const receiptProtocol = process.env.DSHQ_BRIDGE_RECEIPT_PROTOCOL || 'dshq-task-receipt/v1'
+    const tokenFile = path.resolve(process.env.DSHQ_BRIDGE_TOKEN_FILE || path.join(dshHome, 'quant-bridge', 'token'))
+    const taskLog = path.resolve(process.env.DSHQ_BRIDGE_TASK_LOG || path.join(dshHome, 'quant-bridge', 'tasks.jsonl'))
+    const maxBodyBytes = Math.max(1024, Number(process.env.DSHQ_BRIDGE_MAX_BODY_BYTES || 262144))
+    const maxActiveTasks = Math.max(1, Number(process.env.DSHQ_BRIDGE_MAX_ACTIVE_TASKS || 1))
+    const allowedOrigins = new Set(String(process.env.DSHQ_BRIDGE_ALLOWED_ORIGINS || 'http://127.0.0.1:8787,http://localhost:8787')
+      .split(',').map(function (value) { return value.trim().replace(/\/$/, '') }).filter(Boolean))
+    const homeFingerprint = process.env.DSHQ_HOME_FINGERPRINT || crypto.createHash('sha256')
+      .update(projectRoot + '\0' + dshHome + '\0' + protocol).digest('hex').slice(0, 16)
+
     function cors(res) {
-      res.setHeader('Access-Control-Allow-Origin', '*')
+      const origin = res.req && res.req.headers ? String(res.req.headers.origin || '').replace(/\/$/, '') : ''
+      if (allowedOrigins.has(origin)) res.setHeader('Access-Control-Allow-Origin', origin)
+      res.setHeader('Vary', 'Origin')
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-DSHQ-Token')
       res.setHeader('Access-Control-Max-Age', '600')
     }
     function json(res, code, obj) {
@@ -24,9 +66,37 @@ module.exports = {
       res.end(JSON.stringify(obj))
     }
     async function readBody(req) {
-      let body = ''
-      for await (const chunk of req) body += new TextDecoder().decode(chunk)
-      return body
+      const chunks = []
+      let size = 0
+      for await (const chunk of req) {
+        const value = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+        size += value.length
+        if (size > maxBodyBytes) throw new Error('request body too large')
+        chunks.push(value)
+      }
+      return Buffer.concat(chunks).toString('utf8')
+    }
+    async function readJson(req) {
+      return JSON.parse((await readBody(req)) || '{}')
+    }
+    function bridgeToken() {
+      try {
+        const token = fs.readFileSync(tokenFile, 'utf8').trim()
+        return token.length >= 32 ? token : null
+      } catch (e) { return null }
+    }
+    function authorizeMutation(req, res) {
+      if (!identityOk) {
+        json(res, 503, { ok: false, error: 'HARNESS identity mismatch', identity_error: identityError })
+        return false
+      }
+      const expected = bridgeToken()
+      const supplied = String((req.headers && req.headers['x-dshq-token']) || '')
+      const ok = expected && supplied.length === expected.length &&
+        crypto.timingSafeEqual(Buffer.from(supplied), Buffer.from(expected))
+      if (ok) return true
+      json(res, expected ? 401 : 503, { ok: false, error: expected ? 'invalid bridge token' : 'bridge token unavailable' })
+      return false
     }
     function parseQuery(url) {
       const out = {}
@@ -162,26 +232,32 @@ module.exports = {
       return null
     }
 
-    function buildPersona(p) {
-      return '你是「牛散·' + p.name + '」人格模拟（基于公开资料牛散档案 ' + p.skill + ' 蒸馏魔改；不构成投资建议）。\n'
-        + '【风格与选股视角】\n' + p.style + '\n'
-        + '【你的职责】主观选股顾问：基于量化系统提供的【Pitch 候选卡】与【当前持仓】做选股决策。Pitch 卡字段含义：score=综合评分(0-100)、winrate_est=历史胜率、upside_est=预期空间、evidence=证据链、stop_plan=止损/离场计划、factors=关键因子值、risk_flags=风险标记。\n'
-        + '【铁律】\n'
-        + '1. 只在你拿到的 Pitch 候选卡与当前持仓范围内决策；卡外股票最多建议"关注"，绝不推荐买入。\n'
-        + '2. 尊重量化系统纪律：主力仓位走 turn_low 低换手分散，pitch 高分只做卫星仓（集中持仓回撤已被实证 -41%~-60%）；跌破止损/逻辑破坏必须明确标"卖出"。\n'
-        + '3. 逐卡输出：代码名称 → 你的判断（高/中/低优先级）→ 核心理由（关联你的方法论）→ 与量化信号冲突点。结论先行，精炼列表，≤400 字。\n'
-        + '4. 批判自省：你是人格模拟，风格来自公开资料，存在信息滞后/幸存者偏差/造神风险；不追高、不造神。结尾注明"不构成投资建议"。\n'
-        + '5. 决策结构化输出（必须遵守）：在回复【最后一行】输出一个纯 JSON 对象（不要 markdown 代码块），格式：{"niu_decisions":[{"code":"600519.SH","action":"buy","priority":"high","reason_short":"垄断成瘾质量"}]}。action 限 buy/hold/sell/watch；priority 限 high/mid/low；reason_short ≤15 字；只包含你在 Pitch 卡与当前持仓范围内明确给出的决策；本轮没有明确决策就输出 {"niu_decisions":[]}。\n'
-        + '【约束】不调用任何工具、不读取文件、不联网——只基于对话中给出的数据作答。'
+    function loadPersonaConfig() {
+      const local = path.join(projectRoot, 'config', 'niu_personas.yaml')
+      const example = path.join(projectRoot, 'config', 'niu_personas.yaml.example')
+      const configPath = fs.existsSync(local) ? local : example
+      const raw = yaml.parse(fs.readFileSync(configPath, 'utf8')) || {}
+      const cfg = raw.personas || {}
+      if (!cfg.prompt_template || !cfg.entries || typeof cfg.entries !== 'object') {
+        throw new Error('niu_personas 配置缺少 prompt_template/entries')
+      }
+      const entries = {}
+      for (const key of Object.keys(cfg.entries)) {
+        const value = cfg.entries[key] || {}
+        if (!value.name || !value.tag || !value.skill || !value.style) throw new Error('persona 配置不完整: ' + key)
+        entries[key] = Object.assign({ key: key }, value)
+      }
+      return { promptTemplate: String(cfg.prompt_template), entries: entries }
     }
-    const PERSONAS = {
-      linyuan: { key: 'linyuan', name: '林园', tag: '价值·集中', skill: 'niu-san-linyuan', style: '价值投资派：长线集中持有，偏好消费医药与垄断/成瘾性生意，高 ROE 高毛利，回调加仓（"被套=机会"），熊市布局。选股视角：高分卡中优先质量/垄断/现金流健康者；纯题材高评分卡不是你的菜；回调充分的优质卡你愿意越跌越买，但仍须守住卡上止损与离场规则。' },
-      fengliu: { key: 'fengliu', name: '冯柳', tag: '逆向·弱者体系', skill: 'niu-san-fengliu', style: '机构价值派"弱者体系"（高毅资产）：不预测市场、不预判拐点，只做能看懂且赔率足够高的机会；逆向布局、集中持股、逻辑先行（逻辑破坏即走）。选股视角：优先"低关注/低预期/深回撤但质量未坏"的高赔率标的；对已高关注、高热度的高分卡谨慎（人多的地方不去）；胜率不是第一变量，赔率与逻辑完整度优先；牢记抄作业陷阱（季报披露滞后）。' },
-      chaoguyangjia: { key: 'chaoguyangjia', name: '炒股养家', tag: '情绪周期·龙头', skill: 'niu-san-chaoguyangjia', style: '情绪周期派游资：冰点→启动→发酵→高潮→衰退分阶段定仓位，买在分歧、卖在一致，只做最强题材最强龙头。选股视角：识别题材/情绪阶段与龙头；"分歧转一致"形态的卡优先。但你必须承认：情绪聚合择时已实证证伪——你的情绪判断只能作为加减分项，不得替代量化评分；心法多为社区流传未核实，切勿神化。' },
-      chenxiaoqun: { key: 'chenxiaoqun', name: '陈小群', tag: '题材接力·排雷', skill: 'niu-san-chenxiaoqun', style: '游资席位派（银河证券大连黄河路）：题材驱动、人气接力、连板逻辑、快进快出，题材热度=第一驱动。选股视角：按题材热度与人气排序；但游资大额净买已实证为稳定负超额——你的核心价值是排雷：标出哪些高分卡实为情绪炒作/跟风盘，坚决反对追高；宁可错过，不接盘。' },
-      zhangmengzhu: { key: 'zhangmengzhu', name: '章盟主', tag: '大资金·龙头', skill: 'niu-san-zhangmengzhu', style: '游资大资金+牛散双属性（章建平）：景气主线权重龙头大额抢筹、关键位置封板、长短结合。选股视角：优先流动性好、景气主线、权重龙头（大资金容量与进出方便）；敢于重仓的前提是卡上风险可控；牢记监管处罚与"爆赚58亿"辟谣反例——传说不可信，只看数据与纪律，止损严格执行。' },
-      zhaolaoge: { key: 'zhaolaoge', name: '赵老哥', tag: '打板·情绪参考', skill: 'niu-san-zhaolaoge', style: '打板/妖股派游资：追涨停、题材龙头接力、快进快出、吃情绪溢价。选股视角：只看最强的打板/妖股候选，博弈情绪溢价；但打板族组合层已多次证伪、"八年一万倍"无法核实——你的打板视角仅作情绪参考，绝不把打板逻辑当成买入引擎；宁可错过妖股，不参与接力高位。' },
-      methodology: { key: 'methodology', name: '方法论·牛散蒸馏', tag: '防造神质检', skill: 'niu-san-distillation', style: '牛散蒸馏方法论分析师（总览框架）：用批判框架审视任何"牛散信号"——信息滞后、造神机制、幸存者偏差三重风险；把牛散行为转成可验证因子假设，过验证链才有效。选股视角：审查每张高分卡是否存在"造神污染"：媒体热度≠alpha、游资席位净买=负超额、披露滞后已定价。输出每卡排雷结论（✅可参考 / 🟡观察 / ❌排雷）+ 可转因子假设；你不做买入推荐，你做"防造神质检"。' }
+    // Identity failures must still expose /quant/health and fail POST with 503;
+    // do not let a bogus project root crash before the guarded routes register.
+    const personaConfig = identityOk ? loadPersonaConfig() : { promptTemplate: '', entries: {} }
+    const PERSONAS = personaConfig.entries
+    function buildPersona(p) {
+      return personaConfig.promptTemplate
+        .split('{name}').join(String(p.name))
+        .split('{skill}').join(String(p.skill))
+        .split('{style}').join(String(p.style))
     }
 
     const personaChild = {}
@@ -192,6 +268,29 @@ module.exports = {
     function fakeSignal() {
       return { aborted: false, reason: undefined, onabort: null, addEventListener: function () {}, removeEventListener: function () {}, dispatchEvent: function () { return true }, throwIfAborted: function () {} }
     }
+
+    ctx.effect(() => taskProtocol.install({
+      ctx: ctx,
+      webServer: webServer,
+      agents: agents,
+      sessionPersistence: sessionPersistence,
+      apiProxy: apiProxy,
+      protocol: protocol,
+      receiptProtocol: receiptProtocol,
+      projectRoot: projectRoot,
+      dshHome: dshHome,
+      taskLog: taskLog,
+      tokenFile: tokenFile,
+      maxActiveTasks: maxActiveTasks,
+      homeFingerprint: homeFingerprint,
+      identityOk: identityOk,
+      identityError: identityError,
+      cors: cors,
+      json: json,
+      parseQuery: parseQuery,
+      readJson: readJson,
+      textOfContent: textOfContent
+    }))
     async function discoverNiuChildren() {
       const out = {}
       if (!subagents || !agents) return out
@@ -309,6 +408,8 @@ module.exports = {
       handler: async (req, res) => {
         cors(res)
         if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return }
+        if (req.method !== 'POST') { json(res, 405, { ok: false, error: 'method not allowed' }); return }
+        if (!authorizeMutation(req, res)) return
         let key = '', text = '', snapshot = ''
         try {
           const payload = JSON.parse((await readBody(req)) || '{}')
@@ -371,6 +472,8 @@ module.exports = {
       handler: async (req, res) => {
         cors(res)
         if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return }
+        if (req.method !== 'POST') { json(res, 405, { ok: false, error: 'method not allowed' }); return }
+        if (!authorizeMutation(req, res)) return
         let text = '', sessionId = null
         try {
           const payload = JSON.parse((await readBody(req)) || '{}')

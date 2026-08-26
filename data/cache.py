@@ -13,6 +13,7 @@
 adjust：'qfq' 前复权 / 'hfq' 后复权 / 'none' 不复权
 """
 import os
+import glob
 import sqlite3
 import time
 from pathlib import Path
@@ -43,6 +44,52 @@ DEFAULT_DB = CACHE_DIR / "bars.db"
 #   → 增量写入走 INC_DB（bars_incr.db，同 schema），读取时合并主库+增量库（增量优先）。
 #   背景：扫描/回测只读不受影响；每日增量管道写 incr 库后读取方自动见最新数据。
 INC_DB = CACHE_DIR / "bars_incr.db"
+
+
+def material_bar_paths(
+    main_db: str | Path = DEFAULT_DB,
+    increment_glob: str | Path | None = None,
+    *,
+    min_timestamp_bytes: int = 100 * 1024,
+) -> list[Path]:
+    """Return the canonical merged-bar precedence, oldest source first.
+
+    ``bars_incr.db`` is the durable write-ahead shard and is material at any
+    size. Timestamp shards are visible only after their publish-size gate.
+    Later-mtime shards override earlier shards for duplicate
+    ``(code,date,adjust)`` keys. Every bars consumer must use this helper so a
+    quality gate, the next-day qfq anchor, and evidence panels see one view.
+    """
+    main = Path(main_db)
+    pattern = str(increment_glob or main.with_name("bars_incr*.db"))
+    increments: list[Path] = []
+    for value in glob.glob(pattern):
+        path = Path(value)
+        if path == main or not path.exists():
+            continue
+        stat = path.stat()
+        if path.name == "bars_incr.db" or stat.st_size >= int(min_timestamp_bytes):
+            increments.append(path)
+    unique = list(dict.fromkeys(increments))
+    unique.sort(key=lambda path: (path.stat().st_mtime_ns, str(path)))
+    return [main, *unique]
+
+
+def sqlite_read_version(paths) -> tuple:
+    """Cheap cache version that follows symlink targets and their WAL files."""
+    values = []
+    for value in paths:
+        target = Path(value).resolve(strict=False)
+        for path in (target, Path(f"{target}-wal"), Path(f"{target}-journal")):
+            try:
+                stat = path.stat()
+                values.append((
+                    str(path), True, int(stat.st_dev), int(stat.st_ino),
+                    int(stat.st_size), int(stat.st_mtime_ns), int(stat.st_ctime_ns),
+                ))
+            except FileNotFoundError:
+                values.append((str(path), False, 0, 0, 0, 0, 0))
+    return tuple(values)
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS daily_bar (
@@ -228,9 +275,12 @@ class DailyCache:
                 if self._writable(self.inc_path):
                     target = self.inc_path
                 else:
-                    import time as _t
-                    target = self.inc_path.with_name(
-                        f"bars_incr_{_t.strftime('%Y%m%d_%H%M%S')}.db")
+                    # One stable file per trade-date range.  Replays update the
+                    # same partition instead of creating an unbounded sequence
+                    # of non-cumulative timestamp databases.
+                    date_values = sorted({str(value)[:10].replace("-", "") for value in df["date"]})
+                    suffix = date_values[0] if len(date_values) == 1 else f"{date_values[0]}_{date_values[-1]}"
+                    target = self.inc_path.with_name(f"bars_incr_{suffix}.db")
                     con0 = sqlite3.connect(target)
                     try:
                         con0.executescript(_SCHEMA)
@@ -283,27 +333,22 @@ class DailyCache:
         return len(rows)
 
     def _inc_paths(self) -> list:
-        """增量库路径（★2026-08-10 总指导修复：只保留最近 3 个）
-        背景：手动/自动链每次运行创建时间戳增量库（今日已 18 个），全部遍历时每个连接
-        都可能被环境锁等 5s 超时 → get_daily 单只 90s+、load_panel 5.5min 的根因。
-        增量语义：最新库已含全部增量（写入端总是写最新），旧库冗余 → 3 个兜底足够。
-        ★2026-08-12 百轮后#131：过滤微型测试残留库（<100KB，08-10 测试期 5 行单股库）——
-        归档后它们会挤进"最近 3 个"窗口浪费连接数；真实增量库 ≥1MB（5538+ 行）"""
+        """Return every material incremental partition in deterministic order.
+
+        Timestamp partitions are *not* cumulative.  Keeping only the newest
+        three made older trade dates disappear from the merged read view.  A
+        later compaction may reduce file count, but correctness cannot depend
+        on an undocumented rolling window.
+        """
         if self.inc_path is None:
             return []
-        paths = [self.inc_path] if Path(self.inc_path).exists() else []
-        import glob as _glob
-        for f in sorted(_glob.glob(str(self.inc_path.with_name("bars_incr_*.db")))):
-            p = Path(f)
-            if p != self.inc_path and p.stat().st_size >= 100 * 1024:
-                paths.append(p)
-        return paths[-3:] if len(paths) > 3 else paths
+        pattern = self.inc_path.with_name("bars_incr*.db")
+        return material_bar_paths(self.db_path, pattern)[1:]
 
     @staticmethod
     def _ro_uri(p) -> str:
-        """只读 immutable URI（★主库 3.7GB 普通连接等锁 20s → immutable 0.01s；
-        已登记文件被环境锁只读时普通连接会等满 timeout）"""
-        return f"{Path(p).as_uri()}?mode=ro&immutable=1"
+        """只读实时 URI；必须观察已提交但尚未 checkpoint 的 WAL。"""
+        return f"{Path(p).resolve().as_uri()}?mode=ro"
 
     # ---------- 读取（唯一读取入口）----------
     def latest_trade_date(self):
@@ -316,10 +361,10 @@ class DailyCache:
           （原 10min TTL 让常驻进程每 10 分钟白扫一次 2.6s）"""
         _c = DailyCache._LTD_CACHE
         _now = time.time()
-        # 版本键 = 主库 + 最近 3 增量库的 mtime 集合（数据变化才失效）
+        # 版本键 = 主库/增量分区及其 WAL；提交可能完全不改主文件。
         try:
-            _ver_paths = [str(self.db_path)] + [str(p) for p in self._inc_paths()]
-            _ver = tuple((p, os.path.getmtime(p)) for p in _ver_paths if os.path.exists(p))
+            _db_paths = [Path(self.db_path), *[Path(p) for p in self._inc_paths()]]
+            _ver = sqlite_read_version(_db_paths)
         except Exception:
             _ver = None
         if _c["val"] is not None and _c.get("ver") == _ver:
@@ -348,7 +393,7 @@ class DailyCache:
         try:
             import sqlite3 as _sq
             for d in sorted(set(dates), reverse=True):
-                tot = 0
+                codes = set()
                 for p in [self.db_path] + self._inc_paths():
                     if not Path(p).exists():
                         continue
@@ -356,15 +401,15 @@ class DailyCache:
                         is_main = (Path(p) == self.db_path)
                         con = _sq.connect(self._ro_uri(p), uri=True, timeout=3) if is_main else _sq.connect(p, timeout=3)
                         try:
-                            r = con.execute(
-                                "SELECT COUNT(DISTINCT code) FROM daily_bar WHERE date=? "
-                                "AND code NOT LIKE 'sh.%' AND code NOT LIKE 'sz.%'", (d,)).fetchone()
+                            rows = con.execute(
+                                "SELECT DISTINCT code FROM daily_bar WHERE date=? "
+                                "AND code NOT LIKE 'sh.%' AND code NOT LIKE 'sz.%'", (d,)).fetchall()
                         finally:
                             con.close()
-                        tot += r[0] if r and r[0] else 0
+                        codes.update(row[0] for row in rows)
                     except Exception:
                         continue
-                if tot >= 4000:
+                if len(codes) >= 4000:
                     _c["ts"] = _now
                     _c["val"] = d
                     _c["ver"] = _ver
@@ -430,7 +475,7 @@ class DailyCache:
         """★批量读取（★2026-08-10 性能优化：回测 load_panel 5.5min 逐只查询 → 一次 SQL 全拉）
 
         分块 ≤500 只/批（绕 SQLite 变量上限 999），双库合并（增量优先覆盖主库同 key）。
-        主库用 immutable 只读连接（3.7GB 普通连接 20s；immutable 0.01s——bars.db 已锁只读，安全）。
+        主库和时间戳分区使用 WAL-aware 的 mode=ro 连接，禁止漏读未 checkpoint 提交。
         返回 {code.upper(): DataFrame(按日期升序)}；无数据的 code 不在字典。
         ★2026-08-14 fields 裁剪：默认 None=全列；传 fields=["close"] 等只取所需列
           （回测只需 close 时 SQL 传输/DataFrame 构建 ~3× 提速）。
@@ -455,7 +500,7 @@ class DailyCache:
             if not Path(p).exists():
                 continue
             try:
-                # ★2026-08-10：主库与时间戳增量库 immutable；固定 inc 库普通连接（可能正写）
+                # 主库与时间戳分区只读且 WAL-aware；固定 inc 库普通连接（可能正写）。
                 if Path(p) == self.db_path or Path(p) != self.inc_path:
                     con = sqlite3.connect(self._ro_uri(p), uri=True, timeout=3)
                 else:

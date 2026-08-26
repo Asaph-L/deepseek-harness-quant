@@ -28,12 +28,22 @@ import pandas as pd
 
 
 def _load_evals() -> dict:
+    from factors.alpha_panel import read_panel_meta
+    from factors.evidence import load_artifact, load_policy
     fp = BASE / "output" / "factor_evaluations_full.json"
-    return json.loads(fp.read_text(encoding="utf-8")) if fp.exists() else {}
+    artifact = load_artifact(
+        fp,
+        expected_panel_meta=read_panel_meta(),
+        expected_policy=load_policy(),
+    )
+    return artifact
 
 
 def main():
-    evals = _load_evals()
+    from factors.evidence import atomic_write_json
+
+    evidence = _load_evals()
+    evals = evidence["factors"]
     if not evals:
         print("无评估数据，先跑 scripts/evaluate_all_factors.py")
         return 1
@@ -41,7 +51,10 @@ def main():
     dt = datetime.now().strftime("%Y-%m-%d")
 
     # 1) 因子档案（分年度 IC + 综合）
+    provenance = {"evidence_schema_version": evidence["artifact"]["schema_version"],
+                  "evidence_run_id": evidence["artifact"]["run_id"]}
     archive = {"ts": ts, "date": dt, "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+               **provenance,
                "factors": []}
     for name, ev in sorted(evals.items()):
         yearly = ev.get("yearly_ic") or {}
@@ -52,8 +65,7 @@ def main():
             "icir": (ev.get("ic") or {}).get("icir"),
             "ic_by_year": yearly,
         })
-    (BASE / "output" / f"因子档案_2_{ts}.json").write_text(
-        json.dumps(archive, ensure_ascii=False, indent=1), encoding="utf-8")
+    atomic_write_json(BASE / "output" / f"因子档案_2_{ts}.json", archive)
 
     # 2) 市场拥挤度（全市场换手率 252 日分位）
     from factors.alpha_panel import _load_price_panels
@@ -66,14 +78,13 @@ def main():
     # 拥挤股票 = 换手率 > 90 分位
     thr = turn.iloc[-1].quantile(0.90)
     n_crowded = int((turn.iloc[-1] > thr).sum())
-    crowd = {"date": dt, "crowding_mkt": round(cur, 4), "crowding_pctile_252": pctile,
+    crowd = {"date": dt, **provenance, "crowding_mkt": round(cur, 4), "crowding_pctile_252": pctile,
              "zone": zone, "n_crowded_stocks": n_crowded,
              "note": "本地重建：全市场换手率 252 日分位（外包因子池口径替代）"}
-    (BASE / "report" / f"factor_crowding_{ts}.json").write_text(
-        json.dumps(crowd, ensure_ascii=False, indent=1), encoding="utf-8")
+    atomic_write_json(BASE / "report" / f"factor_crowding_{ts}.json", crowd)
 
     # 3) EP-ICIR（估值因子族滚动 ICIR——bp 等月度 ICIR）
-    ep = {"ts": ts, "date": dt, "factors": []}
+    ep = {"ts": ts, "date": dt, **provenance, "factors": []}
     for name in ("bp", "asset_growth", "accruals", "sue", "roe", "fscore"):
         ev = evals.get(name)
         if not ev:
@@ -82,11 +93,10 @@ def main():
         ep["factors"].append({"factor": name, "icir": ic.get("icir"),
                               "ic_mean": ic.get("rank_ic_mean"),
                               "verdict": (ev.get("scorecard") or {}).get("verdict")})
-    (BASE / "report" / f"ep_icir_full_{ts}.json").write_text(
-        json.dumps(ep, ensure_ascii=False, indent=1), encoding="utf-8")
+    atomic_write_json(BASE / "report" / f"ep_icir_full_{ts}.json", ep)
 
     # 4) 基本面因子报告
-    fund = {"ts": ts, "date": dt, "factors": []}
+    fund = {"ts": ts, "date": dt, **provenance, "factors": []}
     for name in ("sue", "roe", "accruals", "fscore", "bp", "asset_growth"):
         ev = evals.get(name)
         if not ev:
@@ -98,11 +108,10 @@ def main():
                                 "t": layer.get("ls_t"),
                                 "monotonicity": layer.get("monotonicity"),
                                 "verdict": (ev.get("scorecard") or {}).get("verdict")})
-    (BASE / "report" / f"fundamental_factor_report_{ts}.json").write_text(
-        json.dumps(fund, ensure_ascii=False, indent=1), encoding="utf-8")
+    atomic_write_json(BASE / "report" / f"fundamental_factor_report_{ts}.json", fund)
 
     # 5) 技术因子裁决（全部因子 verdict 汇总）
-    verdict = {"ts": ts, "date": dt, "factors": []}
+    verdict = {"ts": ts, "date": dt, **provenance, "factors": []}
     for name, ev in sorted(evals.items()):
         verdict["factors"].append({
             "factor": name, "family": ev.get("family", ""),
@@ -110,8 +119,7 @@ def main():
             "score": (ev.get("scorecard") or {}).get("score"),
             "direction": ev.get("direction"),
         })
-    (BASE / "report" / f"factor_pool_report_verdict_{ts}.json").write_text(
-        json.dumps(verdict, ensure_ascii=False, indent=1), encoding="utf-8")
+    atomic_write_json(BASE / "report" / f"factor_pool_report_verdict_{ts}.json", verdict)
 
     print(f"✅ 5 份报告已生成（ts={ts}）")
     print(f"   output/因子档案_2_{ts}.json（{len(archive['factors'])} 因子）")
