@@ -222,6 +222,7 @@ def main() -> int:
         Step("Offline subprocess guard", (python, "-B", "validation/test_offline_guard_contract.py")),
         Step("Content/WAL evidence identity", (python, "-B", "validation/test_content_identity_contract.py")),
         Step("Shared market lifecycle contract", (python, "-B", "validation/test_market_lifecycle_contract.py")),
+        Step("Security-code continuity contract", (python, "-B", "validation/test_security_code_contract.py")),
         Step("PIT disclosure contract", (python, "-B", "validation/test_pit_contract.py")),
         Step("T+1 execution contract", (python, "-B", "validation/test_backtest_execution_contract.py")),
         Step("Config-driven backtest strategy registry", (python, "-B", "validation/test_backtest_strategy_registry.py")),

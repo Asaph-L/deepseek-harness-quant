@@ -1,0 +1,8 @@
+schema_version: dshq-security-code-changes/v1
+changes:
+  - id: avic_cac_2025
+    old_code: 300114.SZ
+    new_code: 302132.SZ
+    effective_from: "2025-02-17"
+    history_policy: canonical_code_has_full_provider_history
+    evidence_url: "https://static.cninfo.com.cn/finalpage/2025-02-07/1222485220.PDF"

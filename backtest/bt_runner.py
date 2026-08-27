@@ -27,6 +27,11 @@ sys.path.insert(0, str(BASE))
 from data.cache import DailyCache
 from data.content_identity import connect_readonly_sqlite, file_content_identity
 from data.market_lifecycle import MarketLifecycleError, parse_market_lifecycle
+from data.security_codes import (
+    canonicalize_provider_rows,
+    load_security_code_changes,
+    selected_config_path as security_code_config_path,
+)
 from backtest.execution import BacktestResult, ExecutionConfig, simulate_targets
 
 CACHE = str(BASE / "data" / "cache")  # ★2026-08-17 跨平台修复：原 r"data/cache" 仅 Windows 可用
@@ -62,6 +67,7 @@ def backtest_data_fingerprint() -> str:
         BASE / "config" / "strategies.yaml",
         BASE / "config" / "strategies.yaml.example",
         selected_factor_catalog,
+        security_code_config_path(),
     ]
     manifest = {"identity_contract": "backtest-data-content/v2"}
     for path in dict.fromkeys(paths):
@@ -88,6 +94,7 @@ def backtest_implementation_fingerprint() -> str:
         BASE / "factors" / "evidence.py",
         BASE / "data" / "content_identity.py",
         BASE / "data" / "market_lifecycle.py",
+        BASE / "data" / "security_codes.py",
         BASE / "scripts" / "evaluate_all_factors.py",
     ]
     return canonical_sha256({
@@ -385,6 +392,7 @@ def _backtest_settings():
         "limit_rules": rules,
         "verdict_thresholds": dict(backtest.get("verdict_thresholds") or {}),
         "market_lifecycle": market_lifecycle,
+        "security_code_changes": load_security_code_changes(),
     }
     return _BT_CONFIG
 
@@ -401,6 +409,12 @@ def _load_pool(stocks, start, end):
     if not rows:
         raise RuntimeError(f"hist_mv 在 {start_month}~{end_month} 无 PIT 市值数据")
     frame = pd.DataFrame(rows, columns=["month", "code", "circ_mv"])
+    frame = canonicalize_provider_rows(
+        frame,
+        key_columns=["month"],
+        evidence_columns=["circ_mv"],
+        contract=_backtest_settings()["security_code_changes"],
+    )
     frame["month_end"] = pd.PeriodIndex(frame["month"], freq="M").to_timestamp("M")
     by_month = {}
     union = set()
@@ -807,6 +821,9 @@ def _period_backtest(panel, universe, score, topn, start, end, rebalance="M"):
             "pre_effective_excluded_pairs": lifecycle_evidence[
                 "pre_effective_excluded_pairs"
             ],
+            "security_code_changes": _backtest_settings()[
+                "security_code_changes"
+            ].evidence(),
         }
     )
     result.execution_metadata["market_lifecycle"] = lifecycle_evidence

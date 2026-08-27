@@ -33,6 +33,11 @@ import numpy as np
 import pandas as pd
 
 from data.content_identity import connect_readonly_sqlite, file_content_identity
+from data.security_codes import (
+    canonicalize_provider_rows,
+    load_security_code_changes,
+    selected_config_path as security_code_config_path,
+)
 
 BASE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE))
@@ -65,6 +70,11 @@ def _sqlite_tables(con: sqlite3.Connection) -> set[str]:
         str(row[0])
         for row in con.execute("SELECT name FROM sqlite_master WHERE type='table'")
     }
+
+
+def _canonical_code6_series(values: pd.Series) -> pd.Series:
+    contract = load_security_code_changes()
+    return values.map(contract.canonical_code6)
 
 
 def _load_lhb() -> dict:
@@ -130,7 +140,7 @@ def _load_lhb() -> dict:
     values = {}
     for name, frame in (("cnt", tl), ("jg", ti)):
         frame = frame.copy()
-        frame["code6"] = frame["ts_code"].astype(str).str[:6]
+        frame["code6"] = _canonical_code6_series(frame["ts_code"])
         frame = frame[
             frame["trade_date"].isin(event_dates)
             & frame["code6"].str.fullmatch(r"\d{6}")
@@ -219,7 +229,7 @@ def _load_shebao() -> pd.DataFrame:
 
     coverage["ann"] = pd.to_datetime(coverage["ann_date"], errors="coerce")
     coverage["end"] = pd.to_datetime(coverage["end_date"], errors="coerce")
-    coverage["code6"] = coverage["ts_code"].astype(str).str[:6]
+    coverage["code6"] = _canonical_code6_series(coverage["ts_code"])
     events = []
     if not rows.empty:
         actual_counts = rows.groupby(
@@ -260,7 +270,7 @@ def _load_shebao() -> pd.DataFrame:
             how="inner",
             validate="many_to_one",
         )
-        rows["code6"] = rows["ts_code"].astype(str).str[:6]
+        rows["code6"] = _canonical_code6_series(rows["ts_code"])
         rows["ann"] = pd.to_datetime(rows["ann_date"], errors="coerce")
         rows["end"] = pd.to_datetime(rows["end_date"], errors="coerce")
         rows = rows[
@@ -311,7 +321,7 @@ def _asof_event_panel(data: pd.DataFrame, value_col: str, P) -> pd.DataFrame:
         return out
     events = data.copy()
     if "code6" not in events and "ts_code" in events:
-        events["code6"] = events["ts_code"].astype(str).str[:6]
+        events["code6"] = _canonical_code6_series(events["ts_code"])
     if "ann" not in events and "ann_date" in events:
         events["ann"] = pd.to_datetime(events["ann_date"], errors="coerce")
     events[value_col] = pd.to_numeric(events[value_col], errors="coerce")
@@ -399,7 +409,7 @@ def _load_gdhs() -> dict:
     if not rows.empty:
         rows["ann"] = pd.to_datetime(rows["ann_date"], errors="coerce")
         rows["end"] = pd.to_datetime(rows["end_date"], errors="coerce")
-        rows["code6"] = rows["ts_code"].astype(str).str[:6]
+        rows["code6"] = _canonical_code6_series(rows["ts_code"])
         rows["chg_pct"] = pd.to_numeric(rows["chg_pct"], errors="coerce")
         rows = rows[
             rows["ann"].isin(set(known_dates))
@@ -509,6 +519,11 @@ def _pivot(df: pd.DataFrame, col: str) -> pd.DataFrame:
 def _load_price_panels(start: str = DEFAULT_START, end: str = None) -> dict:
     """价量面板集 {open/high/low/close/volume/amount/turn/pct_chg: date×code}"""
     df = _read_bars(start, end)
+    df = canonicalize_provider_rows(
+        df,
+        key_columns=["date"],
+        evidence_columns=["volume", "amount", "turn", "pct_chg"],
+    )
     out = {c: _pivot(df, c) for c in
            ("open", "high", "low", "close", "volume", "amount", "turn", "pct_chg")}
     return out
@@ -540,7 +555,8 @@ def _load_finance_pit(start: str = DEFAULT_START) -> pd.DataFrame:
         return pd.DataFrame(
             columns=["date", "code6", "sue", "roe", "asset_growth", "bp", "accruals", "fscore"]
         )
-    fs["code6"] = fs["code"].astype(str).str[:6]
+    security_codes = load_security_code_changes()
+    fs["code6"] = fs["code"].map(security_codes.canonical_code6)
     fs["ann"] = pd.to_datetime(fs["ann_date"], errors="coerce")
     fs["end"] = pd.to_datetime(fs["end_date"], errors="coerce")
     numeric = [
@@ -1039,6 +1055,7 @@ def panel_builder_fingerprint() -> dict:
         BASE / "factors" / "catalog.py",
         BASE / "data" / "cache.py",
         BASE / "data" / "content_identity.py",
+        BASE / "data" / "security_codes.py",
     ]
     files = {path.relative_to(BASE).as_posix(): _sha256(path) for path in paths}
     return {
@@ -1054,7 +1071,10 @@ def panel_source_fingerprints() -> dict:
         "identity_contract": "panel-source-content/v2",
         "factor_catalog": catalog_identity(),
     }
-    paths = [*_material_bar_paths(), FIN_TS_DB, BASIC_DB, LHB_DB, SHEBAO_DB, GDHS_DB]
+    paths = [
+        *_material_bar_paths(), FIN_TS_DB, BASIC_DB, LHB_DB, SHEBAO_DB, GDHS_DB,
+        security_code_config_path(),
+    ]
     for path in dict.fromkeys(paths):
         try:
             key = path.resolve().relative_to(BASE.resolve()).as_posix()

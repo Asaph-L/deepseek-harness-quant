@@ -31,6 +31,7 @@
 | A20 | **新浪实时快照（akshare stock_zh_a_spot）**：代码格式 `sh600519/sz300750/bj920000`；涨停不能用 `chg>=9.8` 一刀切（ST 5%/创业板科创 20%/北交所 30%），需按昨收×板块上限算涨停价；"成交额"单位=元。 |
 | A21 | **stock_basic.industry 是纯中文行业名（110 类）**，无"代码+名称"结构；`ind[:3]/ind[3:]` 切分会把"IT设备"切成 code="IT设"/name="备"。 |
 | A22 | **今天的交易所后缀不是历史市场资格**：Tushare 会把部分历史新三板/精选层行情映射成当前 `.BJ` 代码；仅按 `ipo_date/out_date` 会把北交所 2021-11-15 开市前记录误纳入正式回测。唯一口径是 `config/params.yaml:market_lifecycle`；匹配 `.BJ` 且早于生效日的 pair 必须从 eligibility 排除，ST 只能记 `not_applicable_preserve_source` 并保留冻结快照原值，不能把 Baostock 不支持 BJ 或 `namechange` 空表解释成非 ST。 |
+| A23 | **证券换码会制造重复资产**：同一上市主体从旧代码切换到新代码后，provider 可能同时保留旧代码截止历史，并把完整历史回填到新代码；直接给旧代码补 `stock_basic` 会让横截面和 TopN 把同一资产算两次。必须由 `config/security_code_changes.yaml` 声明 old/new/effective date，验证重叠成交与市值证据一致后只保留 canonical code；合同配置与实现哈希必须进入 panel 和正式回测身份。 |
 
 ## B. 回测与评估
 
